@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Material {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  title        String
+  filePath     String
+  fileFormat   String?
+  sampleRate   Int?
+  bitDepth     Int?
+  recordedAt   DateTime
+  latitude     Float?
+  longitude    Float?
+  locationName String?
+  memo         String?     @db.Text
+  rating       Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  projects     Project[]   @relation("MaterialProjects")
+  tags         Tag[]       @relation("MaterialTags")
+  equipments   Equipment[] @relation("MaterialEquipments")
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  description String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  materials   Material[] @relation("MaterialProjects")
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  materials Material[] @relation("MaterialTags")
+}
+
+model Equipment {
+  id           String     @id @default(cuid())
+  name         String
+  type         String
+  manufacturer String?
+  memo         String?    @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  materials    Material[] @relation("MaterialEquipments")
+}
