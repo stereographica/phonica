@@ -10,7 +10,7 @@ const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/materials', icon: ListMusic, label: 'Materials' },
   { href: '/projects', icon: Folder, label: 'Projects' },
-  { href: '/master', icon: Settings, label: 'Master Data' },
+  { href: '/master/equipment', icon: Settings, label: 'Master Data' },
 ];
 
 interface SidebarProps {
