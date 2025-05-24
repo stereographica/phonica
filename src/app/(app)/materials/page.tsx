@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Table,
@@ -17,58 +18,64 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Eye } from 'lucide-react';
+import { MaterialDetailModal } from '@/components/materials/MaterialDetailModal';
 
-// ダミーデータ型
+// 表示用の素材データの型 (Prismaの型とは異なる場合がある)
+// Prisma の Material モデルに合わせて調整
 interface Material {
   id: string;
   title: string;
-  recordedAt: string;
-  fileFormat: string;
-  sampleRate: number;
-  bitDepth: number;
-  tags: string[];
-  rating: number | null;
+  description: string | null;
+  recordedDate: Date; // PrismaからはDate型で取得される
+  categoryName: string | null; // category テーブルとのリレーションを想定
+  tags: { name: string }[]; // tags テーブルとのリレーションを想定 (多対多)
+  filePath: string;
+  // 必要に応じて他のフィールドを追加 (例: waveformData, durationSeconds)
 }
 
-// ダミーデータ
-const dummyMaterials: Material[] = [
-  {
-    id: '1',
-    title: '公園の鳥の声',
-    recordedAt: '2024-05-01',
-    fileFormat: 'WAV',
-    sampleRate: 48000,
-    bitDepth: 24,
-    tags: ['自然音', '鳥'],
-    rating: 4,
-  },
-  {
-    id: '2',
-    title: '駅の雑踏',
-    recordedAt: '2024-05-10',
-    fileFormat: 'MP3',
-    sampleRate: 44100,
-    bitDepth: 16,
-    tags: ['都市音', '雑踏'],
-    rating: null,
-  },
-  {
-    id: '3',
-    title: '静かな雨音',
-    recordedAt: '2024-04-20',
-    fileFormat: 'WAV',
-    sampleRate: 96000,
-    bitDepth: 24,
-    tags: ['自然音', '雨'],
-    rating: 5,
-  },
-];
-
 export default function MaterialsPage() {
-  // TODO: 将来的にはServer ActionやAPIからデータを取得
-  const materials = dummyMaterials;
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    async function fetchMaterials() {
+      setIsLoading(true);
+      try {
+        // 本来は try-catch やエラーハンドリングをしっかり行う
+        // ここでは /api/materials から取得する想定 (APIルートは別途作成)
+        const response = await fetch('/api/materials');
+        if (!response.ok) {
+          throw new Error('Failed to fetch materials');
+        }
+        const data: Material[] = await response.json();
+        setMaterials(data);
+      } catch (error) {
+        console.error(error);
+        // TODO: エラー表示処理
+      }
+      setIsLoading(false);
+    }
+    fetchMaterials();
+  }, []);
+
+  const openModal = (material: Material) => {
+    setSelectedMaterial(material);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedMaterial(null);
+  };
+
+  if (isLoading) {
+    return <div>Loading materials...</div>; // 簡単なローディング表示
+  }
 
   return (
     <div className="space-y-6">
@@ -93,11 +100,9 @@ export default function MaterialsPage() {
                 <Checkbox /> {/* TODO: ヘッダーチェックボックスの全選択機能 */}
               </TableHead>
               <TableHead>Title</TableHead>
-              <TableHead>Recorded At</TableHead>
-              <TableHead>Format</TableHead>
-              <TableHead>Rate/Depth</TableHead>
+              <TableHead>Category</TableHead>
               <TableHead>Tags</TableHead>
-              <TableHead>Rating</TableHead>
+              <TableHead className="hidden md:table-cell">Recorded Date</TableHead>
               <TableHead className="w-[50px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -108,20 +113,27 @@ export default function MaterialsPage() {
                   <Checkbox />
                 </TableCell>
                 <TableCell className="font-medium">{material.title}</TableCell>
-                <TableCell>{material.recordedAt}</TableCell>
-                <TableCell>{material.fileFormat}</TableCell>
+                <TableCell>{material.categoryName || 'N/A'}</TableCell>
                 <TableCell>
-                  {material.sampleRate / 1000}kHz / {material.bitDepth}bit
+                  <div className="flex flex-wrap gap-1">
+                    {material.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag.name}
+                        className="px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded-full"
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                    {material.tags.length > 2 && (
+                      <span className="text-xs text-muted-foreground">
+                        +{material.tags.length - 2} more
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell>
-                  {material.tags.map((tag) => (
-                    // TODO: タグの表示をBadgeコンポーネントなどを使って見栄え良くする
-                    <span key={tag} className="mr-1 text-xs p-1 bg-muted rounded">
-                      {tag}
-                    </span>
-                  ))}
+                <TableCell className="hidden md:table-cell">
+                  {new Date(material.recordedDate).toLocaleDateString()}
                 </TableCell>
-                <TableCell>{material.rating ? '★'.repeat(material.rating) : '-'}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -131,7 +143,10 @@ export default function MaterialsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Details</DropdownMenuItem> {/* TODO: 詳細モーダル表示 */}
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => openModal(material)}>
+                        <Eye className="mr-2 h-4 w-4" /> View Details
+                      </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href={`/materials/${material.id}/edit`}>Edit</Link>
                       </DropdownMenuItem>
@@ -148,6 +163,20 @@ export default function MaterialsPage() {
         </Table>
       </div>
       {/* TODO: ページネーションは後で追加 */}
+
+      <MaterialDetailModal
+        material={selectedMaterial ? ({
+          id: selectedMaterial.id,
+          title: selectedMaterial.title,
+          description: selectedMaterial.description,
+          recordedDate: selectedMaterial.recordedDate.toISOString(),
+          category: selectedMaterial.categoryName || 'N/A',
+          tags: selectedMaterial.tags.map(t => t.name),
+          filePath: selectedMaterial.filePath,
+        }) : null}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+      />
     </div>
   );
 } 
