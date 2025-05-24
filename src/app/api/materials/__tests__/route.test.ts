@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { GET, POST } from '@/app/api/materials/route';
 import { prismaMock } from '../../../../../jest.setup'; // モックされたPrisma Clientをインポート
 import { NextRequest } from 'next/server';

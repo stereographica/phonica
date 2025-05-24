@@ -1,163 +1,213 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import type { Equipment } from '@prisma/client';
 
-// 機材データの型 (Prismaのスキーマに合わせる想定)
-interface Equipment {
-  id?: string | undefined; // string | undefined に変更
-  name: string;
-  maker: string;
-  model: string | null;
-  serialNumber: string | null;
-  notes: string | null;
-}
+const equipmentFormSchema = z.object({
+  name: z.string().min(1, { message: "Name is required." }),
+  type: z.string().min(1, { message: "Type is required." }),
+  manufacturer: z.string().nullable().optional(),
+  memo: z.string().nullable().optional(),
+});
+
+export type EquipmentFormData = z.infer<typeof equipmentFormSchema>;
 
 interface EquipmentFormModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: Equipment) => void;
+  onOpenChange: (isOpen: boolean) => void;
   initialData?: Equipment | null;
+  onSuccess?: () => void;
 }
 
 export function EquipmentFormModal({
   isOpen,
-  onClose,
-  onSubmit,
+  onOpenChange,
   initialData,
+  onSuccess,
 }: EquipmentFormModalProps) {
-  const [name, setName] = useState('');
-  const [maker, setMaker] = useState('');
-  const [model, setModel] = useState('');
-  const [serialNumber, setSerialNumber] = useState('');
-  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const isEditing = !!initialData;
+  const isEditMode = !!initialData;
+
+  const form = useForm<EquipmentFormData>({
+    resolver: zodResolver(equipmentFormSchema),
+    defaultValues: {
+      name: '',
+      type: '',
+      manufacturer: '',
+      memo: '',
+    },
+  });
 
   useEffect(() => {
-    if (initialData) {
-      setName(initialData.name || '');
-      setMaker(initialData.maker || '');
-      setModel(initialData.model || '');
-      setSerialNumber(initialData.serialNumber || '');
-      setNotes(initialData.notes || '');
-    } else {
-      // 新規作成時はフォームをクリア
-      setName('');
-      setMaker('');
-      setModel('');
-      setSerialNumber('');
-      setNotes('');
+    if (isOpen) {
+      if (isEditMode && initialData) {
+        form.reset({
+          name: initialData.name || '',
+          type: initialData.type || '',
+          manufacturer: initialData.manufacturer || '',
+          memo: initialData.memo || '',
+        });
+      } else {
+        form.reset({
+          name: '',
+          type: '',
+          manufacturer: '',
+          memo: '',
+        });
+      }
+      setError(null);
+      form.clearErrors();
     }
-  }, [initialData, isOpen]); // isOpen も依存配列に追加し、モーダルが開くたびに初期化
+  }, [isOpen, isEditMode, initialData, form]);
 
-  const handleSubmit = () => {
-    const equipmentData: Equipment = {
-      name,
-      maker,
-      model: model || null,
-      serialNumber: serialNumber || null,
-      notes: notes || null,
+  const onSubmit = async (data: EquipmentFormData) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    const equipmentData = {
+      name: data.name,
+      type: data.type,
+      manufacturer: data.manufacturer || null,
+      memo: data.memo || null,
     };
-    if (isEditing && initialData?.id) {
-      equipmentData.id = initialData.id;
+
+    const url = isEditMode && initialData ? `/api/master/equipment/${initialData.id}` : '/api/master/equipment';
+    const method = isEditMode ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(equipmentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
+      onOpenChange(false);
+    } catch (err: unknown) {
+      console.error('Failed to save equipment:', err);
+      if (err instanceof Error) {
+        setError(err.message || 'An unknown error occurred.');
+      } else {
+        setError('An unknown error occurred.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    onSubmit(equipmentData);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Equipment' : 'Add New Equipment'}</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Equipment' : 'Add New Equipment'}</DialogTitle>
           <DialogDescription>
-            {isEditing
-              ? 'Update the details of the equipment.'
-              : 'Enter the details for the new equipment.'}
+            {isEditMode
+              ? "Update the details of the equipment."
+              : "Add a new piece of equipment to your inventory."}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Name
-            </Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
-              placeholder="e.g., Microphone XYZ"
+        {error && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            {error}
+          </p>
+        )}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem className="grid grid-cols-4 items-center gap-4">
+                  <FormLabel className="text-right">Name</FormLabel>
+                  <FormControl className="col-span-3">
+                    <Input placeholder="Equipment name" {...field} />
+                  </FormControl>
+                  <FormMessage className="col-span-4 text-right" />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="maker" className="text-right">
-              Maker
-            </Label>
-            <Input
-              id="maker"
-              value={maker}
-              onChange={(e) => setMaker(e.target.value)}
-              className="col-span-3"
-              placeholder="e.g., Audio-Technica"
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem className="grid grid-cols-4 items-center gap-4">
+                  <FormLabel className="text-right">Type</FormLabel>
+                  <FormControl className="col-span-3">
+                    <Input placeholder="e.g., Recorder, Microphone" {...field} />
+                  </FormControl>
+                  <FormMessage className="col-span-4 text-right" />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="model" className="text-right">
-              Model
-            </Label>
-            <Input
-              id="model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="col-span-3"
-              placeholder="e.g., AT2020"
+            <FormField
+              control={form.control}
+              name="manufacturer"
+              render={({ field }) => (
+                <FormItem className="grid grid-cols-4 items-center gap-4">
+                  <FormLabel className="text-right">Manufacturer</FormLabel>
+                  <FormControl className="col-span-3">
+                    <Input placeholder="e.g., Zoom, Sennheiser" {...field} value={field.value || ''} />
+                  </FormControl>
+                  <FormMessage className="col-span-4 text-right" />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="serialNumber" className="text-right">
-              Serial No.
-            </Label>
-            <Input
-              id="serialNumber"
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-              className="col-span-3"
+            <FormField
+              control={form.control}
+              name="memo"
+              render={({ field }) => (
+                <FormItem className="grid grid-cols-4 items-center gap-4">
+                  <FormLabel className="text-right">Memo</FormLabel>
+                  <FormControl className="col-span-3">
+                    <Textarea placeholder="Any notes about the equipment" {...field} value={field.value || ''} rows={3} />
+                  </FormControl>
+                  <FormMessage className="col-span-4 text-right" />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="notes" className="text-right">
-              Notes
-            </Label>
-            <Input // TODO: Textarea に変更するかも
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="col-span-3"
-              placeholder="Any additional notes"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button type="button" onClick={handleSubmit}>
-            {isEditing ? 'Save Changes' : 'Create Equipment'}
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
+                {isSubmitting ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Add Equipment')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
