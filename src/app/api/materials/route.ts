@@ -1,38 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+import type { Prisma } from '@prisma/client'; // Prismaの型をインポート
+
+// クエリパラメータのバリデーションスキーマ
+const GetMaterialsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  sortBy: z.string().optional().default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+  title: z.string().optional(), // タイトルによるフィルタリング
+  tag: z.string().optional(), // 特定のタグ名によるフィルタリング
+  // 必要に応じて他のフィルター条件を追加 (例: fileFormat, recordedAtRangeなど)
+});
 
 // eslint-disable-next-line no-unused-vars
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const queryParams = Object.fromEntries(searchParams);
+
+    const validationResult = GetMaterialsQuerySchema.safeParse(queryParams);
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: "Invalid query parameters", details: validationResult.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { page, limit, sortBy, sortOrder, title, tag } = validationResult.data;
+
+    const skip = (page - 1) * limit;
+
+    // Prismaの検索条件を構築
+    const where: Prisma.MaterialWhereInput = {}; // 型を Prisma.MaterialWhereInput に変更
+    if (title) {
+      where.title = {
+        contains: title,
+        mode: 'insensitive', // 大文字・小文字を区別しない
+      };
+    }
+    if (tag) {
+      where.tags = {
+        some: {
+          name: tag,
+        },
+      };
+    }
+
+    // Prismaのソート条件を構築
+    const orderBy: Prisma.MaterialOrderByWithRelationInput = {}; // 型を Prisma.MaterialOrderByWithRelationInput に変更
+    // 許可するソートキーを定義 (セキュリティのため)
+    const allowedSortKeys: Array<keyof Prisma.MaterialOrderByWithRelationInput> = [
+        'title', 'createdAt', 'recordedAt', 'rating', 'fileFormat', 'sampleRate', 'bitDepth'
+    ];
+    
+    if (allowedSortKeys.includes(sortBy as keyof Prisma.MaterialOrderByWithRelationInput)) {
+        orderBy[sortBy as keyof Prisma.MaterialOrderByWithRelationInput] = sortOrder;
+    } else {
+        orderBy['createdAt'] = sortOrder; // デフォルトはcreatedAtでソート
+    }
+
+
     const materials = await prisma.material.findMany({
+      where,
+      skip,
+      take: limit,
       include: {
-        tags: true, // Tag リレーションをインクルード (Categoryはスキーマにないので削除)
-        // equipments: true, // 必要であれば機材情報も
+        tags: true,
+        equipments: true, // 機材情報も取得
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy,
     });
 
+    const totalMaterials = await prisma.material.count({ where });
+    const totalPages = Math.ceil(totalMaterials / limit);
+
+    // APIレスポンスの形式を調整 (現状のテストに合わせて一部フィールド名を変更)
     const formattedMaterials = materials.map((material) => ({
       id: material.id,
       title: material.title,
-      description: material.memo,       // description -> memo
-      recordedDate: material.recordedAt,  // recordedDate -> recordedAt
-      categoryName: null,               // categoryName は一旦 null (スキーマにないので)
-      tags: material.tags.map(tag => ({ name: tag.name })), // tags は直接マッピング
       filePath: material.filePath,
-      // スキーマに存在する他のフィールドも必要に応じて追加
-      // fileFormat: material.fileFormat,
-      // sampleRate: material.sampleRate,
-      // bitDepth: material.bitDepth,
-      // latitude: material.latitude,
-      // longitude: material.longitude,
-      // locationName: material.locationName,
-      // rating: material.rating,
+      recordedAt: material.recordedAt,
+      memo: material.memo, // description から memo に合わせる
+      tags: material.tags.map(t => ({ id: t.id, name: t.name, slug: t.slug })), // slugも追加
+      equipments: material.equipments.map(e => ({id: e.id, name: e.name, type: e.type})),
+      fileFormat: material.fileFormat,
+      sampleRate: material.sampleRate,
+      bitDepth: material.bitDepth,
+      latitude: material.latitude,
+      longitude: material.longitude,
+      locationName: material.locationName,
+      rating: material.rating,
+      createdAt: material.createdAt,
+      updatedAt: material.updatedAt,
+      slug: material.slug,
+      // categoryName はスキーマにないので削除
     }));
 
-    return NextResponse.json(formattedMaterials);
+
+    return NextResponse.json({
+      data: formattedMaterials,
+      pagination: {
+        page,
+        limit,
+        totalPages,
+        totalItems: totalMaterials,
+      },
+    });
   } catch (error) {
     console.error("Error fetching materials:", error);
     return NextResponse.json(

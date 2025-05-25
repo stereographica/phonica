@@ -21,35 +21,153 @@ function createMockRequest(method: string, body?: any, searchParams?: URLSearchP
 
 describe('/api/materials', () => {
   describe('GET', () => {
-    it('should return a list of materials with default sorting', async () => {
-      const mockMaterials = [
-        {
-          id: 'mat1', title: 'Material 1', slug: 'mat-1', filePath: 'path/1', recordedAt: new Date(), memo: 'Memo 1', createdAt: new Date(), updatedAt: new Date(),
-          tags: [{ id: 'tag1', name: 'Nature', slug: 'nature', createdAt: new Date(), updatedAt: new Date(), materials: [] }],
-          fileFormat: null, sampleRate: null, bitDepth: null, latitude: null, longitude: null, locationName: null, rating: null, equipments: [], projects: []
-        },
-        {
-          id: 'mat2', title: 'Material 2', slug: 'mat-2', filePath: 'path/2', recordedAt: new Date(), memo: 'Memo 2', createdAt: new Date(), updatedAt: new Date(),
-          tags: [{ id: 'tag2', name: 'Urban', slug: 'urban', createdAt: new Date(), updatedAt: new Date(), materials: [] }],
-          fileFormat: null, sampleRate: null, bitDepth: null, latitude: null, longitude: null, locationName: null, rating: null, equipments: [], projects: []
-        },
-      ];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      prismaMock.material.findMany.mockResolvedValue(mockMaterials as any);
+    const baseMockMaterials = [
+      {
+        id: 'mat1', title: 'Alpha Sound', slug: 'alpha-sound', filePath: 'path/alpha.wav', recordedAt: new Date('2023-01-15T10:00:00Z'), memo: 'First sound', createdAt: new Date('2023-01-15T10:00:00Z'), updatedAt: new Date(),
+        tags: [{ id: 'tag1', name: 'Nature', slug: 'nature', createdAt: new Date(), updatedAt: new Date(), materials:[] }, { id: 'tag3', name: 'Ambient', slug: 'ambient', createdAt: new Date(), updatedAt: new Date(), materials:[] }],
+        equipments: [{id: 'eq1', name: 'Recorder A', type: 'Recorder', manufacturer: 'MakerX', memo:null, createdAt: new Date(), updatedAt: new Date()}],
+        fileFormat: 'WAV', sampleRate: 48000, bitDepth: 24, rating: 5, latitude: null, longitude: null, locationName: null, 
+      },
+      {
+        id: 'mat2', title: 'Beta Beat', slug: 'beta-beat', filePath: 'path/beta.mp3', recordedAt: new Date('2023-02-20T14:30:00Z'), memo: 'Second beat', createdAt: new Date('2023-02-20T14:30:00Z'), updatedAt: new Date(),
+        tags: [{ id: 'tag2', name: 'Urban', slug: 'urban', createdAt: new Date(), updatedAt: new Date(), materials:[] }, { id: 'tag3', name: 'Ambient', slug: 'ambient', createdAt: new Date(), updatedAt: new Date(), materials:[] }],
+        equipments: [{id: 'eq2', name: 'Mic B', type: 'Microphone', manufacturer: 'MakerY', memo:null, createdAt: new Date(), updatedAt: new Date()}],
+        fileFormat: 'MP3', sampleRate: 44100, bitDepth: 16, rating: 4, latitude: null, longitude: null, locationName: null, 
+      },
+      {
+        id: 'mat3', title: 'Gamma Groove', slug: 'gamma-groove', filePath: 'path/gamma.flac', recordedAt: new Date('2023-03-10T08:00:00Z'), memo: 'Third groove', createdAt: new Date('2023-03-10T08:00:00Z'), updatedAt: new Date(),
+        tags: [{ id: 'tag1', name: 'Nature', slug: 'nature', createdAt: new Date(), updatedAt: new Date(), materials:[] }],
+        equipments: [],
+        fileFormat: 'FLAC', sampleRate: 96000, bitDepth: 24, rating: 3, latitude: null, longitude: null, locationName: null, 
+      },
+    ];
 
+    beforeEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      prismaMock.material.findMany.mockImplementation(async (args: any) => {
+        let filteredMaterials = [...baseMockMaterials];
+        if (args.where?.title?.contains) {
+          filteredMaterials = filteredMaterials.filter(m => m.title.toLowerCase().includes(args.where.title.contains.toLowerCase()));
+        }
+        if (args.where?.tags?.some?.name) {
+          filteredMaterials = filteredMaterials.filter(m => m.tags.some(t => t.name === args.where.tags.some.name));
+        }
+        // orderBy (簡易的な実装、本番APIはPrismaが処理)
+        if (args.orderBy) {
+          const sortBy = Object.keys(args.orderBy)[0];
+          const sortOrder = args.orderBy[sortBy];
+          filteredMaterials.sort((a, b) => {
+            if (a[sortBy as keyof typeof a] < b[sortBy as keyof typeof b]) return sortOrder === 'asc' ? -1 : 1;
+            if (a[sortBy as keyof typeof a] > b[sortBy as keyof typeof b]) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        const skip = args.skip || 0;
+        const take = args.take || 10;
+        return filteredMaterials.slice(skip, skip + take);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      prismaMock.material.count.mockImplementation(async (args: any) => {
+        let filteredMaterials = [...baseMockMaterials];
+         if (args.where?.title?.contains) {
+          filteredMaterials = filteredMaterials.filter(m => m.title.toLowerCase().includes(args.where.title.contains.toLowerCase()));
+        }
+        if (args.where?.tags?.some?.name) {
+          filteredMaterials = filteredMaterials.filter(m => m.tags.some(t => t.name === args.where.tags.some.name));
+        }
+        return filteredMaterials.length;
+      });
+    });
+
+    it('should return a list of materials with default pagination and sorting', async () => {
       const request = createMockRequest('GET');
       const response = await GET(request);
       const responseBody = await response.json();
 
       expect(response.status).toBe(200);
-      expect(responseBody).toHaveLength(2);
-      expect(responseBody[0].title).toBe('Material 1');
-      expect(responseBody[0].description).toBe('Memo 1');
-      expect(responseBody[0].tags[0].name).toBe('Nature');
-      expect(prismaMock.material.findMany).toHaveBeenCalledWith({
-        include: { tags: true },
+      expect(responseBody.data).toHaveLength(3); // default limit 10, 3 items total
+      expect(responseBody.data[0].title).toBe('Gamma Groove'); // default sort createdAt desc
+      expect(responseBody.data[0].tags).toBeDefined();
+      expect(responseBody.data[0].equipments).toBeDefined();
+      expect(responseBody.pagination.page).toBe(1);
+      expect(responseBody.pagination.limit).toBe(10);
+      expect(responseBody.pagination.totalPages).toBe(1);
+      expect(responseBody.pagination.totalItems).toBe(3);
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        skip: 0,
+        take: 10,
         orderBy: { createdAt: 'desc' },
-      });
+        include: { tags: true, equipments: true },
+        where: {}
+      }));
+      expect(prismaMock.material.count).toHaveBeenCalledWith({where: {}});
+    });
+
+    it('should handle page and limit parameters', async () => {
+      const request = createMockRequest('GET', undefined, new URLSearchParams({ page: '2', limit: '1' }));
+      const response = await GET(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.data).toHaveLength(1);
+      expect(responseBody.data[0].title).toBe('Beta Beat'); // Second item by createdAt desc
+      expect(responseBody.pagination.page).toBe(2);
+      expect(responseBody.pagination.limit).toBe(1);
+      expect(responseBody.pagination.totalPages).toBe(3);
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        skip: 1,
+        take: 1,
+      }));
+    });
+
+    it('should handle sortBy and sortOrder parameters (title asc)', async () => {
+      const request = createMockRequest('GET', undefined, new URLSearchParams({ sortBy: 'title', sortOrder: 'asc' }));
+      const response = await GET(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.data).toHaveLength(3);
+      expect(responseBody.data[0].title).toBe('Alpha Sound');
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        orderBy: { title: 'asc' },
+      }));
+    });
+
+    it('should filter by title (case-insensitive)', async () => {
+      const request = createMockRequest('GET', undefined, new URLSearchParams({ title: 'alpha' }));
+      const response = await GET(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.data).toHaveLength(1);
+      expect(responseBody.data[0].title).toBe('Alpha Sound');
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { title: { contains: 'alpha', mode: 'insensitive' } },
+      }));
+    });
+
+    it('should filter by tag name', async () => {
+      const request = createMockRequest('GET', undefined, new URLSearchParams({ tag: 'Urban' }));
+      const response = await GET(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.data).toHaveLength(1);
+      expect(responseBody.data[0].title).toBe('Beta Beat');
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { tags: { some: { name: 'Urban' } } },
+      }));
+    });
+
+    it('should return 400 for invalid query parameters (e.g., page as string)', async () => {
+      const request = createMockRequest('GET', undefined, new URLSearchParams({ page: 'invalidPage' }));
+      const response = await GET(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(responseBody.error).toBe('Invalid query parameters');
+      expect(responseBody.details).toBeDefined();
     });
 
     it('should return 500 if Prisma query fails', async () => {

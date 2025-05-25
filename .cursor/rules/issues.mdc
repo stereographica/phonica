@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # 課題管理について
 
@@ -25,4 +25,4 @@ alwaysApply: false
 
 ## 課題の解決
 
-ユーザーが課題を解決するように指示した場合は、 `docs/issues.md` に記載されている未解決の項目を全て解決すること
+ユーザーが課題を解決するように指示した場合は、 指示に沿って `docs/issues.md` に記載されている未解決の項目を解決すること

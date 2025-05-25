@@ -1,20 +1,66 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, FormEvent } from 'react';
+import { useRouter, useParams } from 'next/navigation'; // useParams を追加
+import { useState, useEffect, FormEvent } from 'react'; // useEffect を追加
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-// import { Checkbox } from '@/components/ui/checkbox'; // Not used yet
-import { ArrowLeft, TagsIcon } from 'lucide-react'; // Removed unused icons
+import { ArrowLeft, TagsIcon } from 'lucide-react';
 
-export default function NewMaterialPage() {
+// 仮の素材データ型 (実際の型に合わせて調整が必要)
+interface Material {
+  id: string;
+  title: string;
+  filePath: string;
+  recordedAt?: string; // ISO string
+  memo?: string;
+  tags?: string[];
+  fileFormat?: string;
+  sampleRate?: number;
+  bitDepth?: number;
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+  rating?: number;
+  // createdAt: Date; // Prismaの型と合わせる場合はDate型
+  // updatedAt: Date;
+}
+
+// 仮のAPIレスポンス型
+interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+}
+
+// 素材取得関数を修正し、実際のfetchを使うようにする (エンドポイントは仮)
+async function fetchMaterial(id: string): Promise<ApiResponse<Material>> {
+  try {
+    const response = await fetch(`/api/materials/${id}`); // 仮のGETエンドポイント
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+      return { error: errorData.error || `Failed to fetch material. Status: ${response.status}` };
+    }
+    const data = await response.json();
+    return { data: data }; // APIが { data: Material } の形式で返すことを期待
+  } catch (e) {
+    console.error(`Error in fetchMaterial for id ${id}:`, e);
+    if (e instanceof Error) {
+      return { error: e.message };
+    }
+    return { error: 'An unknown error occurred while fetching material.' };
+  }
+}
+
+export default function EditMaterialPage() {
   const router = useRouter();
+  const params = useParams();
+  const materialId = params.id as string;
+
   const [title, setTitle] = useState('');
   const [filePath, setFilePath] = useState('');
-  const [recordedAt, setRecordedAt] = useState('');
+  const [recordedAt, setRecordedAt] = useState(''); // datetime-local用の文字列
   const [memo, setMemo] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [fileFormat, setFileFormat] = useState('');
@@ -26,7 +72,61 @@ export default function NewMaterialPage() {
   const [rating, setRating] = useState<number | string>('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (materialId) {
+      const loadMaterial = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const response = await fetchMaterial(materialId);
+          if (response.error || !response.data) {
+            setError(response.error || 'Failed to load material.');
+            setIsLoading(false);
+            return;
+          }
+          const material = response.data;
+          setTitle(material.title || '');
+          setFilePath(material.filePath || '');
+          // recordedAt は datetime-local のフォーマットに変換する必要がある
+          if (material.recordedAt) {
+            const date = new Date(material.recordedAt);
+            // タイムゾーンオフセットを考慮してフォーマット
+            const year = date.getFullYear();
+            const month = (`0${date.getMonth() + 1}`).slice(-2);
+            const day = (`0${date.getDate()}`).slice(-2);
+            const hours = (`0${date.getHours()}`).slice(-2);
+            const minutes = (`0${date.getMinutes()}`).slice(-2);
+            setRecordedAt(`${year}-${month}-${day}T${hours}:${minutes}`);
+          } else {
+            setRecordedAt('');
+          }
+          setMemo(material.memo || '');
+          setTagsInput(material.tags?.join(', ') || '');
+          setFileFormat(material.fileFormat || '');
+          setSampleRate(material.sampleRate?.toString() || '');
+          setBitDepth(material.bitDepth?.toString() || '');
+          setLatitude(material.latitude?.toString() || '');
+          setLongitude(material.longitude?.toString() || '');
+          setLocationName(material.locationName || '');
+          setRating(material.rating?.toString() || '');
+
+        } catch (e: unknown) {
+          console.error('Error loading material:', e);
+          if (e instanceof Error) {
+            setError(e.message);
+          } else {
+            setError('An unknown error occurred while loading data.');
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadMaterial();
+    }
+  }, [materialId]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,14 +147,13 @@ export default function NewMaterialPage() {
         recordedAtISO = new Date(recordedAt).toISOString();
       }
     } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      console.error('Error parsing recordedAt in handleSubmit catch block:', (e as Error).message);
+      console.error('Error parsing recordedAt:', e);
       setError('Invalid date format for Recorded At.');
       setIsSubmitting(false);
       return;
     }
 
-    const materialData = {
+    const materialDataToUpdate = {
       title,
       filePath,
       recordedAt: recordedAtISO,
@@ -70,12 +169,13 @@ export default function NewMaterialPage() {
     };
 
     try {
-      const response = await fetch('/api/materials', {
-        method: 'POST',
+      // APIエンドポイントは /api/materials/[id] のような形を想定
+      const response = await fetch(`/api/materials/${materialId}`, {
+        method: 'PUT', // または PATCH
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(materialData),
+        body: JSON.stringify(materialDataToUpdate),
       });
 
       if (!response.ok) {
@@ -83,17 +183,24 @@ export default function NewMaterialPage() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      alert('Material saved successfully!');
+      alert('Material updated successfully!');
       router.push('/materials');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error('Failed to save material:', err);
-      setError(err.message || 'An unknown error occurred.');
+    } catch (err: unknown) {
+      console.error('Failed to update material:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return <p>Loading material data...</p>; // 簡単なローディング表示
+  }
 
   return (
     <div className="space-y-6">
@@ -103,7 +210,7 @@ export default function NewMaterialPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-2xl font-semibold">New Material</h1>
+        <h1 className="text-2xl font-semibold">Edit Material (ID: {materialId})</h1>
       </div>
 
       {error && (
@@ -112,7 +219,7 @@ export default function NewMaterialPage() {
         </p>
       )}
 
-      <form data-testid="new-material-form" onSubmit={handleSubmit} className="space-y-8 md:max-w-3xl">
+      <form data-testid="edit-material-form" onSubmit={handleSubmit} className="space-y-8 md:max-w-3xl">
         {/* Section 1: File "Path" Input (Manual) */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Audio File Path</h2>
@@ -235,14 +342,14 @@ export default function NewMaterialPage() {
         {/* Action Buttons */}
         <div className="flex justify-end gap-2 pt-4">
           <Link href="/materials" passHref>
-            <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting || isLoading}>Cancel</Button>
           </Link>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Material'}
+          <Button type="submit" disabled={isSubmitting || isLoading}>
+            {isSubmitting ? 'Updating...' : 'Update Material'}
           </Button>
         </div>
       </form>
     </div>
   );
 } 
-
+ 

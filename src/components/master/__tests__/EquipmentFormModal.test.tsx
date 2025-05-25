@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EquipmentFormModal } from '../EquipmentFormModal'; // EquipmentFormData は不要なので削除
 import type { Equipment } from '@prisma/client';
@@ -65,6 +65,9 @@ describe('EquipmentFormModal', () => {
 
   // 3. バリデーションエラー (Name と Type が必須)
   it('shows validation errors if required fields are empty on submit', async () => {
+    const mockOnOpenChange = jest.fn();
+    const mockOnSuccess = jest.fn();
+    
     render(
       <EquipmentFormModal
         isOpen={true}
@@ -74,11 +77,30 @@ describe('EquipmentFormModal', () => {
     );
 
     const addButton = screen.getByText('Add Equipment');
-    fireEvent.submit(addButton); // handleSubmit を直接呼び出す代わりに submit イベントを発火
+    // 初期状態では isValid が false のためボタンは disabled であることを確認
+    await waitFor(() => {
+      expect(addButton).toBeDisabled(); 
+    });
 
-    // react-hook-formの非同期バリデーション完了を待つ
-    expect(await screen.findByText('Name is required.')).toBeInTheDocument();
-    expect(await screen.findByText('Type is required.')).toBeInTheDocument();
+    // disabled のボタンに対して submit イベントは発火しないため、ここではユーザーがクリックするシナリオを模倣
+    // ただし、react-hook-form の handleSubmit はフォーム要素の submit イベントでトリガーされる
+    // fireEvent.click(addButton); // これだと submit が呼ばれない場合がある
+    // フォーム自体を取得して submit する
+    const formElement = addButton.closest('form');
+    expect(formElement).not.toBeNull();
+
+    await act(async () => {
+      if (formElement) {
+        fireEvent.submit(formElement);
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Name is required.')).toBeInTheDocument();
+      expect(screen.queryByText('Type is required.')).toBeInTheDocument();
+      expect(addButton).toBeDisabled(); // バリデーションエラー後も disabled のまま
+    });
+
     expect(mockOnSuccess).not.toHaveBeenCalled();
   });
   
@@ -107,19 +129,21 @@ describe('EquipmentFormModal', () => {
 
     // APIコールとコールバックの確認
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/master/equipment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'New Name',
-          type: 'New Type',
-          manufacturer: 'New Manufacturer',
-          memo: 'New Memo',
-        }),
-      });
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });
-    await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mockOnOpenChange).toHaveBeenCalledWith(false));
+
+    // その他のアサーション
+    expect(fetch).toHaveBeenCalledWith('/api/master/equipment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'New Name',
+        type: 'New Type',
+        manufacturer: 'New Manufacturer',
+        memo: 'New Memo',
+      }),
+    });
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
   });
 
   // 5. 更新時の正常系サブミット
@@ -144,20 +168,23 @@ describe('EquipmentFormModal', () => {
     const saveButton = screen.getByText('Save Changes');
     fireEvent.click(saveButton);
 
+    // mockOnSuccessが呼ばれることを最終的な完了条件としてwaitForを1つにまとめる
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(`/api/master/equipment/${mockEquipment.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Updated Name',
-          type: mockEquipment.type,
-          manufacturer: mockEquipment.manufacturer,
-          memo: mockEquipment.memo,
-        }),
-      });
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });
-    await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mockOnOpenChange).toHaveBeenCalledWith(false));
+
+    // その他のアサーション
+    expect(fetch).toHaveBeenCalledWith(`/api/master/equipment/${mockEquipment.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Updated Name',
+        type: mockEquipment.type,
+        manufacturer: mockEquipment.manufacturer,
+        memo: mockEquipment.memo,
+      }),
+    });
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
   });
 
   // 6. APIエラー時の処理 (例: 409 Conflict - Name already exists)

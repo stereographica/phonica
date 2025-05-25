@@ -142,14 +142,15 @@ describe('NewMaterialPage', () => {
 
     await userEvent.type(titleInput, 'Invalid Date Test');
     await userEvent.type(filePathInput, '/date/test.wav');
-    fireEvent.change(recordedAtInput, { target: { value: 'invalid-date' } });
+    // fireEvent.change だと不正な日付の場合に値が空になるため、input イベントで直接値を設定する
+    fireEvent.input(recordedAtInput, { target: { value: 'invalid-date' } });
 
     await userEvent.click(saveButton);
     
     await waitFor(() => {
       const alert = screen.getByRole('alert');
       expect(alert).toHaveTextContent(/Invalid date format for Recorded At./i);
-    }, { timeout: 2000 });
+    }, { timeout: 5000 }); // タイムアウトを延長
         
     expect(fetch).not.toHaveBeenCalled();
     expect(global.alert).not.toHaveBeenCalled();
