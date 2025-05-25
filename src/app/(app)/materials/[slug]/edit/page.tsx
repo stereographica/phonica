@@ -1,19 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, FormEvent, ChangeEvent } from 'react';
+import { useRouter, useParams } from 'next/navigation'; // useParams を追加
+import { useState, FormEvent, ChangeEvent, useEffect, useCallback } from 'react'; // useEffect, useCallback を追加
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-// import { Checkbox } from '@/components/ui/checkbox'; // Not used yet
-import { ArrowLeft, TagsIcon } from 'lucide-react'; // Removed unused icons
+import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react'; // Loader2 を追加
 
-export default function NewMaterialPage() {
+// APIから返される素材データの型 (GET /api/materials/[slug] のレスポンスに合わせる)
+interface MaterialData {
+  id: string;
+  slug: string;
+  title: string;
+  recordedDate: string; // ISO String
+  memo: string | null;
+  tags: { name: string }[]; // name の配列
+  filePath: string;
+  fileFormat: string | null;
+  sampleRate: number | null;
+  bitDepth: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationName: string | null;
+  rating: number | null;
+  // 必要に応じて他のフィールドも追加
+}
+
+export default function EditMaterialPage() {
   const router = useRouter();
+  const params = useParams();
+  const slugFromParams = typeof params.slug === 'string' ? params.slug : null; // 修正: params.id -> params.slug
+
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [material, setMaterial] = useState<MaterialData | null>(null);
+
   const [title, setTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingFilePath, setExistingFilePath] = useState<string | null>(null);
   const [recordedAt, setRecordedAt] = useState('');
   const [memo, setMemo] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -28,6 +53,62 @@ export default function NewMaterialPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const formatDateForInput = (isoDate: string | null | undefined): string => {
+    if (!isoDate) return '';
+    try {
+      const date = new Date(isoDate);
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch (e) {
+      console.warn('Error formatting date for input:', e);
+      return '';
+    }
+  };
+  
+  const fetchMaterial = useCallback(async (currentSlug: string) => {
+    setInitialLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/materials/${currentSlug}`);
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to fetch material data');
+      }
+      const data: MaterialData = await response.json();
+      setMaterial(data);
+      setTitle(data.title || '');
+      setRecordedAt(formatDateForInput(data.recordedDate));
+      setMemo(data.memo || '');
+      setTagsInput(data.tags?.map(t => t.name).join(', ') || '');
+      setExistingFilePath(data.filePath || null);
+      setFileFormat(data.fileFormat || '');
+      setSampleRate(data.sampleRate?.toString() || '');
+      setBitDepth(data.bitDepth?.toString() || '');
+      setLatitude(data.latitude?.toString() || '');
+      setLongitude(data.longitude?.toString() || '');
+      setLocationName(data.locationName || '');
+      setRating(data.rating?.toString() || '');
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching data.');
+    } finally {
+      setInitialLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (slugFromParams) { // 修正: slug -> slugFromParams
+      fetchMaterial(slugFromParams); // 修正: slug -> slugFromParams
+    } else {
+      setError('Material slug is missing.');
+      setInitialLoading(false);
+    }
+  }, [slugFromParams, fetchMaterial]); // 修正: slug -> slugFromParams
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
@@ -38,60 +119,54 @@ export default function NewMaterialPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log('[handleSubmit] called');
-    console.log('[handleSubmit] recordedAt state:', recordedAt);
-    setError(null);
-
-    if (!selectedFile) {
-      setError('Please select an audio file.');
+    if (!slugFromParams) { 
+      setError('Cannot submit: Material slug is missing.');
       return;
     }
+    setIsSubmitting(true);
+    setError(null);
+
     if (!title.trim()) {
       setError('Title is required.');
+      setIsSubmitting(false);
       return;
     }
     if (!recordedAt) {
       setError('Recorded At is required.');
+      setIsSubmitting(false);
       return;
     }
-
-    let recordedAtISO;
+    
+    let recordedAtISO = '';
     try {
-      const dateObj = new Date(recordedAt);
-      if (isNaN(dateObj.getTime())) {
-        throw new Error('Invalid date string');
-      }
-      recordedAtISO = dateObj.toISOString();
+      recordedAtISO = new Date(recordedAt).toISOString();
     } catch (e) {
       console.warn(`Date parsing error: ${(e as Error).message}`);
       setError('Invalid date format for Recorded At. Please use YYYY-MM-DDTHH:MM format.');
+      setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
-
     const formData = new FormData();
-    formData.append('file', selectedFile);
     formData.append('title', title);
-    if (recordedAtISO) {
-      formData.append('recordedAt', recordedAtISO);
-    }
-    if (memo) formData.append('memo', memo);
-    if (tagsInput) formData.append('tags', tagsInput);
-    if (fileFormat) formData.append('fileFormat', fileFormat);
+    formData.append('recordedAt', recordedAtISO);
+    if (memo) formData.append('memo', memo); else formData.append('memo', '');
+    if (tagsInput) formData.append('tags', tagsInput); else formData.append('tags', '');
+    if (fileFormat) formData.append('fileFormat', fileFormat); else formData.append('fileFormat', '');
     if (sampleRate) formData.append('sampleRate', String(sampleRate));
     if (bitDepth) formData.append('bitDepth', String(bitDepth));
     if (latitude) formData.append('latitude', String(latitude));
     if (longitude) formData.append('longitude', String(longitude));
-    if (locationName) formData.append('locationName', locationName);
+    if (locationName) formData.append('locationName', locationName); else formData.append('locationName', '');
     if (rating) formData.append('rating', String(rating));
 
-    console.log('Submitting FormData:', Object.fromEntries(formData.entries())); // デバッグ用コメント解除
+    if (selectedFile) {
+      formData.append('file', selectedFile);
+    }
 
     try {
-      console.log('Calling fetch with:', '/api/materials', formData); // デバッグ用コメント解除
-      const response = await fetch('/api/materials', {
-        method: 'POST',
+      const response = await fetch(`/api/materials/${slugFromParams}`, {
+        method: 'PUT',
         body: formData,
       });
 
@@ -100,17 +175,43 @@ export default function NewMaterialPage() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      alert('Material saved successfully!');
+      alert('Material updated successfully!');
       router.push('/materials');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error('Failed to save material:', err);
-      setError(err.message || 'An unknown error occurred.');
+    } catch (err) {
+      console.error('Failed to update material:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="flex justify-center items-center h-32">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading material data...</p>
+      </div>
+    );
+  }
+  
+  if (!slugFromParams && !initialLoading) { // 修正: slug -> slugFromParams
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center gap-4">
+                <Link href="/materials" passHref>
+                    <Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+                </Link>
+                <h1 className="text-2xl font-semibold">Edit Material</h1>
+            </div>
+            <p className="text-destructive">Error: Material identifier is missing. Cannot load data.</p>
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -120,37 +221,51 @@ export default function NewMaterialPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-2xl font-semibold">New Material</h1>
+        <h1 className="text-2xl font-semibold">Edit Material {material?.title ? `\"${material.title}\"` : ''}</h1>
       </div>
 
       {error && (
-        <p role="alert" className="text-sm font-medium text-destructive">
+        <p 
+          role="alert" 
+          data-testid="error-message" 
+          className="text-sm font-medium text-destructive"
+        >
           {error}
         </p>
       )}
 
-      <form data-testid="new-material-form" onSubmit={handleSubmit} className="space-y-8 md:max-w-3xl">
-        {/* Section 1: File Input */}
+      <form data-testid="edit-material-form" onSubmit={handleSubmit} className="space-y-8 md:max-w-3xl">
+        {/* UI Sections (File, Basic Info, Metadata, Location, Details, Memo, Actions) remain largely the same as NewMaterialPage, with value props bound to state derived from fetchedMaterial */}
+        {/* File Input Section - Modified for existing file display */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Audio File</h2>
            <div className="space-y-2">
-            <Label htmlFor="audioFile">Select Audio File</Label>
+            <Label htmlFor="audioFile">Select New Audio File (Optional)</Label>
             <Input 
               id="audioFile" 
               type="file"
               accept="audio/*"
               onChange={handleFileChange}
-              required
             />
             {selectedFile && (
-              <p className="text-xs text-muted-foreground">
-                Selected file: {selectedFile.name} ({ (selectedFile.size / 1024 / 1024).toFixed(2) } MB)
+              <p data-testid="selected-file-info" className="text-xs text-muted-foreground">
+                New file selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
               </p>
+            )}
+            {!selectedFile && existingFilePath && (
+                <p className="text-xs text-muted-foreground">
+                    Current file: {existingFilePath.split('/').pop() || existingFilePath}
+                </p>
+            )}
+            {!selectedFile && !existingFilePath && (
+                <p className="text-xs text-destructive">
+                    No audio file currently associated. Please select one if needed.
+                </p>
             )}
           </div>
         </div>
 
-        {/* Section 2: Basic Information */}
+        {/* Basic Information Section */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Basic Information</h2>
           <div className="space-y-2">
@@ -175,7 +290,7 @@ export default function NewMaterialPage() {
           </div>
         </div>
 
-        {/* Section 3: Technical Metadata */}
+        {/* Technical Metadata Section */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Technical Metadata</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -194,7 +309,7 @@ export default function NewMaterialPage() {
           </div>
         </div>
         
-        {/* Section 5: Location */}
+        {/* Location Section */}
         <div className="space-y-6 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Location (Manual Input)</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
@@ -213,7 +328,7 @@ export default function NewMaterialPage() {
           </div>
         </div>
 
-        {/* Section 6: Tags & Rating */}
+        {/* Details Section (Tags & Rating) */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Details</h2>
           <div className="space-y-2">
@@ -235,7 +350,7 @@ export default function NewMaterialPage() {
           </div>
         </div>
 
-        {/* Section 7: Memo */}
+        {/* Memo Section */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Memo</h2>
           <div className="space-y-2">
@@ -254,14 +369,13 @@ export default function NewMaterialPage() {
         {/* Action Buttons */}
         <div className="flex justify-end gap-2 pt-4">
           <Link href="/materials" passHref>
-            <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting || initialLoading}>Cancel</Button>
           </Link>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Material'}
+          <Button type="submit" disabled={isSubmitting || initialLoading}>
+            {isSubmitting ? 'Updating...' : 'Update Material'}
           </Button>
         </div>
       </form>
     </div>
   );
 } 
-

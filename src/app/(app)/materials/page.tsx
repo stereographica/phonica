@@ -38,6 +38,7 @@ import { Input } from '@/components/ui/input';
 // Prisma の Material モデルに合わせて調整
 interface Material {
   id: string;
+  slug: string;
   title: string;
   description: string | null;
   recordedDate: Date; // PrismaからはDate型で取得される
@@ -183,6 +184,16 @@ const MaterialsPage: React.FC = () => {
     // fetchMaterials will be called by the useEffect watching titleFilter and tagFilter
   };
 
+  const handleViewDetails = (material: Material) => {
+    setSelectedMaterial(material);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedMaterial(null);
+  };
+
   // Render functions for pagination (simplified for brevity, shadcn/ui has more robust components)
   const renderPagination = () => {
     if (totalPages <= 1) return null;
@@ -246,16 +257,6 @@ const MaterialsPage: React.FC = () => {
         </PaginationContent>
       </Pagination>
     );
-  };
-
-  const openModal = (material: Material) => {
-    setSelectedMaterial(material);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedMaterial(null);
   };
 
   if (isLoading) {
@@ -339,9 +340,7 @@ const MaterialsPage: React.FC = () => {
               materials.map((material) => (
                 <TableRow key={material.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/materials/${material.id}`} className="hover:underline">
-                      {material.title}
-                    </Link>
+                    {material.title}
                   </TableCell>
                   <TableCell>{new Date(material.recordedDate).toLocaleDateString()}</TableCell>
                   <TableCell>
@@ -371,11 +370,12 @@ const MaterialsPage: React.FC = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => openModal(material)}>
-                          <Eye className="mr-2 h-4 w-4" /> View Details
+                        <DropdownMenuItem onClick={() => handleViewDetails(material)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link href={`/materials/${material.id}/edit`}>Edit</Link>
+                          <Link href={`/materials/${material.slug}/edit`}>Edit</Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive">
@@ -401,19 +401,13 @@ const MaterialsPage: React.FC = () => {
         {renderPagination()}
       </div>
 
-      <MaterialDetailModal
-        material={selectedMaterial ? ({
-          id: selectedMaterial.id,
-          title: selectedMaterial.title,
-          description: selectedMaterial.description,
-          recordedDate: selectedMaterial.recordedDate.toISOString(),
-          category: selectedMaterial.categoryName || 'N/A',
-          tags: selectedMaterial.tags.map(t => t.name),
-          filePath: selectedMaterial.filePath,
-        }) : null}
-        isOpen={isModalOpen}
-        onClose={closeModal}
-      />
+      {isModalOpen && selectedMaterial && (
+        <MaterialDetailModal
+          materialSlug={selectedMaterial.slug}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 };

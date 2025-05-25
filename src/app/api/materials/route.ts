@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client'; // Prismaの型をインポート
+import { v4 as uuidv4 } from 'uuid'; // uuid をインポート
+import path from 'path'; // path をインポート
+import fs from 'fs/promises'; // fs.promises をインポート
 
 // クエリパラメータのバリデーションスキーマ
 const GetMaterialsQuerySchema = z.object({
@@ -121,62 +124,75 @@ export async function GET(request: NextRequest) {
 // 新しい素材を登録するPOST処理
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const {
-      title,
-      filePath,
-      recordedAt,
-      memo,
-      tags, // タグ名の配列を期待 (例: ['nature', 'bird'])
-      // categoryName, // カテゴリは一旦省略
-      fileFormat,
-      sampleRate,
-      bitDepth,
-      latitude,
-      longitude,
-      locationName,
-      rating
-    } = body;
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const title = formData.get('title') as string | null;
+    // recordedAt は ISO 文字列で送られてくる想定
+    const recordedAt = formData.get('recordedAt') as string | null;
+    const memo = formData.get('memo') as string | null;
+    // tags はカンマ区切りの文字列で送られてくる想定 (例: "nature,bird")
+    const tagsString = formData.get('tags') as string | null;
+    const fileFormat = formData.get('fileFormat') as string | null;
+    const sampleRateStr = formData.get('sampleRate') as string | null;
+    const bitDepthStr = formData.get('bitDepth') as string | null;
+    const latitudeStr = formData.get('latitude') as string | null;
+    const longitudeStr = formData.get('longitude') as string | null;
+    const locationName = formData.get('locationName') as string | null;
+    const ratingStr = formData.get('rating') as string | null;
 
-    // 簡単なバリデーション
-    if (!title || !filePath || !recordedAt) {
+    // 必須フィールドのバリデーション
+    if (!title || !recordedAt || !file) {
       return NextResponse.json(
-        { error: "Missing required fields: title, filePath, recordedAt" },
+        { error: "Missing required fields: title, recordedAt, and file" },
         { status: 400 }
       );
     }
 
-    // slug を title から簡易生成 (実際はより堅牢な方法を推奨)
+    // ファイル保存処理
+    const fileExtension = path.extname(file.name);
+    const uniqueFileName = `${uuidv4()}${fileExtension}`;
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
+    const filePathInFilesystem = path.join(uploadDir, uniqueFileName);
+
+    // ディレクトリが存在しない場合は作成
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    // ファイルを保存
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    await fs.writeFile(filePathInFilesystem, fileBuffer);
+
+    const filePathForDb = `/uploads/materials/${uniqueFileName}`; // DBに保存するパス
+
+    // slug を title から簡易生成
     const slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-    // タグの処理: 既存タグへの接続または新規作成して接続
-    const tagConnectOrCreate = tags && Array.isArray(tags) ? tags.map((tagName: string) => ({
+    // タグの処理
+    const tags = tagsString ? tagsString.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+    const tagConnectOrCreate = tags.map((tagName: string) => ({
       where: { name: tagName },
       create: { name: tagName, slug: tagName.toLowerCase().replace(/\s+/g, '-') },
-    })) : [];
+    }));
 
     const newMaterial = await prisma.material.create({
       data: {
         title,
         slug,
-        filePath,
-        recordedAt: new Date(recordedAt), // ISO文字列をDateオブジェクトに変換
+        filePath: filePathForDb, // 更新されたファイルパス
+        recordedAt: new Date(recordedAt),
         memo,
         fileFormat,
-        sampleRate: sampleRate ? parseInt(sampleRate) : null,
-        bitDepth: bitDepth ? parseInt(bitDepth) : null,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
+        sampleRate: sampleRateStr ? parseInt(sampleRateStr) : null,
+        bitDepth: bitDepthStr ? parseInt(bitDepthStr) : null,
+        latitude: latitudeStr ? parseFloat(latitudeStr) : null,
+        longitude: longitudeStr ? parseFloat(longitudeStr) : null,
         locationName,
-        rating: rating ? parseInt(rating) : null,
+        rating: ratingStr ? parseInt(ratingStr) : null,
         tags: {
           connectOrCreate: tagConnectOrCreate,
         },
-        // category: categoryName ? { connect: { name: categoryName } } : undefined, // カテゴリ処理が必要な場合
       },
       include: {
-        tags: true, // レスポンスに含める
-        // category: true,
+        tags: true,
       },
     });
 
