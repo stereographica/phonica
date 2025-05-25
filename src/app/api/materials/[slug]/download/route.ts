@@ -50,9 +50,10 @@ export async function GET(
     // material.filePath は /uploads/materials/filename.ext のような相対パスを想定
     // これを public ディレクトリからの絶対パスに変換する
     const absoluteFilePath = path.join(BASE_PUBLIC_DIR, material.filePath);
+    let fileStats: Stats; // 外で宣言
 
     try {
-      const fileStats: Stats = await statAsync(absoluteFilePath);
+      fileStats = await statAsync(absoluteFilePath); // 中で代入
       if (!fileStats.isFile()) {
         console.error(`Path is not a file: ${absoluteFilePath}`);
         return NextResponse.json({ error: 'Requested path is not a file' }, { status: 400 });
@@ -80,6 +81,7 @@ export async function GET(
     const headers = new Headers();
     headers.set('Content-Type', contentType);
     headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    headers.set('Content-Length', fileStats.size.toString());
 
     return new NextResponse(webStream, {
       status: 200,

@@ -8,11 +8,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle } from 'lucide-react'; // アイコンを追加
-import dynamic from 'next/dynamic'; // dynamic importのため追加
+import { Loader2, AlertTriangle, Edit, Trash2, Download } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import { useToast } from "@/hooks/use-toast";
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 // Mapコンポーネントをdynamic import (クライアントサイドでのみレンダリング)
 const MaterialLocationMap = dynamic(() => import('@/components/maps/MaterialLocationMap'), {
@@ -47,6 +49,8 @@ interface DetailedMaterial {
   equipments: { id: string; name: string; type: string; manufacturer: string | null }[];
   createdAt: string; // ISO文字列
   updatedAt: string; // ISO文字列
+  // For download link
+  downloadUrl?: string; // Assuming API provides this or we construct it
   // 他にもAPIから返されるフィールドがあれば追加
 }
 
@@ -54,12 +58,19 @@ interface MaterialDetailModalProps {
   materialSlug: string | null;
   isOpen: boolean;
   onClose: () => void;
+  onMaterialDeleted?: () => void;
+  onMaterialEdited?: (slug: string) => void;
 }
 
-export function MaterialDetailModal({ materialSlug, isOpen, onClose }: MaterialDetailModalProps) {
+export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialDeleted, onMaterialEdited }: MaterialDetailModalProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [detailedMaterial, setDetailedMaterial] = useState<DetailedMaterial | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Delete Confirmation Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const fetchMaterialDetails = useCallback(async (slug: string) => {
     // console.log(`[Modal DEBUG] fetchMaterialDetails START - slug: ${slug}`); // デバッグログは必要に応じて有効化
@@ -81,6 +92,9 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose }: MaterialD
         throw new Error(errorMsg);
       }
       const data: DetailedMaterial = await response.json();
+      // Construct download URL (example, adjust as per your API/file serving structure)
+      // This might be better handled by the API response directly
+      data.downloadUrl = `/api/materials/${data.slug}/download`; 
       // console.log(`[Modal DEBUG] fetchMaterialDetails - SUCCESS, data for slug ${slug}:`, data?.title);
       setDetailedMaterial(data);
     } catch (error) {
@@ -114,9 +128,69 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose }: MaterialD
     onClose();
   };
 
-  // useEffect(() => {
-  //   console.log('[Modal DEBUG] State Change: isFetching:', isFetching, 'fetchError:', fetchError, 'detailedMaterial:', detailedMaterial?.title);
-  // }, [isFetching, fetchError, detailedMaterial]);
+  const handleOpenDeleteModal = () => {
+    if (!detailedMaterial) return;
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!detailedMaterial) return;
+
+    try {
+      const response = await fetch(`/api/materials/${detailedMaterial.slug}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete material');
+      }
+      toast({
+        title: "成功",
+        description: `素材「${detailedMaterial.title}」を削除しました。`,
+      });
+      if (onMaterialDeleted) {
+        onMaterialDeleted();
+      }
+      handleClose(); // Close the detail modal as well
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      toast({
+        title: "エラー",
+        description: `素材の削除に失敗しました: ${errorMessage}`,
+        variant: "destructive",
+      });
+    } finally {
+      handleCloseDeleteModal();
+    }
+  };
+
+  const handleEdit = () => {
+    if (!detailedMaterial) return;
+    if (onMaterialEdited) {
+        onMaterialEdited(detailedMaterial.slug);
+    } else {
+        router.push(`/materials/${detailedMaterial.slug}/edit`);
+    }
+    handleClose(); // Close modal after navigating to edit
+  };
+
+  const handleDownload = () => {
+    if (detailedMaterial?.downloadUrl) {
+        // Create a temporary link and click it to trigger download
+        const link = document.createElement('a');
+        link.href = detailedMaterial.downloadUrl;
+        link.setAttribute('download', detailedMaterial.title || 'material'); // Or use actual filename from filePath
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else {
+        toast({ title: "エラー", description: "ダウンロードURLが見つかりません。", variant: "destructive" });
+    }
+  };
 
   // DialogDescriptionのためのIDを生成（あるいは固定のIDを使用）
   const titleId = "material-detail-title";
@@ -254,36 +328,41 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose }: MaterialD
                 </div>
             )}
             {detailedMaterial.filePath && (
-              <div className="md:col-span-2 mt-4">
-                <h3 className="font-semibold mb-2 text-sm">Audio Player:</h3>
+              <div className="my-4">
                 <AudioPlayer audioUrl={`/api/materials/${detailedMaterial.slug}/download`} />
               </div>
             )}
           </div>
         )}
 
-        <DialogFooter className="mt-2" data-testid="dialog-footer">
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Close
-            </Button>
-          </DialogClose>
-          {detailedMaterial && (
-            <Button
-              type="button"
-              variant="default"
-              onClick={() => {
-                if (detailedMaterial) {
-                  window.location.href = `/api/materials/${detailedMaterial.slug}/download`;
-                }
-              }}
-              disabled={!detailedMaterial}
-            >
-              Download File
-            </Button>
-          )}
+        <DialogFooter className="mt-4 pt-4 border-t" data-testid="dialog-footer">
+            {detailedMaterial && !isFetching && !fetchError && (
+                <>
+                    <Button variant="outline" onClick={handleDownload}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                    </Button>
+                    <Button variant="outline" onClick={handleEdit}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                    </Button>
+                    <Button variant="destructive" onClick={handleOpenDeleteModal}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                    </Button>
+                </>
+            )}
+          <Button variant="outline" onClick={handleClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
+      {detailedMaterial && (
+        <DeleteConfirmationModal 
+            isOpen={isDeleteModalOpen} 
+            onClose={handleCloseDeleteModal} 
+            onConfirm={handleConfirmDelete} 
+            materialTitle={detailedMaterial.title}
+        />
+      )}
     </Dialog>
   );
 } 

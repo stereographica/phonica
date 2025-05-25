@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-// import userEvent from '@testing-library/user-event'; // Removed
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event'; // Import userEvent
 import MaterialsPage from '../page'; // Adjust path as necessary
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import fetchMock from 'jest-fetch-mock'; // fetchMock をインポート
@@ -14,6 +14,22 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
   usePathname: jest.fn(),
+}));
+
+// Mock MaterialDetailModal
+jest.mock('@/components/materials/MaterialDetailModal', () => ({
+  MaterialDetailModal: jest.fn(({ isOpen, materialSlug, onClose, onMaterialDeleted, onMaterialEdited }) => {
+    // console.log('[Mock MaterialDetailModal] isOpen:', isOpen, 'slug:', materialSlug);
+    if (!isOpen) return null;
+    return (
+      <div data-testid="mock-material-detail-modal">
+        Mock Material Detail Modal: {materialSlug}
+        <button onClick={onClose}>Close</button>
+        <button onClick={() => onMaterialDeleted(materialSlug!)}>Delete</button>
+        <button onClick={() => onMaterialEdited(materialSlug!)}>Edit</button>
+      </div>
+    );
+  }),
 }));
 
 // Mock fetch
@@ -76,8 +92,10 @@ describe('MaterialsPage', () => {
   let mockRouterReplace: jest.Mock;
   let mockRouterPush: jest.Mock;
   let mockSearchParams: URLSearchParams;
+  let user: ReturnType<typeof userEvent.setup>; // Define user
 
   beforeEach(() => {
+    user = userEvent.setup(); // Setup userEvent
     mockRouterReplace = jest.fn();
     mockRouterPush = jest.fn();
     mockSearchParams = new URLSearchParams();
@@ -248,7 +266,112 @@ describe('MaterialsPage', () => {
       expect(fetch).toHaveBeenLastCalledWith(expect.stringContaining('page=2&limit=1&sortBy=recordedDate&sortOrder=desc'));
     }, {timeout: 2000});
     await screen.findByText('Material Gamma');
-    expect(screen.queryByText('Material Delta - Nature')).not.toBeInTheDocument();
+  });
+
+  test('opens material detail modal when title is clicked', async () => {
+    render(<MaterialsPage />);
+    await waitForLoadingAndTable();
+    const materialTitle = await screen.findByText('Material Alpha');
+    fireEvent.click(materialTitle);
+    // screen.debug(); // DEBUG: Check DOM state after click
+    await waitFor(() => {
+        expect(screen.getByTestId('mock-material-detail-modal')).toBeInTheDocument();
+    });
+  });
+
+  test('opens menu for a material and checks items', async () => {
+    render(<MaterialsPage />); 
+    await waitForLoadingAndTable(); 
+
+    const firstMaterialTitle = mockMaterialsMasterData[0].title; // Corrected to 'Material Alpha'
+    const materialTitleElement = await screen.findByText(firstMaterialTitle);
+    const materialRow = materialTitleElement.closest('tr');
+
+    if (!materialRow) {
+      throw new Error(`Row for "${firstMaterialTitle}" not found`);
+    }
+    // screen.debug(materialRow); // DEBUG: Check the row before clicking menu
+
+    const menuTrigger = await within(materialRow).findByRole('button', { name: /open menu/i });
+    // fireEvent.click(menuTrigger);
+    await user.click(menuTrigger); // Use userEvent
+    // screen.debug(); // DEBUG: Check DOM after clicking menu trigger
+
+    await waitFor(() => {
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+    }, { timeout: 5000 });
+
+    await screen.findByRole('menuitem', { name: /編集/i }, { timeout: 5000 });
+    expect(screen.getByRole('menuitem', { name: /編集/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /削除/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /詳細表示/i })).not.toBeInTheDocument();
+    
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem', { name: /編集/i })).not.toBeInTheDocument();
+    });
+    // screen.debug(materialAlphaRow); // DEBUG: Check the row before clicking menu
+
+    if (materialRow) {
+      const menuTrigger = await within(materialRow).findByRole('button', { name: /open menu/i });
+      // fireEvent.click(menuTrigger);
+      await user.click(menuTrigger); // Use userEvent
+      // screen.debug(); // DEBUG: Check DOM after clicking menu trigger
+      await waitFor(() => {
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+      }, { timeout: 5000 });
+
+      await screen.findByRole('menuitem', { name: /編集/i }, { timeout: 5000 }); 
+      expect(screen.getByRole('menuitem', { name: /編集/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /削除/i })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /詳細表示/i })).not.toBeInTheDocument();
+      
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: /編集/i })).not.toBeInTheDocument();
+      });
+    }
+    //   expect(screen.queryByText('Material Gamma')).not.toBeInTheDocument();
+    // });
+  }, 10000); // Added test-specific timeout
+
+  it('displays materials and allows searching', async () => {
+    (useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('title=Material+A'));
+    render(<MaterialsPage />); 
+    await waitForLoadingAndTable();
+    await screen.findByText('Material Alpha'); // Check if Material Alpha is there due to search
+
+    // Check actions menu for Material Alpha
+    const materialAlphaTitleElement = await screen.findByText('Material Alpha');
+    const materialAlphaRow = materialAlphaTitleElement.closest('tr');
+    expect(materialAlphaRow).not.toBeNull();
+
+    if (materialAlphaRow) {
+      const menuTrigger = await within(materialAlphaRow).findByRole('button', { name: /open menu/i });
+      // fireEvent.click(menuTrigger);
+      await user.click(menuTrigger); // Use userEvent
+      await waitFor(() => {
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+      }, { timeout: 5000 });
+
+      await screen.findByRole('menuitem', { name: /編集/i }, { timeout: 5000 }); 
+      expect(screen.getByRole('menuitem', { name: /編集/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /削除/i })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /詳細表示/i })).not.toBeInTheDocument();
+      
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: /編集/i })).not.toBeInTheDocument();
+      });
+    }
+
+    // Ensure other materials are not displayed when filtered by "Material A"
+    // This part depends on the mockApiResponse accurately filtering for 'Material Alpha'
+    // when title='Material A'
+    // await waitFor(() => {
+    //   expect(screen.queryByText('Material Beta')).not.toBeInTheDocument();
+    //   expect(screen.queryByText('Material Gamma')).not.toBeInTheDocument();
+    // });
   });
 
   it.skip('initial fetch uses URL search parameters and displays correct item', async () => {

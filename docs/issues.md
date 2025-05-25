@@ -57,3 +57,6 @@
 | `src/app/(app)/materials/__tests__/page.test.tsx` | L:267       | `initial fetch uses URL search parameters and displays correct item` テストが失敗している。`mockRouterReplace` が期待通りに呼び出されず、`mockUseSearchParams` のモックがテストケース内で意図通りに機能しない問題があるためスキップ。 | 2          | false    |
 | (テスト全体)                                     | N/A         | `jest-fetch-mock` の型定義が正しく解決できず、テストファイル (`MaterialDetailModal.test.tsx`等) で `any` 型として使用している。 | 4          | false    |
 | `src/app/(app)/materials/[slug]/edit/__tests__/page.test.tsx` | L:188, L:217, L:246 | フォーム送信時のクライアントサイドバリデーション（title空、recordedAt空、APIエラー）のテストケース3件がタイムアウトで失敗するためスキップ。`error` ステートは更新されるが、DOMへの反映をテストで検知できない。 | 3          | false    |
+| `src/app/api/materials/[slug]/route.ts`               | L:217 (PUT), L:315 (DELETE) | Prisma TransactionClient (`tx`) の型が実態と合っておらず、`any` や `@ts-expect-error` で対応している。根本的な型解決が望ましい。 | 4          | false    |
+| `src/app/api/materials/[slug]/__tests__/route.test.ts`  | L:27        | Prisma TransactionClient のモック (`mockTx`) で `any` を使用している。                         | 4          | false    |
+| `src/app/api/materials/route.ts`               | L:214 (POST) | `equipments: { @ts-expect-error connectOrCreate ...}` で型エラーを抑制している。           | 4          | false    |

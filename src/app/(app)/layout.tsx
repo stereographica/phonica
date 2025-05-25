@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/toaster";
 
 export default function AppLayout({
   children,
@@ -32,6 +33,7 @@ export default function AppLayout({
           {children}
         </main>
       </div>
+      <Toaster />
     </div>
   );
 } 

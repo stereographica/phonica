@@ -3,12 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client'; // Prisma Namespaceをインポート
 import { v4 as uuidv4 } from 'uuid'; // 追加
-import fs from 'fs/promises'; // 追加
 import path from 'path'; // 追加
+import { deleteFile } from '@/lib/file-system';
+import fs from 'fs/promises'; // fs を再度インポート
 // import type { Prisma } from '@prisma/client'; // Prisma Namespaceはここでは不要かも
 
 const routeParamsSchema = z.object({
-  slug: z.string().min(1, { message: "Material slug cannot be empty." }),
+  slug: z.string().trim().min(1, { message: "Material slug cannot be empty." }),
 });
 
 interface GetRequestContext {
@@ -206,7 +207,8 @@ export async function PUT(
       updateData.filePath = relativeFilePath; // DBには相対パスを保存
     }
 
-    const updatedMaterial = await prisma.$transaction(async (tx) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updatedMaterial = await prisma.$transaction(async (tx: any) => {
       const material = await tx.material.update({
         where: { slug },
         data: updateData,
@@ -302,26 +304,39 @@ export async function DELETE(
 
     const materialToDelete = await prisma.material.findUnique({ 
         where: { slug },
-        select: { id: true } // 削除前にIDだけ取得すれば十分
+        select: { id: true, filePath: true } // filePath を追加
     });
     if (!materialToDelete) {
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 関連レコードの解除 (tags と equipments)
-      // スキーマで onDelete: Cascade が設定されていれば不要な場合もあるが、明示的に行う
+    const filePathToDelete = materialToDelete.filePath;
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // 関連レコードの削除: Materialのtagsとequipmentsリレーションを空にする
       await tx.material.update({
         where: { id: materialToDelete.id },
         data: {
-          tags: { set: [] },       // 関連するタグをすべて解除
-          equipments: { set: [] }, // 関連する機材をすべて解除 (スキーマ定義に依存)
+          tags: { set: [] },       // 関連するTagの解除 (MaterialTagテーブルから削除)
+          equipments: { set: [] }, // 関連するEquipmentの解除 (MaterialEquipmentテーブルから削除)
         },
       });
 
-      // 素材本体の削除
+      // 素材レコードの削除
       await tx.material.delete({ where: { id: materialToDelete.id } });
     });
+
+    // ファイルの削除 (DBトランザクションとは別)
+    if (filePathToDelete) {
+      const absoluteFilePath = path.join(process.cwd(), 'public', filePathToDelete);
+      try {
+        await deleteFile(absoluteFilePath);
+        // console.log(`Successfully deleted file: ${absoluteFilePath}`); // 必要であればログ出力
+      } catch (fileError) {
+        console.error(`Failed to delete file ${filePathToDelete}:`, fileError);
+        // ファイル削除のエラーはログに記録するが、DB削除が成功していれば200を返す
+      }
+    }
 
     return NextResponse.json({ message: 'Material deleted successfully' }, { status: 200 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
@@ -20,8 +20,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle, Eye, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ChevronDown, ChevronUp, Search, Trash2 } from 'lucide-react';
 import { MaterialDetailModal } from '@/components/materials/MaterialDetailModal';
+import { DeleteConfirmationModal } from '@/components/materials/DeleteConfirmationModal';
 import {
   Pagination,
   PaginationContent,
@@ -32,62 +33,51 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { Input } from '@/components/ui/input';
+import { useToast } from "@/hooks/use-toast";
+import { Material, Tag } from "@/types/material";
+import { PaginationState } from '@tanstack/react-table';
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Currently unused for tag filter
 
 // 表示用の素材データの型 (Prismaの型とは異なる場合がある)
 // Prisma の Material モデルに合わせて調整
-interface Material {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  recordedDate: Date; // PrismaからはDate型で取得される
-  categoryName: string | null; // category テーブルとのリレーションを想定
-  tags: { name: string }[]; // tags テーブルとのリレーションを想定 (多対多)
-  filePath: string;
-  // 必要に応じて他のフィールドを追加 (例: waveformData, durationSeconds)
-}
-
-// interface Tag { // Removed unused Tag interface
-//   id: string;
-//   name: string;
-//   slug: string;
+// interface ApiResponse {
+//   data: Material[];
+//   pagination: {
+//     page: number;
+//     limit: number;
+//     totalPages: number;
+//     totalItems: number;
+//   };
 // }
 
-// interface Equipment { // Removed unused Equipment interface
-//   id: string;
-//   name: string;
-//   type: string;
-// }
+// const DEBOUNCE_DELAY = 500; // Unused
 
-interface ApiResponse {
-  data: Material[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalPages: number;
-    totalItems: number;
-  };
-}
-
-const MaterialsPage: React.FC = () => {
+export default function MaterialsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Delete confirmation modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
+
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [limit, /* setLimit */] = useState(Number(searchParams.get('limit')) || 10); // Commented out setLimit, and removed eslint-disable line
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: searchParams.get('page') ? Number(searchParams.get('page')) - 1 : 0,
+    pageSize: searchParams.get('limit') ? Number(searchParams.get('limit')) : 10,
+  });
+  // const [totalItems, setTotalItems] = useState(0); // Unused for now
+  const [totalPages, setTotalPages] = useState(0);
 
   // Sorting state
-  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'createdAt');
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'recordedAt');
   const [sortOrder, setSortOrder] = useState(searchParams.get('sortOrder') || 'desc');
 
   // Filtering state
@@ -96,76 +86,95 @@ const MaterialsPage: React.FC = () => {
   const [tempTitleFilter, setTempTitleFilter] = useState(searchParams.get('title') || '');
   const [tempTagFilter, setTempTagFilter] = useState(searchParams.get('tag') || '');
 
+  const lastReplacedUrlParams = useRef<string | null>(null);
+
   const fetchMaterials = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    const params = new URLSearchParams();
+    params.set('page', String(pagination.pageIndex + 1));
+    params.set('limit', String(pagination.pageSize));
+    if (titleFilter) params.set('title', titleFilter);
+    if (tagFilter) params.set('tag', tagFilter);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+
+    // console.log('Fetching materials with params:', params.toString());
+
     try {
-      const params = new URLSearchParams();
-      params.append('page', currentPage.toString());
-      params.append('limit', limit.toString());
-      params.append('sortBy', sortBy);
-      params.append('sortOrder', sortOrder);
-      if (titleFilter) params.append('title', titleFilter);
-      if (tagFilter) params.append('tag', tagFilter);
-
-      // Update URL query parameters
-      const currentParams = new URLSearchParams(searchParams.toString());
-      if (params.toString() !== currentParams.toString()) {
-        router.replace(`${pathname}?${params.toString()}`);
-      }
-
       const response = await fetch(`/api/materials?${params.toString()}`);
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch materials');
+        let errorText = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || errorText;
+        } catch (e: unknown) {
+          const message = (e instanceof Error && e.message) ? e.message : String(e);
+          console.warn(`Failed to parse error JSON: ${message}`);
+        }
+        throw new Error(errorText);
       }
-      const result: ApiResponse = await response.json();
-      setMaterials(result.data);
-      setTotalPages(result.pagination.totalPages);
-      // setCurrentPage(result.pagination.page); // APIから返されるページ番号を使うか、現在のstateを維持するか
-
+      const data = await response.json();
+      // console.log('Fetched data:', data);
+      setMaterials(data.data || []);
+      // setTotalItems(data.pagination.totalItems || 0); // Still unused
+      setTotalPages(data.pagination.totalPages || 0);
     } catch (err) {
+      // console.error('Error in fetchMaterials:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
         setError('An unknown error occurred');
       }
-      setMaterials([]); // Clear data on error
+      setMaterials([]); // Clear materials on error
+      setTotalPages(0); // Reset total pages on error
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, limit, sortBy, sortOrder, titleFilter, tagFilter, router, pathname, searchParams]);
+  }, [pagination.pageIndex, pagination.pageSize, titleFilter, tagFilter, sortBy, sortOrder]);
 
+  // useEffect to update URL when filters or pagination change
   useEffect(() => {
-    // Initialize filters from URL on first load
-    const initialTitle = searchParams.get('title') || '';
-    const initialTag = searchParams.get('tag') || '';
-    setTitleFilter(initialTitle);
-    setTagFilter(initialTag);
-    setTempTitleFilter(initialTitle);
-    setTempTagFilter(initialTag);
-    setCurrentPage(Number(searchParams.get('page')) || 1);
-    setSortBy(searchParams.get('sortBy') || 'createdAt');
-    setSortOrder(searchParams.get('sortOrder') || 'desc');
-  }, [searchParams]);
+    const newUrlParams = new URLSearchParams();
+    newUrlParams.set('page', String(pagination.pageIndex + 1));
+    newUrlParams.set('limit', String(pagination.pageSize));
+    if (titleFilter) newUrlParams.set('title', titleFilter); else newUrlParams.delete('title');
+    if (tagFilter) newUrlParams.set('tag', tagFilter); else newUrlParams.delete('tag');
+    if (sortBy) newUrlParams.set('sortBy', sortBy); else newUrlParams.delete('sortBy');
+    if (sortOrder) newUrlParams.set('sortOrder', sortOrder); else newUrlParams.delete('sortOrder');
 
+    const newSearchQuery = newUrlParams.toString();
+    const currentSearchQueryFromHook = searchParams.toString();
+
+    // Only replace if the new query is different from the current one from useSearchParams
+    // AND it's different from the last one we manually set via router.replace
+    if (newSearchQuery !== currentSearchQueryFromHook && newSearchQuery !== lastReplacedUrlParams.current) {
+      // console.log('[DEBUG useEffect router.replace] Replacing URL. New params:', newSearchQuery, 'Old params from hook:', currentSearchQueryFromHook, 'Last replaced:', lastReplacedUrlParams.current);
+      router.replace(`${pathname}?${newSearchQuery}`);
+      lastReplacedUrlParams.current = newSearchQuery; // Store what we just set
+    }
+  }, [pagination, titleFilter, tagFilter, sortBy, sortOrder, router, pathname, searchParams]);
+
+  // useEffect to fetch materials when searchParams change (i.e., URL changes)
   useEffect(() => {
+    // console.log("searchParams changed, fetching materials:", searchParams.toString());
     fetchMaterials();
-  }, [fetchMaterials]);
+  }, [fetchMaterials]); // fetchMaterials の依存配列が実質的なトリガーとなる
 
   const handleSort = (newSortBy: string) => {
     if (sortBy === newSortBy) {
-      setSortOrder(prevOrder => prevOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
       setSortBy(newSortBy);
       setSortOrder('asc');
     }
-    setCurrentPage(1); // Reset to first page on sort change
+    setPagination((prev: PaginationState) => ({ ...prev, pageIndex: 0 }));
   };
 
   const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
+    // pageIndex is 0-based, newPage is 1-based
+    if (newPage -1 >= 0 && newPage -1 < totalPages) {
+      setPagination((prev: PaginationState) => ({ ...prev, pageIndex: newPage -1 }));
     }
   };
   
@@ -178,7 +187,7 @@ const MaterialsPage: React.FC = () => {
   };
 
   const applyFilters = () => {
-    setCurrentPage(1); // Reset to first page when applying new filters
+    setPagination((prev: PaginationState) => ({ ...prev, pageIndex: 0 }));
     setTitleFilter(tempTitleFilter);
     setTagFilter(tempTagFilter);
     // fetchMaterials will be called by the useEffect watching titleFilter and tagFilter
@@ -186,12 +195,56 @@ const MaterialsPage: React.FC = () => {
 
   const handleViewDetails = (material: Material) => {
     setSelectedMaterial(material);
-    setIsModalOpen(true);
+    setIsDetailModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
     setSelectedMaterial(null);
+  };
+
+  const openDeleteModal = (material: Material) => {
+    setMaterialToDelete(material);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setMaterialToDelete(null);
+  };
+
+  const handleDeleteMaterial = async () => {
+    if (!materialToDelete) return;
+
+    try {
+      const response = await fetch(`/api/materials/${materialToDelete.slug}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete material');
+      }
+      
+      toast({
+        title: "成功",
+        description: `素材「${materialToDelete.title}」を削除しました。`,
+      });
+      // Optimistic update (optional):
+      // setMaterials(prevMaterials => prevMaterials.filter(m => m.id !== materialToDelete.id));
+      // Or refetch:
+      fetchMaterials(); // Refetch to update the list
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(errorMessage); // Display error to user
+      toast({
+        title: "エラー",
+        description: `素材の削除に失敗しました: ${errorMessage}`,
+        variant: "destructive",
+      });
+    } finally {
+      closeDeleteModal();
+    }
   };
 
   // Render functions for pagination (simplified for brevity, shadcn/ui has more robust components)
@@ -199,7 +252,7 @@ const MaterialsPage: React.FC = () => {
     if (totalPages <= 1) return null;
     const pageNumbers = [];
     const maxPagesToShow = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let startPage = Math.max(1, pagination.pageIndex + 1 - Math.floor(maxPagesToShow / 2));
     const endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
 
     if (endPage - startPage + 1 < maxPagesToShow) {
@@ -216,8 +269,8 @@ const MaterialsPage: React.FC = () => {
           <PaginationItem>
             <PaginationPrevious 
               href="#"
-              onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }}
-              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+              onClick={(e) => { e.preventDefault(); handlePageChange(pagination.pageIndex + 1 - 1); }}
+              className={pagination.pageIndex === 0 ? 'pointer-events-none opacity-50' : ''}
             />
           </PaginationItem>
           {startPage > 1 && (
@@ -233,7 +286,7 @@ const MaterialsPage: React.FC = () => {
               <PaginationLink 
                 href="#" 
                 onClick={(e) => { e.preventDefault(); handlePageChange(number); }}
-                isActive={currentPage === number}
+                isActive={pagination.pageIndex + 1 === number}
               >
                 {number}
               </PaginationLink>
@@ -250,8 +303,8 @@ const MaterialsPage: React.FC = () => {
           <PaginationItem>
             <PaginationNext 
               href="#"
-              onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }}
-              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+              onClick={(e) => { e.preventDefault(); handlePageChange(pagination.pageIndex + 1 + 1); }}
+              className={pagination.pageIndex === totalPages - 1 ? 'pointer-events-none opacity-50' : ''}
             />
           </PaginationItem>
         </PaginationContent>
@@ -328,8 +381,8 @@ const MaterialsPage: React.FC = () => {
               <TableHead onClick={() => handleSort('title')} className="cursor-pointer">
                 Title {sortBy === 'title' && (sortOrder === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />)}
               </TableHead>
-              <TableHead onClick={() => handleSort('recordedDate')} className="cursor-pointer">
-                Recorded Date {sortBy === 'recordedDate' && (sortOrder === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />)}
+              <TableHead onClick={() => handleSort('recordedAt')} className="cursor-pointer">
+                Recorded Date {sortBy === 'recordedAt' && (sortOrder === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />)}
               </TableHead>
               <TableHead>Tags</TableHead>
               <TableHead>Actions</TableHead>
@@ -340,12 +393,20 @@ const MaterialsPage: React.FC = () => {
               materials.map((material) => (
                 <TableRow key={material.id}>
                   <TableCell className="font-medium">
-                    {material.title}
+                    <span 
+                      onClick={() => handleViewDetails(material)} 
+                      className="hover:underline cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleViewDetails(material); }}
+                    >
+                      {material.title}
+                    </span>
                   </TableCell>
-                  <TableCell>{new Date(material.recordedDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(material.recordedAt).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {material.tags.slice(0, 2).map((tag) => (
+                      {material.tags.slice(0, 2).map((tag: Tag) => (
                         <span
                           key={tag.name}
                           className="px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded-full"
@@ -360,7 +421,7 @@ const MaterialsPage: React.FC = () => {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -369,17 +430,19 @@ const MaterialsPage: React.FC = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleViewDetails(material)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/materials/${material.slug}/edit`}>Edit</Link>
+                        <DropdownMenuLabel>アクション</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/materials/${material.slug}/edit`)}
+                        >
+                          編集
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete {/* TODO: 削除確認モーダル表示 */}
+                        <DropdownMenuItem
+                          onClick={() => openDeleteModal(material)}
+                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          削除
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -401,15 +464,29 @@ const MaterialsPage: React.FC = () => {
         {renderPagination()}
       </div>
 
-      {isModalOpen && selectedMaterial && (
+      {selectedMaterial && (
         <MaterialDetailModal
           materialSlug={selectedMaterial.slug}
-          isOpen={isModalOpen}
-          onClose={closeModal}
+          isOpen={isDetailModalOpen}
+          onClose={closeDetailModal}
+          onMaterialDeleted={() => {
+            fetchMaterials(); // Refetch materials after deletion
+            closeDetailModal(); // Ensure detail modal is closed
+          }}
+          onMaterialEdited={(slug) => {
+            router.push(`/materials/${slug}/edit`);
+            closeDetailModal(); // Ensure detail modal is closed
+          }}
+        />
+      )}
+      {materialToDelete && (
+        <DeleteConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={closeDeleteModal}
+          onConfirm={handleDeleteMaterial}
+          materialTitle={materialToDelete.title}
         />
       )}
     </div>
   );
-};
-
-export default MaterialsPage; 
+} 

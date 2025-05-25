@@ -6,6 +6,17 @@ import { v4 as uuidv4 } from 'uuid'; // uuid をインポート
 import path from 'path'; // path をインポート
 import fs from 'fs/promises'; // fs.promises をインポート
 
+// slugify関数を再定義
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(/[^\w-]+/g, '') // Remove all non-word chars
+    .replace(/--+/g, '-'); // Replace multiple - with single -
+}
+
 // クエリパラメータのバリデーションスキーマ
 const GetMaterialsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
@@ -127,11 +138,9 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const title = formData.get('title') as string | null;
-    // recordedAt は ISO 文字列で送られてくる想定
     const recordedAt = formData.get('recordedAt') as string | null;
     const memo = formData.get('memo') as string | null;
-    // tags はカンマ区切りの文字列で送られてくる想定 (例: "nature,bird")
-    const tagsString = formData.get('tags') as string | null;
+    const tagsStr = formData.get('tags') as string | null;
     const fileFormat = formData.get('fileFormat') as string | null;
     const sampleRateStr = formData.get('sampleRate') as string | null;
     const bitDepthStr = formData.get('bitDepth') as string | null;
@@ -139,8 +148,8 @@ export async function POST(request: NextRequest) {
     const longitudeStr = formData.get('longitude') as string | null;
     const locationName = formData.get('locationName') as string | null;
     const ratingStr = formData.get('rating') as string | null;
+    const equipmentsStr = formData.get('equipments') as string | null;
 
-    // 必須フィールドのバリデーション
     if (!title || !recordedAt || !file) {
       return NextResponse.json(
         { error: "Missing required fields: title, recordedAt, and file" },
@@ -148,62 +157,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ファイル保存処理
     const fileExtension = path.extname(file.name);
-    const uniqueFileName = `${uuidv4()}${fileExtension}`;
+    // テスト環境の場合はファイル名にプレフィックスを付ける
+    const fileNamePrefix = process.env.NODE_ENV === 'test' ? 'test-dummy-' : '';
+    const uniqueFileName = `${fileNamePrefix}${uuidv4()}${fileExtension}`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
     const filePathInFilesystem = path.join(uploadDir, uniqueFileName);
-
-    // ディレクトリが存在しない場合は作成
     await fs.mkdir(uploadDir, { recursive: true });
-
-    // ファイルを保存
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(filePathInFilesystem, fileBuffer);
+    const filePathForDb = `/uploads/materials/${uniqueFileName}`;
 
-    const filePathForDb = `/uploads/materials/${uniqueFileName}`; // DBに保存するパス
+    const slug = slugify(title);
 
-    // slug を title から簡易生成
-    const slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const tagsToConnect = tagsStr
+      ? await Promise.all(
+          tagsStr.split(',').map(async (tagName) => {
+            const trimmedName = tagName.trim();
+            return {
+              where: { name: trimmedName },
+              create: { name: trimmedName, slug: slugify(trimmedName) },
+            };
+          })
+        )
+      : [];
 
-    // タグの処理
-    const tags = tagsString ? tagsString.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
-    const tagConnectOrCreate = tags.map((tagName: string) => ({
-      where: { name: tagName },
-      create: { name: tagName, slug: tagName.toLowerCase().replace(/\s+/g, '-') },
-    }));
+    const equipmentsToConnect = equipmentsStr
+      ? await Promise.all(
+          equipmentsStr.split(',').map(async (equipName) => {
+            const trimmedName = equipName.trim();
+            return {
+              where: { name: trimmedName },
+              create: { name: trimmedName },
+            };
+          })
+        )
+      : [];
 
     const newMaterial = await prisma.material.create({
       data: {
         title,
         slug,
-        filePath: filePathForDb, // 更新されたファイルパス
+        filePath: filePathForDb,
         recordedAt: new Date(recordedAt),
-        memo,
-        fileFormat,
+        memo: (memo === "null" || memo === "") ? null : memo,
+        fileFormat: (fileFormat === "null" || fileFormat === "") ? null : fileFormat,
         sampleRate: sampleRateStr ? parseInt(sampleRateStr) : null,
         bitDepth: bitDepthStr ? parseInt(bitDepthStr) : null,
-        latitude: latitudeStr ? parseFloat(latitudeStr) : null,
-        longitude: longitudeStr ? parseFloat(longitudeStr) : null,
-        locationName,
+        latitude: latitudeStr ? (parseFloat(latitudeStr) || null) : null,
+        longitude: longitudeStr ? (parseFloat(longitudeStr) || null) : null,
+        locationName: (locationName === "null" || locationName === "") ? null : locationName,
         rating: ratingStr ? parseInt(ratingStr) : null,
-        tags: {
-          connectOrCreate: tagConnectOrCreate,
+        tags: { connectOrCreate: tagsToConnect },
+        equipments: { 
+          // @ts-expect-error Prismaの型定義と実際の使用方法の不一致のため、一時的にエラーを無視
+          connectOrCreate: equipmentsToConnect 
         },
       },
-      include: {
-        tags: true,
-      },
+      include: { tags: true, equipments: true },
     });
 
     return NextResponse.json(newMaterial, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating material:", error);
-    // @ts-expect-error Prismaの型エラーの可能性があるため、一時的に無視
-    if (error.code === 'P2002' && error.meta?.target?.includes('slug')) {
+    if (error && error.code === 'P2002' && error.meta?.target?.includes('slug')) {
       return NextResponse.json(
         { error: "Failed to create material: Slug already exists. Please change the title." },
-        { status: 409 } // Conflict
+        { status: 409 }
       );
     }
     return NextResponse.json(
@@ -212,3 +232,6 @@ export async function POST(request: NextRequest) {
     );
   }
 } 
+
+
+
