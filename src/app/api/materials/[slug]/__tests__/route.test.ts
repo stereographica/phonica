@@ -121,7 +121,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'DELETE',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -162,7 +162,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'DELETE',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -198,7 +198,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'DELETE',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -254,7 +254,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'DELETE',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -294,7 +294,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'DELETE',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -313,7 +313,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest('http://localhost/api/materials/ ', {
         method: 'DELETE',
       });
-      const context = { params: { slug: ' ' } };
+      const context = { params: Promise.resolve({ slug: ' ' }) };
   
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -340,7 +340,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'DELETE',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await DELETE(request, context);
       const responseBody = await response.json();
@@ -399,7 +399,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'GET',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await GET(request, context);
       const responseBody = await response.json();
@@ -419,7 +419,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'GET',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await GET(request, context);
       const responseBody = await response.json();
@@ -432,7 +432,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest('http://localhost/api/materials/ ', {
         method: 'GET',
       });
-      const context = { params: { slug: ' ' } };
+      const context = { params: Promise.resolve({ slug: ' ' }) };
 
       const response = await GET(request, context);
       const responseBody = await response.json();
@@ -448,7 +448,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'GET',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await GET(request, context);
       const responseBody = await response.json();
@@ -467,7 +467,7 @@ describe('API Route: /api/materials/[slug]', () => {
       const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
         method: 'GET',
       });
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
 
       const response = await GET(request, context);
       const responseBody = await response.json();
@@ -525,7 +525,7 @@ describe('API Route: /api/materials/[slug]', () => {
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -544,7 +544,7 @@ describe('API Route: /api/materials/[slug]', () => {
         formData: () => Promise.resolve(formData),
       } as unknown as NextRequest;
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -562,7 +562,7 @@ describe('API Route: /api/materials/[slug]', () => {
         formData: () => Promise.resolve(formData),
       } as unknown as NextRequest;
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -624,7 +624,7 @@ describe('API Route: /api/materials/[slug]', () => {
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
 
       expect(response.status).toBe(200);
@@ -645,7 +645,7 @@ describe('API Route: /api/materials/[slug]', () => {
         return null; // Simulate transaction returning null
       });
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -666,7 +666,7 @@ describe('API Route: /api/materials/[slug]', () => {
       // Mock general error
       (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('General error'));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -689,7 +689,7 @@ describe('API Route: /api/materials/[slug]', () => {
         throw new z.ZodError([]);
       });
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -710,7 +710,7 @@ describe('API Route: /api/materials/[slug]', () => {
       // Mock specific error message
       (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('Material not found for update'));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
       const responseBody = await response.json();
 
@@ -755,7 +755,7 @@ describe('API Route: /api/materials/[slug]', () => {
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
 
       expect(response.status).toBe(200);
@@ -814,7 +814,7 @@ describe('API Route: /api/materials/[slug]', () => {
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
 
       expect(response.status).toBe(200);
@@ -860,7 +860,7 @@ describe('API Route: /api/materials/[slug]', () => {
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
 
       expect(response.status).toBe(200);
@@ -893,7 +893,7 @@ describe('API Route: /api/materials/[slug]', () => {
         await callback(mockTx);
       });
 
-      const context = { params: { slug: mockSlug } };
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
       const response = await PUT(mockRequest, context);
 
       expect(response.status).toBe(500); // Error should result in 500
