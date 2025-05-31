@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client'; // Prisma Namespaceをインポート
 import { v4 as uuidv4 } from 'uuid'; // 追加
 import path from 'path'; // 追加
-import { deleteFile } from '@/lib/file-system';
+import { deleteFile, markFileForDeletion, unmarkFileForDeletion, FileSystemError } from '@/lib/file-system';
 import fs from 'fs/promises'; // fs を再度インポート
 // import type { Prisma } from '@prisma/client'; // Prisma Namespaceはここでは不要かも
 
@@ -124,6 +124,8 @@ export async function PUT(
 ) {
   let oldFilePath: string | null = null;
   let newFilePathForCleanup: string | null = null;
+  let markedOldFilePath: string | null = null;
+  const uploadsBaseDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
 
   try {
     const paramsObject = await context.params;
@@ -194,6 +196,17 @@ export async function PUT(
       const existingMaterial = await prisma.material.findUnique({ where: { slug }, select: { filePath: true } });
       if (existingMaterial?.filePath) {
         oldFilePath = existingMaterial.filePath;
+        // 古いファイルを削除用にマーク
+        const oldAbsolutePath = path.join(process.cwd(), 'public', oldFilePath);
+        try {
+          await fs.access(oldAbsolutePath);
+          markedOldFilePath = await markFileForDeletion(oldAbsolutePath);
+        } catch (error) {
+          const fileError = error as FileSystemError;
+          if (fileError.code !== 'ENOENT') {
+            console.warn(`Could not mark old file for deletion: ${oldFilePath}`, error);
+          }
+        }
       }
 
       const fileExtension = path.extname(fileToSave.name);
@@ -204,7 +217,7 @@ export async function PUT(
 
       await fs.mkdir(path.dirname(absoluteFilePath), { recursive: true });
       await fs.writeFile(absoluteFilePath, Buffer.from(await fileToSave.arrayBuffer()));
-      updateData.filePath = relativeFilePath; // DBには相対パスを保存
+      updateData.filePath = relativeFilePath; // DBには相対パスを保宙
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -256,12 +269,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Material not found or update failed' }, { status: 404 });
     }
 
-    // トランザクション成功後、古いファイルがあれば削除
-    if (oldFilePath) {
+    // トランザクション成功後、マークした古いファイルを削除
+    if (markedOldFilePath) {
       try {
-        await fs.unlink(path.join(process.cwd(), 'public', oldFilePath));
+        await deleteFile(markedOldFilePath, {
+          allowedBaseDir: uploadsBaseDir,
+          materialId: updatedMaterial.id,
+          skipValidation: true
+        });
       } catch (e) {
-        console.warn(`Failed to delete old file: ${oldFilePath}`, e);
+        console.warn(`Failed to delete old file: ${markedOldFilePath}`, e);
       }
     }
 
@@ -269,9 +286,17 @@ export async function PUT(
 
   } catch (error) {
     console.error("Failed to update material:", error);
-    // エラー発生時、もし新しいファイルが作成途中だったら削除
+    // エラー発生時のクリーンアップ
     if (newFilePathForCleanup) {
         try { await fs.unlink(newFilePathForCleanup); } catch (e) { console.warn('Failed to clean up new file after error:', e); }
+    }
+    // マークした古いファイルを元に戻す
+    if (markedOldFilePath) {
+        try { 
+          await unmarkFileForDeletion(markedOldFilePath); 
+        } catch (e) { 
+          console.warn('Failed to restore marked old file:', e); 
+        }
     }
     if (error instanceof z.ZodError) {
         return NextResponse.json({ error: "Invalid request data", details: error.flatten() }, { status: 400 });
@@ -290,6 +315,9 @@ export async function DELETE(
   request: NextRequest, 
   context: PutOrDeleteRequestContext
 ) {
+  let markedFilePath: string | null = null;
+  const uploadsBaseDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
+  
   try {
     const paramsObject = await context.params;
     const validatedRouteParams = routeParamsSchema.safeParse(paramsObject);
@@ -304,7 +332,7 @@ export async function DELETE(
 
     const materialToDelete = await prisma.material.findUnique({ 
         where: { slug },
-        select: { id: true, filePath: true } // filePath を追加
+        select: { id: true, filePath: true }
     });
     if (!materialToDelete) {
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });
@@ -312,33 +340,68 @@ export async function DELETE(
 
     const filePathToDelete = materialToDelete.filePath;
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 関連レコードの削除: Materialのtagsとequipmentsリレーションを空にする
-      await tx.material.update({
-        where: { id: materialToDelete.id },
-        data: {
-          tags: { set: [] },       // 関連するTagの解除 (MaterialTagテーブルから削除)
-          equipments: { set: [] }, // 関連するEquipmentの解除 (MaterialEquipmentテーブルから削除)
-        },
-      });
-
-      // 素材レコードの削除
-      await tx.material.delete({ where: { id: materialToDelete.id } });
-    });
-
-    // ファイルの削除 (DBトランザクションとは別)
+    // ステップ1: ファイルを削除用にマーク（存在する場合）
     if (filePathToDelete) {
       const absoluteFilePath = path.join(process.cwd(), 'public', filePathToDelete);
       try {
-        await deleteFile(absoluteFilePath);
-        // console.log(`Successfully deleted file: ${absoluteFilePath}`); // 必要であればログ出力
-      } catch (fileError) {
-        console.error(`Failed to delete file ${filePathToDelete}:`, fileError);
-        // ファイル削除のエラーはログに記録するが、DB削除が成功していれば200を返す
+        // ファイルが存在する場合のみマーク
+        await fs.access(absoluteFilePath);
+        markedFilePath = await markFileForDeletion(absoluteFilePath);
+      } catch (error) {
+        const fileError = error as FileSystemError;
+        if (fileError.code !== 'ENOENT') {
+          // ファイルが存在しないエラー以外は警告
+          console.warn(`Could not mark file for deletion: ${filePathToDelete}`, error);
+        }
       }
     }
 
-    return NextResponse.json({ message: 'Material deleted successfully' }, { status: 200 });
+    try {
+      // ステップ2: データベーストランザクション
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        // 関連レコードの削除: Materialのtagsとequipmentsリレーションを空にする
+        await tx.material.update({
+          where: { id: materialToDelete.id },
+          data: {
+            tags: { set: [] },       // 関連するTagの解除
+            equipments: { set: [] }, // 関連するEquipmentの解除
+          },
+        });
+
+        // 素材レコードの削除
+        await tx.material.delete({ where: { id: materialToDelete.id } });
+      });
+
+      // ステップ3: DBトランザクション成功後、実際にファイルを削除
+      if (markedFilePath) {
+        try {
+          await deleteFile(markedFilePath, {
+            allowedBaseDir: uploadsBaseDir,
+            materialId: materialToDelete.id,
+            skipValidation: true // すでにマーク済みのパスなので検証スキップ
+          });
+        } catch (fileError) {
+          // ファイル削除エラーは記録するが、DB削除は成功しているので処理を継続
+          const error = fileError as FileSystemError;
+          if (error.code !== 'ENOENT') {
+            console.error(`Failed to delete marked file ${markedFilePath}:`, fileError);
+          }
+        }
+      }
+
+      return NextResponse.json({ message: 'Material deleted successfully' }, { status: 200 });
+
+    } catch (dbError) {
+      // DBトランザクション失敗時：マークしたファイルを元に戻す
+      if (markedFilePath) {
+        try {
+          await unmarkFileForDeletion(markedFilePath);
+        } catch (restoreError) {
+          console.error('Failed to restore marked file after DB error:', restoreError);
+        }
+      }
+      throw dbError; // エラーを再スロー
+    }
 
   } catch (error) {
     console.error("Failed to delete material:", error);
