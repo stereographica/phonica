@@ -1,19 +1,27 @@
-import { NextRequest } from 'next/server';
-import { DELETE } from '../route';
-import { prisma } from '@/lib/prisma';
 import path from 'path';
-import { 
-  deleteFile as actualDeleteFile,
-  markFileForDeletion,
-  unmarkFileForDeletion
-} from '@/lib/file-system';
-import fs from 'fs/promises';
 
+// fs/promisesのデフォルトエクスポートをモック
+const mockFs = {
+  access: jest.fn(),
+  readdir: jest.fn(),
+  unlink: jest.fn(),
+  rename: jest.fn(),
+  writeFile: jest.fn(),
+  mkdir: jest.fn(),
+};
+
+jest.mock('fs/promises', () => ({
+  __esModule: true,
+  default: mockFs,
+}));
+
+// 他のモジュールも設定
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     material: {
       findUnique: jest.fn(),
     },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -21,13 +29,23 @@ jest.mock('@/lib/file-system', () => ({
   deleteFile: jest.fn(),
   markFileForDeletion: jest.fn(),
   unmarkFileForDeletion: jest.fn(),
+  checkFileExists: jest.fn(),
 }));
 
 jest.mock('uuid', () => ({
   v4: () => 'test-uuid-v4',
 }));
 
-const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads', 'materials');
+// モック設定後にインポート
+import { NextRequest } from 'next/server';
+import { DELETE } from '../route';
+import { prisma } from '@/lib/prisma';
+import { 
+  deleteFile as actualDeleteFile,
+  markFileForDeletion,
+  unmarkFileForDeletion,
+  checkFileExists
+} from '@/lib/file-system';
 
 describe('API Route: /api/materials/[slug]', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,36 +65,13 @@ describe('API Route: /api/materials/[slug]', () => {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
-    (prisma.$transaction as jest.Mock) = jest.fn().mockImplementation(async (callback) => callback(mockTx));
-    (prisma.material.findUnique as jest.Mock).mockReset();
-    (actualDeleteFile as jest.Mock).mockReset();
-    (markFileForDeletion as jest.Mock).mockReset();
-    (unmarkFileForDeletion as jest.Mock).mockReset();
-    (fs.access as jest.Mock) = jest.fn();
+
+    // Reset all mocks
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  afterAll(async () => {
-    try {
-      const files = await fs.readdir(UPLOADS_DIR);
-      for (const file of files) {
-        if (file.startsWith('test-dummy-')) {
-          try {
-            await fs.unlink(path.join(UPLOADS_DIR, file));
-          } catch (err) {
-            console.error(`Failed to delete dummy file ${file}:`, err);
-          }
-        }
-      }
-    } catch (err) {
-      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
-      } else {
-        console.error('Error during dummy file cleanup:', err);
-      }
-    }
   });
 
   describe('DELETE', () => {
@@ -86,12 +81,16 @@ describe('API Route: /api/materials/[slug]', () => {
       const absoluteFilePath = path.join(process.cwd(), 'public', mockFilePath);
       const markedPath = `${absoluteFilePath}.deleted_123456`;
       
+      // Setup mocks
       (prisma.material.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'test-id',
         slug: mockSlug,
         filePath: mockFilePath,
       });
-      (fs.access as jest.Mock).mockResolvedValueOnce(undefined);
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
+      
+      // Mock checkFileExists to return true (file exists)
+      (checkFileExists as jest.Mock).mockResolvedValueOnce(true);
       (markFileForDeletion as jest.Mock).mockResolvedValueOnce(markedPath);
       (actualDeleteFile as jest.Mock).mockResolvedValueOnce(undefined);
 
@@ -106,11 +105,11 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(response.status).toBe(200);
       expect(responseBody.message).toBe('Material deleted successfully');
 
-      // ファイルのマーク確認
-      expect(fs.access).toHaveBeenCalledWith(absoluteFilePath);
-      expect(markFileForDeletion).toHaveBeenCalledWith(absoluteFilePath);
-      
-      // DBトランザクション確認
+      // Verify database operations
+      expect(prisma.material.findUnique).toHaveBeenCalledWith({
+        where: { slug: mockSlug },
+        select: { id: true, filePath: true },
+      });
       expect(mockTx.material.update).toHaveBeenCalledWith({
         where: { id: 'test-id' },
         data: {
@@ -122,7 +121,9 @@ describe('API Route: /api/materials/[slug]', () => {
         where: { id: 'test-id' },
       });
 
-      // マークされたファイルの削除確認
+      // Verify 2-phase file deletion
+      expect(checkFileExists).toHaveBeenCalledWith(absoluteFilePath);
+      expect(markFileForDeletion).toHaveBeenCalledWith(absoluteFilePath);
       expect(actualDeleteFile).toHaveBeenCalledWith(markedPath, {
         allowedBaseDir: path.join(process.cwd(), 'public', 'uploads', 'materials'),
         materialId: 'test-id',
@@ -145,6 +146,7 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(response.status).toBe(404);
       expect(responseBody.error).toBe('Material not found');
       expect(actualDeleteFile).not.toHaveBeenCalled();
+      expect((markFileForDeletion as jest.Mock)).not.toHaveBeenCalled();
       expect(mockTx.material.update).not.toHaveBeenCalled();
       expect(mockTx.material.delete).not.toHaveBeenCalled();
     });
@@ -160,7 +162,10 @@ describe('API Route: /api/materials/[slug]', () => {
         slug: mockSlug,
         filePath: mockFilePath,
       });
-      (fs.access as jest.Mock).mockResolvedValueOnce(undefined);
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
+      
+      // Mock checkFileExists to return true (file exists)
+      (checkFileExists as jest.Mock).mockResolvedValueOnce(true);
       (markFileForDeletion as jest.Mock).mockResolvedValueOnce(markedPath);
       (actualDeleteFile as jest.Mock).mockRejectedValueOnce(new Error('Permission denied'));
       
@@ -177,6 +182,27 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(response.status).toBe(200);
       expect(responseBody.message).toBe('Material deleted successfully');
       
+      // DB operations should still succeed
+      expect(mockTx.material.update).toHaveBeenCalledWith({
+        where: { id: 'test-id-fail' },
+        data: {
+          tags: { set: [] },
+          equipments: { set: [] },
+        },
+      });
+      expect(mockTx.material.delete).toHaveBeenCalledWith({
+        where: { id: 'test-id-fail' },
+      });
+
+      // File operations attempted but failed
+      expect(checkFileExists).toHaveBeenCalledWith(absoluteFilePath);
+      expect((markFileForDeletion as jest.Mock)).toHaveBeenCalledWith(absoluteFilePath);
+      expect(actualDeleteFile).toHaveBeenCalledWith(markedPath, {
+        allowedBaseDir: path.join(process.cwd(), 'public', 'uploads', 'materials'),
+        materialId: 'test-id-fail',
+        skipValidation: true
+      });
+      
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Failed to delete marked file ${markedPath}:`),
         expect.any(Error)
@@ -187,15 +213,17 @@ describe('API Route: /api/materials/[slug]', () => {
     it('should handle file not found (ENOENT) silently', async () => {
       const mockSlug = 'material-file-not-found';
       const mockFilePath = 'uploads/materials/missing-file.wav';
+      const absoluteFilePath = path.join(process.cwd(), 'public', mockFilePath);
       
       (prisma.material.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'test-id-missing',
         slug: mockSlug,
         filePath: mockFilePath,
       });
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
       
-      const enoentError = Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
-      (fs.access as jest.Mock).mockRejectedValueOnce(enoentError);
+      // Mock checkFileExists to return false (file doesn't exist)
+      (checkFileExists as jest.Mock).mockResolvedValueOnce(false);
       
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -210,7 +238,9 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(response.status).toBe(200);
       expect(responseBody.message).toBe('Material deleted successfully');
       
-      expect(markFileForDeletion).not.toHaveBeenCalled();
+      // File should not be marked or deleted if it doesn't exist
+      expect(checkFileExists).toHaveBeenCalledWith(absoluteFilePath);
+      expect((markFileForDeletion as jest.Mock)).not.toHaveBeenCalled();
       expect(actualDeleteFile).not.toHaveBeenCalled();
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       
@@ -228,10 +258,12 @@ describe('API Route: /api/materials/[slug]', () => {
         slug: mockSlug,
         filePath: mockFilePath,
       });
-      (fs.access as jest.Mock).mockResolvedValueOnce(undefined);
+      
+      // Mock checkFileExists to return true (file exists)
+      (checkFileExists as jest.Mock).mockResolvedValueOnce(true);
       (markFileForDeletion as jest.Mock).mockResolvedValueOnce(markedPath);
       
-      // DBトランザクションを失敗させる
+      // DB transaction failure
       (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error('DB transaction failed'));
       (unmarkFileForDeletion as jest.Mock).mockResolvedValueOnce(absoluteFilePath);
 
@@ -246,9 +278,10 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(response.status).toBe(500);
       expect(responseBody.error).toBe('Internal Server Error');
       
-      // ファイルがマークされて、元に戻されたことを確認
-      expect(markFileForDeletion).toHaveBeenCalledWith(absoluteFilePath);
-      expect(unmarkFileForDeletion).toHaveBeenCalledWith(markedPath);
+      // File should be marked and then unmarked due to DB failure
+      expect(checkFileExists).toHaveBeenCalledWith(absoluteFilePath);
+      expect((markFileForDeletion as jest.Mock)).toHaveBeenCalledWith(absoluteFilePath);
+      expect((unmarkFileForDeletion as jest.Mock)).toHaveBeenCalledWith(markedPath);
       expect(actualDeleteFile).not.toHaveBeenCalled();
     });
 
@@ -265,8 +298,48 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(responseBody.error).toBe('Invalid material slug in URL');
       expect(prisma.material.findUnique).not.toHaveBeenCalled();
       expect(actualDeleteFile).not.toHaveBeenCalled();
+      expect((markFileForDeletion as jest.Mock)).not.toHaveBeenCalled();
       expect(mockTx.material.update).not.toHaveBeenCalled();
       expect(mockTx.material.delete).not.toHaveBeenCalled();
+    });
+
+    it('should successfully delete a material without file', async () => {
+      const mockSlug = 'test-material-no-file';
+      
+      (prisma.material.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: 'test-id',
+        slug: mockSlug,
+        filePath: null, // No file
+      });
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
+
+      const request = new NextRequest(`http://localhost/api/materials/${mockSlug}`, {
+        method: 'DELETE',
+      });
+      const context = { params: { slug: mockSlug } };
+
+      const response = await DELETE(request, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.message).toBe('Material deleted successfully');
+
+      // No file operations should be performed
+      expect(checkFileExists).not.toHaveBeenCalled();
+      expect((markFileForDeletion as jest.Mock)).not.toHaveBeenCalled();
+      expect(actualDeleteFile).not.toHaveBeenCalled();
+
+      // DB operations should succeed
+      expect(mockTx.material.update).toHaveBeenCalledWith({
+        where: { id: 'test-id' },
+        data: {
+          tags: { set: [] },
+          equipments: { set: [] },
+        },
+      });
+      expect(mockTx.material.delete).toHaveBeenCalledWith({
+        where: { id: 'test-id' },
+      });
     });
   });
 });

@@ -176,7 +176,7 @@ export async function scheduleOrphanedFilesCleanup(
   const jobName = 'scheduled-cleanup';
   
   // 既存のスケジュールされたジョブを削除
-  await orphanedFilesCleanupQueue.removeRepeatable(jobName);
+  await orphanedFilesCleanupQueue.removeRepeatable(jobName, {});
   
   // 新しいスケジュールを設定
   if (options?.repeatInterval) {

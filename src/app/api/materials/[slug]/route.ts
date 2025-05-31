@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client'; // Prisma Namespaceをインポート
 import { v4 as uuidv4 } from 'uuid'; // 追加
 import path from 'path'; // 追加
-import { deleteFile, markFileForDeletion, unmarkFileForDeletion, FileSystemError } from '@/lib/file-system';
+import { deleteFile, markFileForDeletion, unmarkFileForDeletion, checkFileExists, FileSystemError } from '@/lib/file-system';
 import fs from 'fs/promises'; // fs を再度インポート
 // import type { Prisma } from '@prisma/client'; // Prisma Namespaceはここでは不要かも
 
@@ -198,14 +198,8 @@ export async function PUT(
         oldFilePath = existingMaterial.filePath;
         // 古いファイルを削除用にマーク
         const oldAbsolutePath = path.join(process.cwd(), 'public', oldFilePath);
-        try {
-          await fs.access(oldAbsolutePath);
+        if (await checkFileExists(oldAbsolutePath)) {
           markedOldFilePath = await markFileForDeletion(oldAbsolutePath);
-        } catch (error) {
-          const fileError = error as FileSystemError;
-          if (fileError.code !== 'ENOENT') {
-            console.warn(`Could not mark old file for deletion: ${oldFilePath}`, error);
-          }
         }
       }
 
@@ -343,16 +337,8 @@ export async function DELETE(
     // ステップ1: ファイルを削除用にマーク（存在する場合）
     if (filePathToDelete) {
       const absoluteFilePath = path.join(process.cwd(), 'public', filePathToDelete);
-      try {
-        // ファイルが存在する場合のみマーク
-        await fs.access(absoluteFilePath);
+      if (await checkFileExists(absoluteFilePath)) {
         markedFilePath = await markFileForDeletion(absoluteFilePath);
-      } catch (error) {
-        const fileError = error as FileSystemError;
-        if (fileError.code !== 'ENOENT') {
-          // ファイルが存在しないエラー以外は警告
-          console.warn(`Could not mark file for deletion: ${filePathToDelete}`, error);
-        }
       }
     }
 

@@ -113,6 +113,24 @@ export async function deleteFile(
 }
 
 /**
+ * ファイルが存在するかチェックします
+ * @param filePath チェックするファイルのパス
+ * @returns ファイルが存在する場合はtrue、存在しない場合はfalse
+ */
+export async function checkFileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch (error) {
+    const fileError = error as FileSystemError;
+    if (fileError.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
  * ファイルを一時的にマーク（リネーム）します
  * @param filePath マークするファイルのパス
  * @returns マーク後のファイルパス

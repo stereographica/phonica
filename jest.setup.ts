@@ -46,6 +46,18 @@ global.FormData = jest.fn(() => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 })) as any;
 
+// Global fs/promises mock for API route tests
+export const mockFsPromises = {
+  access: jest.fn(),
+  readdir: jest.fn(),
+  unlink: jest.fn(),
+  rename: jest.fn(),
+  writeFile: jest.fn(),
+  mkdir: jest.fn(),
+};
+
+jest.mock('fs/promises', () => mockFsPromises);
+
 beforeEach(() => {
   mockReset(prismaMock);
   fetchMock.resetMocks();
@@ -55,6 +67,14 @@ beforeEach(() => {
   mockGetAll.mockClear();
   mockHas.mockClear();
   mockFormDataStore.clear(); // ストアもクリアする
+  
+  // fs/promises mocks もクリア
+  mockFsPromises.access.mockClear();
+  mockFsPromises.readdir.mockClear();
+  mockFsPromises.unlink.mockClear();
+  mockFsPromises.rename.mockClear();
+  mockFsPromises.writeFile.mockClear();
+  mockFsPromises.mkdir.mockClear();
 });
 
 // Mock NextResponse.json

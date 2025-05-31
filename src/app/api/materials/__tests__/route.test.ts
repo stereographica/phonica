@@ -110,7 +110,7 @@ describe('/api/materials', () => {
     ];
 
     beforeEach(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       prismaMock.material.findMany.mockImplementation(async (args: Parameters<typeof prismaMock.material.findMany>[0]) => {
         let filteredMaterials = [...baseMockMaterials];
         if (args?.where?.title && typeof args.where.title === 'object' && 'contains' in args.where.title) {
@@ -137,7 +137,7 @@ describe('/api/materials', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return Promise.resolve(filteredMaterials.slice(skip, skip + take) as any); // Promiseでラップし、anyキャスト
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       prismaMock.material.count.mockImplementation(async (args: Parameters<typeof prismaMock.material.count>[0]) => {
         let filteredMaterials = [...baseMockMaterials];
          if (args?.where?.title && typeof args.where.title === 'object' && 'contains' in args.where.title) {
@@ -286,8 +286,8 @@ describe('/api/materials', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         tags: [
-          { id: 'tag-new', name: 'new', slug:'new', createdAt: new Date(), updatedAt: new Date(), materials: [] as any[] },
-          { id: 'tag-test', name: 'test', slug:'test', createdAt: new Date(), updatedAt: new Date(), materials: [] as any[] }
+          { id: 'tag-new', name: 'new', slug:'new', createdAt: new Date(), updatedAt: new Date(), materials: [] },
+          { id: 'tag-test', name: 'test', slug:'test', createdAt: new Date(), updatedAt: new Date(), materials: [] }
         ],
         equipments: [
           { name: 'Mixer Pro', createdAt: new Date(), updatedAt: new Date() },
@@ -297,7 +297,7 @@ describe('/api/materials', () => {
         longitude: null,
         locationName: null,
         rating: validMaterialData.rating,
-        projects: [] as any[]
+        projects: []
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       prismaMock.material.create.mockResolvedValue(createdMaterialResponse as any);
@@ -355,10 +355,11 @@ describe('/api/materials', () => {
     });
 
     it('should return 409 if slug already exists', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       prismaMock.material.create.mockRejectedValue({
           code: 'P2002',
           meta: { target: ['slug'] },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // PrismaClientKnownRequestError を模倣するために any を使用
       );
 
