@@ -52,9 +52,25 @@ import {
   checkFileExists
 } from '@/lib/file-system';
 
+interface MockTransaction {
+  material: {
+    update: jest.MockedFunction<(args: unknown) => Promise<unknown>>;
+    delete: jest.MockedFunction<(args: unknown) => Promise<unknown>>;
+    findUnique: jest.MockedFunction<(args: unknown) => Promise<unknown>>;
+  };
+  equipment: {
+    findMany: jest.MockedFunction<(args: unknown) => Promise<unknown[]>>;
+  };
+  materialTag: {
+    deleteMany: jest.MockedFunction<(args: unknown) => Promise<unknown>>;
+  };
+  materialEquipment: {
+    deleteMany: jest.MockedFunction<(args: unknown) => Promise<unknown>>;
+  };
+}
+
 describe('API Route: /api/materials/[slug]', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockTx: any;
+  let mockTx: MockTransaction;
 
   beforeEach(() => {
     mockTx = {

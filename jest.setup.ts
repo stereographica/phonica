@@ -3,6 +3,7 @@ import { mockDeep, mockReset } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
 import { prisma as prismaClient } from '@/lib/prisma'; // 実際のPrisma Clientインスタンス
 import fetchMock from 'jest-fetch-mock';
+import { TypedPrismaMock } from '@/types/test-types';
 
 // Prisma Client のモックを作成
 jest.mock('@/lib/prisma', () => ({
@@ -10,7 +11,7 @@ jest.mock('@/lib/prisma', () => ({
   prisma: mockDeep<PrismaClient>(),
 }));
 
-export const prismaMock = prismaClient as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
+export const prismaMock = prismaClient as unknown as TypedPrismaMock;
 
 // Global fetch mock
 fetchMock.enableMocks();

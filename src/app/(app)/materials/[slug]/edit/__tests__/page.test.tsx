@@ -5,8 +5,6 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EditMaterialPage from '../page';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { useParams, useRouter } from 'next/navigation';
 // import '../../../../../../global.mock'; // fetch, alert, FormData などのグローバルモック (REMOVED)
 
 // next/navigation のモック

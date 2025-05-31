@@ -12,6 +12,14 @@ module.exports = {
   collectCoverage: true,
   coverageDirectory: "coverage",
   coverageProvider: "v8",
+  coverageReporters: [
+    "text",
+    "text-summary", 
+    "lcov",
+    "clover",
+    "json",
+    "json-summary"
+  ],
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': ['@swc/jest', {
       sourceMaps: true, // ソースマップを有効にする（デバッグ用）

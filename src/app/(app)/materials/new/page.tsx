@@ -103,10 +103,9 @@ export default function NewMaterialPage() {
       alert('Material saved successfully!');
       router.push('/materials');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save material:', err);
-      setError(err.message || 'An unknown error occurred.');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsSubmitting(false);
     }

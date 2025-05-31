@@ -39,15 +39,16 @@ jest.mock('@/hooks/use-toast', () => ({
 // Updated Mock for next/dynamic with React.Suspense
 jest.mock('next/dynamic', () => ({
   __esModule: true,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  default: (loader: () => Promise<{ default: React.ComponentType<any> }>, options?: { loading?: () => React.ReactNode }) => {
+  default: <T extends Record<string, unknown>>(
+    loader: () => Promise<{ default: React.ComponentType<T> }>, 
+    options?: { loading?: () => React.ReactNode }
+  ) => {
     // loader is a function that returns a Promise to the component.
     const LazyComponent = React.lazy(loader);
     
-    const DynamicMockComponent = (props: React.PropsWithChildren<unknown>) => (
+    const DynamicMockComponent = (props: T) => (
       <React.Suspense fallback={options?.loading ? options.loading() : <div data-testid="dynamic-fallback">Loading...</div>}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <LazyComponent {...props as any} />
+        <LazyComponent {...props} />
       </React.Suspense>
     );
     // Attempt to give it a display name for easier debugging if needed

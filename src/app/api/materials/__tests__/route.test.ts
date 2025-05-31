@@ -4,10 +4,10 @@
 import { GET, POST } from '@/app/api/materials/route';
 import { prismaMock } from '../../../../../jest.setup'; // モックされたPrisma Clientをインポート
 import { NextRequest } from 'next/server'; // NextResponse を削除
-// import { jest } from '@jest/globals'; // jest オブジェクトは通常グローバルなので削除
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path'; // path をインポート
 import fs from 'fs/promises'; // fs/promises をインポート
+import { MockFindManyArgs, MockCountArgs } from '@/types/test-types';
 
 // FormData and its methods will be mocked globally via jest.setup.ts
 
@@ -16,7 +16,7 @@ const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads', 'materials'); 
 // Helper function to create a mock NextRequest
 function createMockRequest(
   method: string, 
-  body?: unknown, // any から unknown に変更
+  body?: Record<string, unknown> | FormData,
   searchParams?: URLSearchParams
 ): NextRequest {
   const url = new URL(`http://localhost/api/materials${searchParams ? '?' + searchParams.toString() : ''}`);
@@ -26,16 +26,20 @@ function createMockRequest(
   if (body) {
     if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
       const internalFormData = new FormData(); // グローバルモックを使用
-      if (typeof body === 'object' && body !== null) {
-        for (const key in body) {
-          if (Object.prototype.hasOwnProperty.call(body, key)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const value = (body as any)[key];
-            internalFormData.append(key, value instanceof File ? value : String(value));
+      if (body instanceof FormData) {
+        requestBody = body;
+      } else if (typeof body === 'object' && body !== null) {
+        for (const [key, value] of Object.entries(body)) {
+          if (value instanceof File) {
+            internalFormData.append(key, value);
+          } else if (Array.isArray(value)) {
+            internalFormData.append(key, value.join(','));
+          } else if (value !== null && value !== undefined) {
+            internalFormData.append(key, String(value));
           }
         }
+        requestBody = internalFormData;
       }
-      requestBody = internalFormData;
       // Content-Type は FormData によって自動的に設定されるため、ここでは明示的にセットしない
     } else {
       requestBody = JSON.stringify(body);
@@ -50,15 +54,16 @@ function createMockRequest(
   });
 
   // formData メソッドをモック
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (req as any).formData = async () => {
-    if (requestBody instanceof FormData) {
-      return requestBody;
-    }
-    // 他のケース（例: body がない、JSON body）では空の FormData を返すか、エラーを投げる
-    // ここではテスト対象の POST が FormData を期待しているので、requestBody が FormData である前提
-    return new FormData(); // Fallback, or throw error if not FormData
-  };
+  Object.defineProperty(req, 'formData', {
+    value: async () => {
+      if (requestBody instanceof FormData) {
+        return requestBody;
+      }
+      return new FormData(); // Fallback
+    },
+    writable: true,
+    configurable: true
+  });
 
   return req;
 }
@@ -110,10 +115,7 @@ describe('/api/materials', () => {
     ];
 
     beforeEach(() => {
-       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // @ts-ignore - Prismaモックの型の問題を回避
-      prismaMock.material.findMany.mockImplementation(async (args: any) => {
+      prismaMock.material.findMany.mockImplementation(async (args?: MockFindManyArgs) => {
         let filteredMaterials = [...baseMockMaterials];
         if (args?.where?.title && typeof args.where.title === 'object' && 'contains' in args.where.title) {
           const titleQuery = (args.where.title as { contains: string; mode?: string }).contains.toLowerCase();
@@ -124,25 +126,24 @@ describe('/api/materials', () => {
         }
         // orderBy (簡易的な実装、本番APIはPrismaが処理)
         if (args?.orderBy && typeof args.orderBy === 'object' && !Array.isArray(args.orderBy)) {
-          const sortBy = Object.keys(args.orderBy)[0] as keyof typeof baseMockMaterials[0];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const sortOrder = (args.orderBy as any)[sortBy]; // anyキャストでインデックスアクセスエラー回避
+          const [[sortBy, sortOrder]] = Object.entries(args.orderBy);
+          const key = sortBy as keyof typeof baseMockMaterials[0];
           filteredMaterials.sort((a, b) => {
-            if (a[sortBy]! < b[sortBy]!) return sortOrder === 'asc' ? -1 : 1;
-            if (a[sortBy]! > b[sortBy]!) return sortOrder === 'asc' ? 1 : -1;
+            const aVal = a[key];
+            const bVal = b[key];
+            if (aVal == null || bVal == null) return 0;
+            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
             return 0;
           });
         }
 
         const skip = args?.skip || 0;
         const take = args?.take || 10;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return Promise.resolve(filteredMaterials.slice(skip, skip + take) as any); // Promiseでラップし、anyキャスト
+        return filteredMaterials.slice(skip, skip + take);
       });
        
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // @ts-ignore - Prismaモックの型の問題を回避
-      prismaMock.material.count.mockImplementation(async (args: any) => {
+      prismaMock.material.count.mockImplementation(async (args?: MockCountArgs) => {
         let filteredMaterials = [...baseMockMaterials];
          if (args?.where?.title && typeof args.where.title === 'object' && 'contains' in args.where.title) {
           const titleQuery = (args.where.title as { contains: string; mode?: string }).contains.toLowerCase();
@@ -151,8 +152,7 @@ describe('/api/materials', () => {
         if (args?.where?.tags?.some?.name) {
           filteredMaterials = filteredMaterials.filter(m => m.tags.some(t => t.name === args!.where!.tags!.some!.name));
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return Promise.resolve(filteredMaterials.length as any); // Promiseでラップし、anyキャスト
+        return filteredMaterials.length;
       });
     });
 
@@ -309,8 +309,7 @@ describe('/api/materials', () => {
         rating: validMaterialData.rating,
         projects: []
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      prismaMock.material.create.mockResolvedValue(createdMaterialResponse as any);
+      prismaMock.material.create.mockResolvedValue(createdMaterialResponse);
 
       const request = createMockRequest('POST', validMaterialData);
       const response = await POST(request);
@@ -374,9 +373,7 @@ describe('/api/materials', () => {
       prismaMock.material.create.mockRejectedValue({
           code: 'P2002',
           meta: { target: ['slug'] },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any, // PrismaClientKnownRequestError を模倣するために any を使用
-      );
+        } as Error & { code: string; meta: { target: string[] } });
 
       const request = createMockRequest('POST', validMaterialData);
       const response = await POST(request);
@@ -456,8 +453,7 @@ describe('/api/materials', () => {
         projects: []
       };
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      prismaMock.material.create.mockResolvedValue(createdMaterialResponse as any);
+      prismaMock.material.create.mockResolvedValue(createdMaterialResponse);
 
       const request = createMockRequest('POST', noEquipmentData);
       const response = await POST(request);

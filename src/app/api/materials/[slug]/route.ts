@@ -140,8 +140,7 @@ export async function PUT(
     const { slug } = validatedRouteParams.data;
 
     const formData = await request.formData();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parsedData: Record<string, any> = {};
+    const parsedData: Record<string, unknown> = {};
     let fileToSave: File | null = null;
 
     for (const [key, value] of formData.entries()) {
@@ -217,8 +216,7 @@ export async function PUT(
       updateData.filePath = relativeFilePath; // DBには相対パスを保宙
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updatedMaterial = await prisma.$transaction(async (tx: any) => {
+    const updatedMaterial = await prisma.$transaction(async (tx) => {
       const material = await tx.material.update({
         where: { slug },
         data: updateData,
