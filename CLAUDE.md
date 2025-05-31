@@ -90,6 +90,7 @@ Please follow the structured development process documented in `docs/development
   - `fix/issue-{number}-{description}` (bug fixes)
   - `test/issue-{number}-{description}` (test additions)
   - `refactor/issue-{number}-{description}` (refactoring)
+- **IMPORTANT**: Never commit or push directly to the main branch. Always work on a separate branch and use PR
 - Update issue status to `status: in progress`
 - Use TodoWrite tool for task management
 - Commit only when tests pass
