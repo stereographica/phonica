@@ -104,6 +104,7 @@ const updateMaterialSchema = z.object({
   recordedAt: z.string().datetime({ message: "Invalid datetime string. Must be UTC ISO8601." }).optional(),
   memo: z.string().nullable().optional(),
   tags: z.array(z.string().min(1)).optional(), // タグ名の配列
+  equipmentIds: z.array(z.string().min(1)).optional(), // 機材IDの配列
   fileFormat: z.string().nullable().optional(),
   sampleRate: z.number().int().positive().nullable().optional(),
   bitDepth: z.number().int().positive().nullable().optional(),
@@ -152,6 +153,8 @@ export async function PUT(
       }
       if (key === 'tags' && typeof value === 'string') {
         parsedData[key] = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+      } else if (key === 'equipmentIds' && typeof value === 'string') {
+        parsedData[key] = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
       } else if (key === 'sampleRate' || key === 'bitDepth' || key === 'rating') {
         parsedData[key] = value && typeof value === 'string' && value.trim() !== '' ? parseInt(value, 10) : null;
       } else if (key === 'latitude' || key === 'longitude') {
@@ -243,8 +246,32 @@ export async function PUT(
         });
       }
       
-      // TODO: 機材(Equipment)の更新処理も同様にリレーションAPIを使用してここに追加する
-      // if (validatedBody.data.equipments) { ... }
+      // 機材の更新処理
+      if (validatedBody.data.equipmentIds) {
+        // 機材IDの検証
+        const existingEquipments = await tx.equipment.findMany({
+          where: {
+            id: { in: validatedBody.data.equipmentIds }
+          }
+        });
+        
+        const existingIds = existingEquipments.map((e: { id: string }) => e.id);
+        const invalidIds = validatedBody.data.equipmentIds.filter(id => !existingIds.includes(id));
+        
+        if (invalidIds.length > 0) {
+          throw new Error(`Invalid equipment IDs: ${invalidIds.join(', ')}`);
+        }
+        
+        await tx.material.update({
+          where: { id: material.id },
+          data: {
+            equipments: {
+              set: [], // 既存の関連をすべて解除
+              connect: validatedBody.data.equipmentIds.map(id => ({ id })),
+            },
+          },
+        });
+      }
 
       return tx.material.findUnique({
         where: { id: material.id },
@@ -258,7 +285,7 @@ export async function PUT(
     if (!updatedMaterial) {
       // トランザクションが失敗した場合 (materialが見つからないなど)
       if (newFilePathForCleanup) { // 新しいファイルを保存してしまっていたら削除
-        try { await fs.unlink(newFilePathForCleanup); } catch (e) { console.warn('Failed to clean up new file after transaction error:', e); }
+        try { await fs.unlink(newFilePathForCleanup); } catch (e: unknown) { console.warn('Failed to clean up new file after transaction error:', e); }
       }
       return NextResponse.json({ error: 'Material not found or update failed' }, { status: 404 });
     }

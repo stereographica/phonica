@@ -20,6 +20,10 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     material: {
       findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    equipment: {
+      findMany: jest.fn(),
     },
     $transaction: jest.fn(),
   },
@@ -38,7 +42,7 @@ jest.mock('uuid', () => ({
 
 // モック設定後にインポート
 import { NextRequest } from 'next/server';
-import { DELETE } from '../route';
+import { DELETE, PUT } from '../route';
 import { prisma } from '@/lib/prisma';
 import { 
   deleteFile as actualDeleteFile,
@@ -57,6 +61,9 @@ describe('API Route: /api/materials/[slug]', () => {
         update: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn().mockResolvedValue({ id: 'test-id' }),
         findUnique: jest.fn(),
+      },
+      equipment: {
+        findMany: jest.fn(),
       },
       materialTag: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -340,6 +347,159 @@ describe('API Route: /api/materials/[slug]', () => {
       expect(mockTx.material.delete).toHaveBeenCalledWith({
         where: { id: 'test-id' },
       });
+    });
+  });
+
+  describe('PUT', () => {
+    const createMockFormData = (data: Record<string, string | string[]>) => {
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(data)) {
+        if (Array.isArray(value)) {
+          formData.append(key, value.join(','));
+        } else {
+          formData.append(key, value);
+        }
+      }
+      return formData;
+    };
+
+    it('should update material with equipment IDs', async () => {
+      const mockSlug = 'test-material';
+      const formData = createMockFormData({
+        title: 'Updated Material',
+        memo: 'Updated memo',
+        equipmentIds: ['equip-1', 'equip-2']
+      });
+
+      // Mock form data parsing
+      const mockRequest = {
+        formData: () => Promise.resolve(formData),
+      } as unknown as NextRequest;
+
+      // Mock existing equipment
+      mockTx.equipment.findMany.mockResolvedValue([
+        { id: 'equip-1', name: 'Mixer', type: 'Mixer' },
+        { id: 'equip-2', name: 'Mic', type: 'Microphone' }
+      ]);
+
+      // Mock material update result
+      const mockMaterial = {
+        id: 'mat-1',
+        title: 'Updated Material',
+        slug: mockSlug,
+        memo: 'Updated memo'
+      };
+
+      mockTx.material.update
+        .mockResolvedValueOnce(mockMaterial) // First update call
+        .mockResolvedValueOnce(mockMaterial); // Equipment update call
+
+      // Mock final result
+      mockTx.material.findUnique.mockResolvedValue({
+        ...mockMaterial,
+        tags: [],
+        equipments: [
+          { id: 'equip-1', name: 'Mixer', type: 'Mixer' },
+          { id: 'equip-2', name: 'Mic', type: 'Microphone' }
+        ]
+      });
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
+
+      const context = { params: { slug: mockSlug } };
+      const response = await PUT(mockRequest, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.title).toBe('Updated Material');
+      expect(responseBody.equipments).toHaveLength(2);
+
+      // Verify equipment validation was called
+      expect(mockTx.equipment.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['equip-1', 'equip-2'] } }
+      });
+
+      // Verify equipment update was called
+      expect(mockTx.material.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mat-1' },
+          data: expect.objectContaining({
+            equipments: {
+              set: [],
+              connect: [{ id: 'equip-1' }, { id: 'equip-2' }],
+            },
+          }),
+        })
+      );
+    });
+
+    it('should return 400 for invalid equipment IDs', async () => {
+      const mockSlug = 'test-material';
+      const formData = createMockFormData({
+        title: 'Updated Material',
+        equipmentIds: ['equip-1', 'invalid-equip']
+      });
+
+      const mockRequest = {
+        formData: () => Promise.resolve(formData),
+      } as unknown as NextRequest;
+
+      // Mock only one equipment exists
+      mockTx.equipment.findMany.mockResolvedValue([
+        { id: 'equip-1', name: 'Mixer', type: 'Mixer' }
+      ]);
+
+      const mockMaterial = { id: 'mat-1', title: 'Updated Material', slug: mockSlug };
+      mockTx.material.update.mockResolvedValue(mockMaterial);
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        try {
+          await callback(mockTx);
+        } catch (error) {
+          throw error;
+        }
+      });
+
+      const context = { params: { slug: mockSlug } };
+      
+      await expect(PUT(mockRequest, context)).rejects.toThrow('Invalid equipment IDs: invalid-equip');
+    });
+
+    it('should handle empty equipment IDs array', async () => {
+      const mockSlug = 'test-material';
+      const formData = createMockFormData({
+        title: 'Updated Material',
+        equipmentIds: []
+      });
+
+      const mockRequest = {
+        formData: () => Promise.resolve(formData),
+      } as unknown as NextRequest;
+
+      const mockMaterial = {
+        id: 'mat-1',
+        title: 'Updated Material',
+        slug: mockSlug
+      };
+
+      mockTx.material.update.mockResolvedValue(mockMaterial);
+      mockTx.material.findUnique.mockResolvedValue({
+        ...mockMaterial,
+        tags: [],
+        equipments: []
+      });
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(mockTx));
+
+      const context = { params: { slug: mockSlug } };
+      const response = await PUT(mockRequest, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.equipments).toHaveLength(0);
+
+      // Equipment validation should not be called for empty array
+      expect(mockTx.equipment.findMany).not.toHaveBeenCalled();
     });
   });
 });
