@@ -135,8 +135,8 @@ Please follow the structured development process documented in `docs/development
 - Provide specific test steps for user
 - Address reported bugs and add edge cases to tests
 
-#### 6. Post-Approval
-- Merge PR after approval
+#### 6. Post-Review
+- Merge PR after user confirms review completion
 - Create issues for any problems found during development with:
   - Target location
   - Problem description
