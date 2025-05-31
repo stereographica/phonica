@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     
     services:
       postgres:
@@ -118,6 +121,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     needs: test
+    permissions:
+      contents: read
+      pull-requests: write
     
     steps:
     - name: Checkout code
