@@ -111,6 +111,20 @@ Please follow the structured development process documented in `docs/development
   - `npm run lint` - No lint errors
   - `npx tsc --noEmit` - No type errors
   - `npm run dev` - Dev server runs
+- Run GitHub Actions equivalent tests locally before pushing:
+  ```bash
+  # Test with CI environment settings
+  DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false
+  
+  # Build check (CI equivalent)
+  DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build
+  
+  # Lint & Type check
+  npm run lint && npx tsc --noEmit
+  
+  # Security audit
+  npm audit --audit-level=moderate
+  ```
 - Fix all errors in current task
 - For existing errors outside task scope: Check if GitHub issue exists, create if needed (Step 8)
 

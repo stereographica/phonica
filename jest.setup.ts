@@ -19,6 +19,44 @@ fetchMock.enableMocks();
 // Global alert mock
 global.alert = jest.fn();
 
+// Global File mock
+global.File = class File {
+  constructor(
+    private parts: BlobPart[],
+    public name: string,
+    private options?: FilePropertyBag
+  ) {
+    this.size = parts.reduce((acc, part) => {
+      if (typeof part === 'string') return acc + part.length;
+      if (part instanceof ArrayBuffer) return acc + part.byteLength;
+      if (part instanceof Blob) return acc + part.size;
+      return acc;
+    }, 0);
+    this.type = options?.type || '';
+    this.lastModified = options?.lastModified || Date.now();
+  }
+
+  size: number;
+  type: string;
+  lastModified: number;
+
+  async text(): Promise<string> {
+    return this.parts.join('');
+  }
+
+  slice(start?: number, end?: number, contentType?: string): Blob {
+    return new Blob(this.parts, { type: contentType || this.type });
+  }
+
+  stream(): ReadableStream {
+    return new ReadableStream();
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    return new ArrayBuffer(0);
+  }
+} as any;
+
 // Global FormData mock
 // このモックは、NextRequestのformData()メソッドが返すPromise<FormData>を解決するために使われる
 // createMockRequest内で、このモックを使って実際のFormDataインスタンスが作られる

@@ -60,6 +60,20 @@
     - [ ] `npm run lint` - lintエラーなし
     - [ ] `npx tsc --noEmit` - 型エラーなし
     - [ ] `npm run dev` - 開発サーバー起動確認
+  - GitHub Actions と同等のローカルテストを実施してください：
+    ```bash
+    # CI環境と同じ条件でテストを実行
+    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false
+    
+    # ビルドの確認（CI環境相当）
+    DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build
+    
+    # Lint & 型チェック
+    npm run lint && npx tsc --noEmit
+    
+    # セキュリティ監査
+    npm audit --audit-level=moderate
+    ```
   - タスク内で発生したエラーについては確実に解決していることを確認してください。
   - 実施したタスク外で発生している既存のエラーについては、GitHub の issue を確認し、該当する対応用 issue が作成されていない場合はステップ 8 で追加してください。
   - エラーや不整合が発生した場合は、以下のプロセスで対応してください：
