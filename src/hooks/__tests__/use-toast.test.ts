@@ -1,8 +1,15 @@
 /**
  * @jest-environment jsdom
  */
+import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { useToast, toast, reducer } from '../use-toast';
+
+type MockToast = {
+  id: string;
+  title: string;
+  open: boolean;
+};
 
 // Mock timers for testing setTimeout behavior
 jest.useFakeTimers();
@@ -112,11 +119,11 @@ describe('use-toast', () => {
     });
 
     it('should handle DISMISS_TOAST action without toastId (dismiss all)', () => {
-      const toast1 = { id: 'test-1', title: 'Test 1', open: true };
-      const toast2 = { id: 'test-2', title: 'Test 2', open: true };
+      const toast1 = { id: 'test-1', title: 'Test 1', open: true } as const;
+      const toast2 = { id: 'test-2', title: 'Test 2', open: true } as const;
 
       // Add multiple toasts by changing TOAST_LIMIT temporarily
-      let state = { toasts: [toast1, toast2] };
+      let state = { toasts: [toast1, toast2] as MockToast[] };
 
       state = reducer(state, {
         type: 'DISMISS_TOAST',
@@ -126,10 +133,10 @@ describe('use-toast', () => {
     });
 
     it('should handle DISMISS_TOAST action with non-matching toastId', () => {
-      const toast1 = { id: 'test-1', title: 'Test 1', open: true };
-      const toast2 = { id: 'test-2', title: 'Test 2', open: true };
+      const toast1 = { id: 'test-1', title: 'Test 1', open: true } as const;
+      const toast2 = { id: 'test-2', title: 'Test 2', open: true } as const;
 
-      let state = { toasts: [toast1, toast2] };
+      let state = { toasts: [toast1, toast2] as MockToast[] };
 
       state = reducer(state, {
         type: 'DISMISS_TOAST',
@@ -441,15 +448,12 @@ describe('use-toast', () => {
     it('should handle toast with action element', () => {
       const { result } = renderHook(() => useToast());
 
-      const mockAction = { 
-        altText: 'Undo',
-        onClick: jest.fn()
-      };
+      const mockAction = jest.fn();
 
       act(() => {
         result.current.toast({
           title: 'Toast with Action',
-          action: mockAction,
+          action: mockAction as unknown as React.ReactElement,
         });
       });
 

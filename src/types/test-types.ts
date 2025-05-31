@@ -25,8 +25,8 @@ export type TestMaterial = {
   id: string;
   slug: string;
   title: string;
-  tags: Array<{ id: string; name: string; slug: string }>;
-  equipments: Array<{ id: string; name: string; type: string; manufacturer: string }>;
+  tags: Array<{ id: string; name: string; slug: string; createdAt?: Date; updatedAt?: Date; materials?: never[] }>;
+  equipments: Array<{ id?: string; name: string; type: string; manufacturer: string; memo?: null; createdAt?: Date; updatedAt?: Date }>;
   [key: string]: unknown;
 };
 
@@ -35,15 +35,17 @@ export type TestEquipment = {
   id: string;
   name: string;
   type: string;
-  manufacturer: string;
+  manufacturer: string | null;
   memo?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 // Transaction function type
 export type TransactionFunction<T> = (tx: unknown) => Promise<T>;
 
-// Extend PrismaClient mock with proper typing
-export interface TypedPrismaMock extends DeepMockProxy<import('@prisma/client').PrismaClient> {
+// Extend PrismaClient mock with proper typing  
+export type TypedPrismaMock = DeepMockProxy<import('@prisma/client').PrismaClient> & {
   material: {
     findMany: jest.MockedFunction<(args?: MockFindManyArgs) => Promise<TestMaterial[]>>;
     count: jest.MockedFunction<(args?: MockCountArgs) => Promise<number>>;
@@ -54,6 +56,6 @@ export interface TypedPrismaMock extends DeepMockProxy<import('@prisma/client').
   };
   equipment: {
     findMany: jest.MockedFunction<(args?: Prisma.EquipmentFindManyArgs) => Promise<TestEquipment[]>>;
+    create: jest.MockedFunction<(args: Prisma.EquipmentCreateArgs) => Promise<TestEquipment>>;
   };
-  $transaction: jest.MockedFunction<<T>(fn: TransactionFunction<T>) => Promise<T>>;
-}
+};
