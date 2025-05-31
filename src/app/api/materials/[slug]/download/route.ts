@@ -13,8 +13,9 @@ const paramsSchema = z.object({
   slug: z.string().min(1, { message: "Material slug cannot be empty." }), 
 });
 
-interface GetRequestContext {
-  params: { slug: string }; // 修正: idからslugへ変更
+// Next.js 15.3.3 の新しい型定義
+type RouteContext = {
+  params: Promise<{ slug: string }>;
 }
 
 // TODO: UPLOAD_DIRの定義を見直し、'public' ディレクトリ基準に統一する
@@ -24,7 +25,7 @@ const BASE_PUBLIC_DIR = path.join(process.cwd(), 'public');
 
 export async function GET(
   request: NextRequest,
-  context: GetRequestContext
+  context: RouteContext
 ) {
   try {
     const paramsObject = await context.params; // ★ 追加: context.paramsをawaitで解決

@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 
-interface Params {
-  params: { id: string };
+// Next.js 15.3.3 の新しい型定義
+type RouteContext = {
+  params: Promise<{ id: string }>;
 }
 
 // GET /api/master/equipment/[id] - 特定の機材取得
-export async function GET(_request: Request, { params }: Params) {
-  const { id } = params;
+export async function GET(_request: Request, { params }: RouteContext) {
+  const { id } = await params;
   try {
     const equipment = await prisma.equipment.findUnique({
       where: { id },
@@ -27,8 +28,8 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 // PUT /api/master/equipment/[id] - 特定の機材更新
-export async function PUT(request: Request, { params }: Params) {
-  const { id } = params;
+export async function PUT(request: Request, { params }: RouteContext) {
+  const { id } = await params;
   try {
     const body = await request.json();
     const { name, type, manufacturer, memo } = body;
@@ -84,8 +85,8 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 // DELETE /api/master/equipment/[id] - 特定の機材削除
-export async function DELETE(_request: Request, { params }: Params) {
-  const { id } = params;
+export async function DELETE(_request: Request, { params }: RouteContext) {
+  const { id } = await params;
   try {
     await prisma.equipment.delete({
       where: { id },

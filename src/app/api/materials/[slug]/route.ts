@@ -12,13 +12,14 @@ const routeParamsSchema = z.object({
   slug: z.string().trim().min(1, { message: "Material slug cannot be empty." }),
 });
 
-interface GetRequestContext {
-  params: { slug: string };
+// Next.js 15.3.3 の新しい型定義
+type RouteContext = {
+  params: Promise<{ slug: string }>;
 }
 
 export async function GET(
   request: NextRequest,
-  context: GetRequestContext
+  context: RouteContext
 ) {
   try {
     const paramsObject = await context.params;
@@ -115,13 +116,9 @@ const updateMaterialSchema = z.object({
   // file: z.instanceof(File).optional(), // FormData を使う場合、スキーマでの直接バリデーションは難しいことがある
 });
 
-interface PutOrDeleteRequestContext {
-  params: { slug: string };
-}
-
 export async function PUT(
   request: NextRequest,
-  context: PutOrDeleteRequestContext
+  context: RouteContext
 ) {
   let oldFilePath: string | null = null;
   let newFilePathForCleanup: string | null = null;
@@ -332,7 +329,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest, 
-  context: PutOrDeleteRequestContext
+  context: RouteContext
 ) {
   let markedFilePath: string | null = null;
   const uploadsBaseDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
