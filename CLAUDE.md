@@ -136,7 +136,7 @@ Please follow the structured development process documented in `docs/development
 - Address reported bugs and add edge cases to tests
 
 #### 6. Post-Review
-- Merge PR after user confirms review completion
+- User will merge PR after review completion (Claude does not merge PRs)
 - Create issues for any problems found during development with:
   - Target location
   - Problem description
