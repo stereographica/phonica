@@ -85,6 +85,11 @@ Please follow the structured development process documented in `docs/development
 - Create detailed implementation steps and determine optimal execution order
 
 #### 2. Task Execution
+- First, get latest main branch:
+  ```bash
+  git checkout main
+  git pull origin main
+  ```
 - Create branch using naming convention:
   - `feature/issue-{number}-{description}` (new features)
   - `fix/issue-{number}-{description}` (bug fixes)
