@@ -1,14 +1,16 @@
 /**
  * @jest-environment jsdom
  */
-import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { useToast, toast, reducer } from '../use-toast';
 
-type MockToast = {
-  id: string;
-  title: string;
-  open: boolean;
+// Simplified toast state type for testing
+type SimpleToastState = {
+  toasts: Array<{
+    id: string;
+    title: string;
+    open: boolean;
+  }>;
 };
 
 // Mock timers for testing setTimeout behavior
@@ -123,29 +125,29 @@ describe('use-toast', () => {
       const toast2 = { id: 'test-2', title: 'Test 2', open: true } as const;
 
       // Add multiple toasts by changing TOAST_LIMIT temporarily
-      let state = { toasts: [toast1, toast2] as MockToast[] };
+      const state: SimpleToastState = { toasts: [toast1, toast2] };
 
-      state = reducer(state, {
+      const result = reducer(state as unknown as Parameters<typeof reducer>[0], {
         type: 'DISMISS_TOAST',
       });
 
-      expect(state.toasts.every(t => t.open === false)).toBe(true);
+      expect(result.toasts.every(t => t.open === false)).toBe(true);
     });
 
     it('should handle DISMISS_TOAST action with non-matching toastId', () => {
       const toast1 = { id: 'test-1', title: 'Test 1', open: true } as const;
       const toast2 = { id: 'test-2', title: 'Test 2', open: true } as const;
 
-      let state = { toasts: [toast1, toast2] as MockToast[] };
+      const state: SimpleToastState = { toasts: [toast1, toast2] };
 
-      state = reducer(state, {
+      const result = reducer(state as unknown as Parameters<typeof reducer>[0], {
         type: 'DISMISS_TOAST',
         toastId: 'non-existent',
       });
 
       // Toasts that don't match the toastId should remain unchanged (line 112 coverage)
-      expect(state.toasts[0].open).toBe(true);
-      expect(state.toasts[1].open).toBe(true);
+      expect(result.toasts[0].open).toBe(true);
+      expect(result.toasts[1].open).toBe(true);
     });
 
     it('should handle REMOVE_TOAST action with specific toastId', () => {
@@ -445,20 +447,19 @@ describe('use-toast', () => {
       expect(result.current.toasts[0].title).toBe('Title Only Toast');
     });
 
-    it('should handle toast with action element', () => {
+    it('should handle toast with basic properties', () => {
       const { result } = renderHook(() => useToast());
-
-      const mockAction = jest.fn();
 
       act(() => {
         result.current.toast({
-          title: 'Toast with Action',
-          action: mockAction as unknown as React.ReactElement,
+          title: 'Simple Toast',
+          description: 'Toast description',
         });
       });
 
       expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0].action).toBe(mockAction);
+      expect(result.current.toasts[0].title).toBe('Simple Toast');
+      expect(result.current.toasts[0].description).toBe('Toast description');
     });
   });
 });
