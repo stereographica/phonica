@@ -28,7 +28,7 @@ const GetMaterialsQuerySchema = z.object({
   // 必要に応じて他のフィルター条件を追加 (例: fileFormat, recordedAtRangeなど)
 });
 
-// eslint-disable-next-line no-unused-vars
+ 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -218,9 +218,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(newMaterial, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating material:", error);
-    if (error && error.code === 'P2002' && error.meta?.target?.includes('slug')) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002' && 
+        'meta' in error && error.meta && typeof error.meta === 'object' && 'target' in error.meta &&
+        Array.isArray(error.meta.target) && error.meta.target.includes('slug')) {
       return NextResponse.json(
         { error: "Failed to create material: Slug already exists. Please change the title." },
         { status: 409 }
