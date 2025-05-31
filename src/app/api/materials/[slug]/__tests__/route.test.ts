@@ -556,7 +556,11 @@ describe('API Route: /api/materials/[slug]', () => {
 
     it('should handle file upload', async () => {
       const mockSlug = 'test-material';
-      const mockFile = new File(['content'], 'test.wav', { type: 'audio/wav' });
+      const mockFile = {
+        name: 'test.wav',
+        size: 1000,
+        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
+      };
       
       // Mock FormData with file
       const formDataWithFile = {
@@ -575,6 +579,14 @@ describe('API Route: /api/materials/[slug]', () => {
       const mockRequest = {
         formData: () => Promise.resolve(formDataWithFile),
       } as unknown as NextRequest;
+
+      // Mock file system operations
+      (mockFs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (mockFs.writeFile as jest.Mock).mockResolvedValue(undefined);
+      
+      // Mock file-system module functions
+      (checkFileExists as jest.Mock).mockResolvedValue(true);
+      (markFileForDeletion as jest.Mock).mockResolvedValue('/path/to/marked/file.deleted_123');
 
       // Mock existing material for file replacement
       (prisma.material.findUnique as jest.Mock).mockResolvedValue({
