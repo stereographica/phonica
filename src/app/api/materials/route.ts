@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     const longitudeStr = formData.get('longitude') as string | null;
     const locationName = formData.get('locationName') as string | null;
     const ratingStr = formData.get('rating') as string | null;
-    const equipmentsStr = formData.get('equipments') as string | null;
+    const equipmentsStr = formData.get('equipmentIds') as string | null;
 
     if (!title || !recordedAt || !file) {
       return NextResponse.json(
@@ -182,17 +182,31 @@ export async function POST(request: NextRequest) {
         )
       : [];
 
-    const equipmentsToConnect = equipmentsStr
-      ? await Promise.all(
-          equipmentsStr.split(',').map(async (equipName) => {
-            const trimmedName = equipName.trim();
-            return {
-              where: { name: trimmedName },
-              create: { name: trimmedName },
-            };
-          })
-        )
-      : [];
+    // 機材IDの検証と接続処理
+    let equipmentsToConnect: { id: string }[] = [];
+    if (equipmentsStr) {
+      const equipmentIds = equipmentsStr.split(',').map(id => id.trim()).filter(id => id);
+      
+      // 存在する機材IDを検証
+      const existingEquipments = await prisma.equipment.findMany({
+        where: {
+          id: { in: equipmentIds }
+        }
+      });
+      
+      // 存在しないIDをチェック
+      const existingIds = existingEquipments.map(e => e.id);
+      const invalidIds = equipmentIds.filter(id => !existingIds.includes(id));
+      
+      if (invalidIds.length > 0) {
+        return NextResponse.json(
+          { error: `Invalid equipment IDs: ${invalidIds.join(', ')}` },
+          { status: 400 }
+        );
+      }
+      
+      equipmentsToConnect = equipmentIds.map(id => ({ id }));
+    }
 
     const newMaterial = await prisma.material.create({
       data: {
@@ -210,8 +224,7 @@ export async function POST(request: NextRequest) {
         rating: ratingStr ? parseInt(ratingStr) : null,
         tags: { connectOrCreate: tagsToConnect },
         equipments: { 
-          // @ts-expect-error Prismaの型定義と実際の使用方法の不一致のため、一時的にエラーを無視
-          connectOrCreate: equipmentsToConnect 
+          connect: equipmentsToConnect 
         },
       },
       include: { tags: true, equipments: true },

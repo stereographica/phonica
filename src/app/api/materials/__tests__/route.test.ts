@@ -111,7 +111,9 @@ describe('/api/materials', () => {
 
     beforeEach(() => {
        
-      prismaMock.material.findMany.mockImplementation(async (args: Parameters<typeof prismaMock.material.findMany>[0]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // @ts-ignore - Prismaモックの型の問題を回避
+      prismaMock.material.findMany.mockImplementation(async (args: any) => {
         let filteredMaterials = [...baseMockMaterials];
         if (args?.where?.title && typeof args.where.title === 'object' && 'contains' in args.where.title) {
           const titleQuery = (args.where.title as { contains: string; mode?: string }).contains.toLowerCase();
@@ -138,7 +140,9 @@ describe('/api/materials', () => {
         return Promise.resolve(filteredMaterials.slice(skip, skip + take) as any); // Promiseでラップし、anyキャスト
       });
        
-      prismaMock.material.count.mockImplementation(async (args: Parameters<typeof prismaMock.material.count>[0]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // @ts-ignore - Prismaモックの型の問題を回避
+      prismaMock.material.count.mockImplementation(async (args: any) => {
         let filteredMaterials = [...baseMockMaterials];
          if (args?.where?.title && typeof args.where.title === 'object' && 'contains' in args.where.title) {
           const titleQuery = (args.where.title as { contains: string; mode?: string }).contains.toLowerCase();
@@ -261,7 +265,7 @@ describe('/api/materials', () => {
       recordedAt: new Date(),
       memo: 'A very new sound',
       tags: ['new', 'test'],
-      equipments: ['Mixer Pro', 'Headphones Deluxe'],
+      equipmentIds: ['equip-1', 'equip-2'],
       fileFormat: 'WAV', 
       sampleRate: 48000, 
       bitDepth: 24,
@@ -272,6 +276,12 @@ describe('/api/materials', () => {
     };
 
     it('should create a new material and return 201', async () => {
+      // 機材の存在確認をモック
+      prismaMock.equipment.findMany.mockResolvedValue([
+        { id: 'equip-1', name: 'Mixer Pro', type: 'Mixer', manufacturer: 'ProAudio', memo: null, createdAt: new Date(), updatedAt: new Date() },
+        { id: 'equip-2', name: 'Headphones Deluxe', type: 'Headphones', manufacturer: 'AudioTech', memo: null, createdAt: new Date(), updatedAt: new Date() }
+      ]);
+
       const dynamicFilePath = `/uploads/materials/${uuidv4()}.wav`; // 動的なファイルパスを生成
       const createdMaterialResponse = {
         id: 'mat-created',
@@ -290,8 +300,8 @@ describe('/api/materials', () => {
           { id: 'tag-test', name: 'test', slug:'test', createdAt: new Date(), updatedAt: new Date(), materials: [] }
         ],
         equipments: [
-          { name: 'Mixer Pro', createdAt: new Date(), updatedAt: new Date() },
-          { name: 'Headphones Deluxe', createdAt: new Date(), updatedAt: new Date()}
+          { id: 'equip-1', name: 'Mixer Pro', type: 'Mixer', manufacturer: 'ProAudio', memo: null, createdAt: new Date(), updatedAt: new Date() },
+          { id: 'equip-2', name: 'Headphones Deluxe', type: 'Headphones', manufacturer: 'AudioTech', memo: null, createdAt: new Date(), updatedAt: new Date()}
         ],
         latitude: null,
         longitude: null,
@@ -334,9 +344,9 @@ describe('/api/materials', () => {
             ],
           },
           equipments: {
-            connectOrCreate: [
-              { where: { name: 'Mixer Pro' }, create: { name: 'Mixer Pro' } },
-              { where: { name: 'Headphones Deluxe' }, create: { name: 'Headphones Deluxe' } },
+            connect: [
+              { id: 'equip-1' },
+              { id: 'equip-2' },
             ]
           }
         }),
@@ -355,7 +365,12 @@ describe('/api/materials', () => {
     });
 
     it('should return 409 if slug already exists', async () => {
-       
+      // 機材の存在確認をモック
+      prismaMock.equipment.findMany.mockResolvedValue([
+        { id: 'equip-1', name: 'Mixer Pro', type: 'Mixer', manufacturer: 'ProAudio', memo: null, createdAt: new Date(), updatedAt: new Date() },
+        { id: 'equip-2', name: 'Headphones Deluxe', type: 'Headphones', manufacturer: 'AudioTech', memo: null, createdAt: new Date(), updatedAt: new Date() }
+      ]);
+
       prismaMock.material.create.mockRejectedValue({
           code: 'P2002',
           meta: { target: ['slug'] },
@@ -373,6 +388,12 @@ describe('/api/materials', () => {
     });
 
     it('should return 500 for other database errors on create', async () => {
+      // 機材の存在確認をモック
+      prismaMock.equipment.findMany.mockResolvedValue([
+        { id: 'equip-1', name: 'Mixer Pro', type: 'Mixer', manufacturer: 'ProAudio', memo: null, createdAt: new Date(), updatedAt: new Date() },
+        { id: 'equip-2', name: 'Headphones Deluxe', type: 'Headphones', manufacturer: 'AudioTech', memo: null, createdAt: new Date(), updatedAt: new Date() }
+      ]);
+
       prismaMock.material.create.mockRejectedValue(new Error('Some other DB error'));
       const request = createMockRequest('POST', validMaterialData);
       const response = await POST(request);
@@ -381,6 +402,77 @@ describe('/api/materials', () => {
       expect(response.status).toBe(500);
       expect(responseBody.error).toBe('Failed to create material');
       expect(prismaMock.material.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return 400 for invalid equipment IDs', async () => {
+      // 存在しない機材IDを含む場合
+      const invalidEquipmentData = {
+        ...validMaterialData,
+        equipmentIds: ['equip-1', 'invalid-equip']
+      };
+
+      // 一部のIDのみ存在する機材をモック
+      prismaMock.equipment.findMany.mockResolvedValue([
+        { id: 'equip-1', name: 'Mixer Pro', type: 'Mixer', manufacturer: 'ProAudio', memo: null, createdAt: new Date(), updatedAt: new Date() }
+      ]);
+
+      const request = createMockRequest('POST', invalidEquipmentData);
+      const response = await POST(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(responseBody.error).toBe('Invalid equipment IDs: invalid-equip');
+      expect(prismaMock.material.create).not.toHaveBeenCalled();
+    });
+
+    it('should handle empty equipment IDs array', async () => {
+      const noEquipmentData = {
+        ...validMaterialData,
+        equipmentIds: []
+      };
+
+      const dynamicFilePath = `/uploads/materials/${uuidv4()}.wav`;
+      const createdMaterialResponse = {
+        id: 'mat-created',
+        slug: 'new-sound',
+        title: noEquipmentData.title,
+        filePath: dynamicFilePath,
+        recordedAt: new Date(noEquipmentData.recordedAt),
+        memo: noEquipmentData.memo,
+        fileFormat: noEquipmentData.fileFormat,
+        sampleRate: noEquipmentData.sampleRate,
+        bitDepth: noEquipmentData.bitDepth,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: [
+          { id: 'tag-new', name: 'new', slug:'new', createdAt: new Date(), updatedAt: new Date(), materials: [] },
+          { id: 'tag-test', name: 'test', slug:'test', createdAt: new Date(), updatedAt: new Date(), materials: [] }
+        ],
+        equipments: [], // 空の配列
+        latitude: null,
+        longitude: null,
+        locationName: null,
+        rating: noEquipmentData.rating,
+        projects: []
+      };
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      prismaMock.material.create.mockResolvedValue(createdMaterialResponse as any);
+
+      const request = createMockRequest('POST', noEquipmentData);
+      const response = await POST(request);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(responseBody.equipments).toHaveLength(0);
+      expect(prismaMock.material.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          equipments: {
+            connect: []
+          }
+        }),
+        include: { tags: true, equipments: true },
+      });
     });
   });
 }); 
