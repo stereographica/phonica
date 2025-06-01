@@ -258,6 +258,7 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
     const handleClose = jest.fn();
     const handleEdited = jest.fn();
+    mockPush.mockClear();
     
     render(
       <MaterialDetailModal 
@@ -273,8 +274,11 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     const editButton = screen.getByRole('button', { name: /Edit/i });
     fireEvent.click(editButton);
     
-    expect(handleEdited).toHaveBeenCalledWith(mockMaterial.slug);
+    // Should navigate to edit page
+    expect(mockPush).toHaveBeenCalledWith(`/materials/${mockMaterial.slug}/edit`);
     expect(handleClose).toHaveBeenCalled();
+    // And also call the callback
+    expect(handleEdited).toHaveBeenCalledWith(mockMaterial.slug);
   });
 
   it('handles edit button without onMaterialEdited callback', async () => {

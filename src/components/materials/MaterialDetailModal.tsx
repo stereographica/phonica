@@ -170,12 +170,11 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
 
   const handleEdit = () => {
     if (!detailedMaterial) return;
+    router.push(`/materials/${detailedMaterial.slug}/edit`);
+    handleClose(); // Close modal after navigating to edit
+    // Call the callback if provided to refresh the list
     if (onMaterialEdited) {
         onMaterialEdited(detailedMaterial.slug);
-        handleClose(); // Close modal after callback
-    } else {
-        router.push(`/materials/${detailedMaterial.slug}/edit`);
-        handleClose(); // Close modal after navigating to edit
     }
   };
 
@@ -193,38 +192,29 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
     }
   };
 
-  // DialogDescriptionのためのIDを生成（あるいは固定のIDを使用）
-  const titleId = "material-detail-title";
-  const descriptionId = "material-detail-description";
+  // Remove manual IDs to let Radix handle accessibility automatically
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { 
       // console.log(`[Modal DEBUG] Dialog onOpenChange - open: ${open}`);
       if (!open) handleClose(); 
     }}>
-      <DialogContent 
-        className="sm:max-w-[600px] md:max-w-[700px] lg:max-w-[800px]"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-      >
+      <DialogContent className="sm:max-w-[600px] md:max-w-[700px] lg:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle id={titleId}>
-            {isFetching && "Loading Details..."}
-            {fetchError && !isFetching && "Error"}
-            {detailedMaterial && !isFetching && !fetchError && detailedMaterial.title}
-            {!detailedMaterial && !isFetching && !fetchError && "Material Details"}
+          <DialogTitle>
+            {isFetching ? "Loading Details..." : 
+             fetchError ? "Error" :
+             detailedMaterial ? detailedMaterial.title :
+             "Material Details"}
           </DialogTitle>
 
           {/* DialogDescriptionを常時レンダリングし、内容を状態に応じて変更 */} 
-          <DialogDescription id={descriptionId}>
-            {isFetching && "Fetching material information, please wait."}
-            {fetchError && !isFetching && `An error occurred while loading details: ${fetchError}`}
-            {detailedMaterial && !isFetching && !fetchError && 
-              `Recorded on: ${new Date(detailedMaterial.recordedDate).toLocaleDateString()} (Updated: ${new Date(detailedMaterial.updatedAt).toLocaleDateString()})`
-            }
-            {!detailedMaterial && !isFetching && !fetchError && 
-              (materialSlug ? "Details will appear here once loaded." : "Please select a material to view its details.")
-            }
+          <DialogDescription>
+            {isFetching ? "Fetching material information, please wait." :
+             fetchError ? `An error occurred while loading details: ${fetchError}` :
+             detailedMaterial ? `Recorded on: ${new Date(detailedMaterial.recordedDate).toLocaleDateString()} (Updated: ${new Date(detailedMaterial.updatedAt).toLocaleDateString()})` :
+             materialSlug ? "Details will appear here once loaded." : 
+             "Please select a material to view its details."}
           </DialogDescription>
         </DialogHeader>
 

@@ -84,6 +84,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
       ws.seekTo(0);
       setCurrentTime(0);
     };
+
+    const handleSeeking = () => {
+      if (!isMounted.current || wavesurferRef.current !== ws) return;
+      // Update current time when seeking
+      setCurrentTime(ws.getCurrentTime());
+    };
     
     const handleError = (err: Error | string) => { 
       if (!isMounted.current || wavesurferRef.current !== ws) return;
@@ -103,6 +109,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
     ws.on('play', handlePlay);
     ws.on('pause', handlePause);
     ws.on('finish', handleFinish);
+    ws.on('seeking', handleSeeking);
     ws.on('error', handleError);
 
     return () => {
@@ -135,9 +142,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
   
   const seek = (amount: number) => {
     if (wavesurferRef.current && !isLoading && !error && duration > 0) {
-        const currentWsTime = wavesurferRef.current.getCurrentTime();
-        const newTime = Math.max(0, Math.min(duration, currentWsTime + amount));
-        wavesurferRef.current.seekTo(newTime / duration);
+        const currentProgress = wavesurferRef.current.getCurrentTime() / duration;
+        const seekAmount = amount / duration;
+        const newProgress = Math.max(0, Math.min(1, currentProgress + seekAmount));
+        wavesurferRef.current.seekTo(newProgress);
     }
   };
 
