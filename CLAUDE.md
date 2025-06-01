@@ -106,25 +106,31 @@ Please follow the structured development process documented in `docs/development
   3. Add tests and verify coverage improvement
 
 #### 3. Quality Management
+- **CRITICAL: Pre-push Verification** - Always run ALL checks before pushing. CI failures cause significant delays:
 - Run quality checks:
   - `npm test` - All tests pass
   - `npm run lint` - No lint errors
   - `npx tsc --noEmit` - No type errors
   - `npm run dev` - Dev server runs
-- Run GitHub Actions equivalent tests locally before pushing:
+- **MANDATORY**: Run GitHub Actions equivalent tests locally before pushing. ALL must pass:
   ```bash
-  # Test with CI environment settings
+  # 1. Test with CI environment settings
   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false
   
-  # Build check (CI equivalent)
+  # 2. Build check (CI equivalent) - CRITICAL: Catches Next.js specific errors
   DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build
   
-  # Lint & Type check
+  # 3. Lint & Type check
   npm run lint && npx tsc --noEmit
   
-  # Security audit
+  # 4. Security audit
   npm audit --audit-level=moderate
   ```
+- **Common CI Failures to Check**:
+  - `useSearchParams()` must be wrapped in Suspense boundary
+  - Date formatting differences between locales (use flexible patterns)
+  - ESModule import issues (check transformIgnorePatterns in jest.config.js)
+  - Redis/BullMQ initialization in test environment
 - Fix all errors in current task
 - For existing errors outside task scope: Check if GitHub issue exists, create if needed (Step 8)
 
@@ -185,6 +191,12 @@ Please follow the structured development process documented in `docs/development
 - Remove debug code and console.logs before committing
 
 ### Quality Checklist
+**BEFORE PUSHING** (CI failures cause significant delays):
+- [ ] CI environment tests pass: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false`
+- [ ] Build succeeds: `DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build`
+- [ ] Lint & type check pass: `npm run lint && npx tsc --noEmit`
+- [ ] Security audit passes: `npm audit --audit-level=moderate`
+
 Before creating a PR, ensure:
 - [ ] All tests pass (`npm test`)
 - [ ] No lint errors (`npm run lint`)

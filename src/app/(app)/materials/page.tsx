@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
@@ -33,7 +33,7 @@ interface ApiResponse {
   };
 }
 
-export default function MaterialsPage() {
+function MaterialsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -368,5 +368,13 @@ export default function MaterialsPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function MaterialsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <MaterialsPageContent />
+    </Suspense>
   );
 }

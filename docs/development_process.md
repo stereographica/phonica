@@ -119,26 +119,30 @@ npx prisma generate      # Prisma Client生成
 
 3. 品質管理と問題対応
   - 各タスクの実行結果を迅速に検証してください。
-  - 以下の品質チェックを実施してください：
+  - **重要**: プッシュ前に必ず以下のすべての品質チェックを実施してください。1つでも失敗した場合は、修正してから再度すべてのチェックを行ってください：
     - [ ] `npm test` - 全テストがパス
     - [ ] `npm run lint` - lintエラーなし
     - [ ] `npx tsc --noEmit` - 型エラーなし
     - [ ] `npm run dev` - 開発サーバー起動確認
     - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
-  - GitHub Actions と同等のローカルテストを実施してください：
+  - **プッシュ前の必須確認**: GitHub Actions と同等のローカルテストをすべて実施してください。CIで失敗すると手戻りが大きいため、以下のコマンドをすべて成功させてからプッシュしてください：
     ```bash
-    # CI環境と同じ条件でテストを実行
+    # 1. CI環境と同じ条件でテストを実行
     DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false
     
-    # ビルドの確認（CI環境相当）
+    # 2. ビルドの確認（CI環境相当）- 特に重要：useSearchParams等のNext.js固有のエラーを検出
     DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build
     
-    # Lint & 型チェック
+    # 3. Lint & 型チェック
     npm run lint && npx tsc --noEmit
     
-    # セキュリティ監査
+    # 4. セキュリティ監査
     npm audit --audit-level=moderate
     ```
+  - **ビルドエラーの事前チェック**:
+    - Next.js 15では`useSearchParams()`をSuspense boundaryでラップする必要があります
+    - 動的インポートやサーバーサイドレンダリングに関するエラーに注意
+    - CI環境特有の問題（ロケール依存の日付フォーマット等）を考慮
   - タスク内で発生したエラーについては確実に解決していることを確認してください。
   - 実施したタスク外で発生している既存のエラーについては、GitHub の issue を確認し、該当する対応用 issue が作成されていない場合はステップ 8 で追加してください。
   - エラーや不整合が発生した場合は、以下のプロセスで対応してください：
@@ -160,6 +164,12 @@ npx prisma generate      # Prisma Client生成
 - コミット前にデバッグコードとconsole.logを削除
 
 ## 品質チェックリスト
+
+**プッシュ前**の必須確認（CIで失敗すると手戻りが大きいため）：
+- [ ] CI環境想定のテスト成功（`DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false`）
+- [ ] ビルド成功（`DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build`）
+- [ ] lintと型チェック成功（`npm run lint && npx tsc --noEmit`）
+- [ ] セキュリティ監査パス（`npm audit --audit-level=moderate`）
 
 PRを作成する前に確認：
 - [ ] 全テストがパス（`npm test`）
