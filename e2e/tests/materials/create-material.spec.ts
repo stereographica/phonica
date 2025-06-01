@@ -15,25 +15,25 @@ test.describe('素材作成', () => {
 
   test('素材作成フォームが正しく表示される', async ({ page }) => {
     // ページタイトルの確認
-    await expect(page.locator('h1')).toHaveText('素材作成');
+    await expect(page.locator('h1')).toHaveText('Create Material');
 
     // 必須フィールドの存在確認
-    await expect(page.locator('label:has-text("タイトル")')).toBeVisible();
-    await expect(page.locator('label:has-text("音声ファイル")')).toBeVisible();
-    await expect(page.locator('label:has-text("説明")')).toBeVisible();
-    await expect(page.locator('label:has-text("備考")')).toBeVisible();
+    await expect(page.locator('label:has-text("Title")')).toBeVisible();
+    await expect(page.locator('label:has-text("Audio File")')).toBeVisible();
+    await expect(page.locator('label:has-text("Description")')).toBeVisible();
+    await expect(page.locator('label:has-text("Memo")')).toBeVisible();
 
     // 位置情報フィールド
-    await expect(page.locator('label:has-text("緯度")')).toBeVisible();
-    await expect(page.locator('label:has-text("経度")')).toBeVisible();
+    await expect(page.locator('label:has-text("Latitude")')).toBeVisible();
+    await expect(page.locator('label:has-text("Longitude")')).toBeVisible();
 
     // 技術仕様フィールド
-    await expect(page.locator('label:has-text("サンプルレート")')).toBeVisible();
-    await expect(page.locator('label:has-text("ビットデプス")')).toBeVisible();
-    await expect(page.locator('label:has-text("チャンネル数")')).toBeVisible();
+    await expect(page.locator('label:has-text("Sample Rate")')).toBeVisible();
+    await expect(page.locator('label:has-text("Bit Depth")')).toBeVisible();
+    await expect(page.locator('label:has-text("Channels")')).toBeVisible();
 
     // 送信ボタン
-    await expect(page.locator('button[type="submit"]')).toHaveText('作成');
+    await expect(page.locator('button[type="submit"]')).toHaveText('Create');
   });
 
   test('必須フィールドが空の場合エラーが表示される', async ({ page }) => {
@@ -41,24 +41,24 @@ test.describe('素材作成', () => {
     await form.submitForm();
 
     // バリデーションエラーの確認
-    await expect(await form.hasValidationError('タイトル')).toBeTruthy();
-    await expect(await form.hasValidationError('音声ファイル')).toBeTruthy();
+    await expect(await form.hasValidationError('Title')).toBeTruthy();
+    await expect(await form.hasValidationError('Audio File')).toBeTruthy();
   });
 
   test('有効な素材を作成できる', async ({ page }) => {
     // フォームに入力
-    await form.fillByLabel('タイトル', 'E2Eテスト素材');
-    await form.fillTextareaByLabel('説明', 'E2Eテストで作成された素材です');
-    await form.fillTextareaByLabel('備考', 'テスト用のメモ');
+    await form.fillByLabel('Title', 'E2E Test Material');
+    await form.fillTextareaByLabel('Description', 'Material created by E2E test');
+    await form.fillTextareaByLabel('Memo', 'Test memo');
     
     // 位置情報
-    await form.fillByLabel('緯度', '35.6762');
-    await form.fillByLabel('経度', '139.6503');
+    await form.fillByLabel('Latitude', '35.6762');
+    await form.fillByLabel('Longitude', '139.6503');
 
     // 技術仕様
-    await form.selectByLabel('サンプルレート', '48000');
-    await form.selectByLabel('ビットデプス', '24');
-    await form.selectByLabel('チャンネル数', '2');
+    await form.selectByLabel('Sample Rate', '48000');
+    await form.selectByLabel('Bit Depth', '24');
+    await form.selectByLabel('Channels', '2');
 
     // テスト用の音声ファイルを作成（実際のE2E環境では適切なテストファイルを用意）
     const testAudioPath = path.join(process.cwd(), 'e2e', 'fixtures', 'test-audio.wav');
@@ -76,26 +76,26 @@ test.describe('素材作成', () => {
 
     // 成功メッセージまたはリダイレクトを確認
     // 実際の挙動に応じて調整が必要
-    const successToast = page.locator('[role="alert"]:has-text("作成しました")');
+    const successToast = page.locator('[role="alert"]:has-text("Created successfully")');
     const isRedirected = page.url().includes('/materials/') && !page.url().includes('/new');
     
     // いずれかの成功インジケーターを確認
-    await expect(successToast.or(page.locator('h1:has-text("素材一覧")'))).toBeVisible({ timeout: 10000 });
+    await expect(successToast.or(page.locator('h1:has-text("Materials")'))).toBeVisible({ timeout: 10000 });
   });
 
   test('位置情報の入力バリデーションが機能する', async ({ page }) => {
     // 無効な緯度を入力
-    await form.fillByLabel('緯度', '91'); // 緯度は-90〜90の範囲
-    await form.fillByLabel('経度', '180');
+    await form.fillByLabel('Latitude', '91'); // 緯度は-90〜90の範囲
+    await form.fillByLabel('Longitude', '180');
 
     // タイトルとファイルも入力（他のバリデーションを回避）
-    await form.fillByLabel('タイトル', 'テスト');
+    await form.fillByLabel('Title', 'Test');
 
     // フォーム送信
     await form.submitForm();
 
     // エラーメッセージの確認
-    const hasLatError = await form.hasValidationError('緯度');
+    const hasLatError = await form.hasValidationError('Latitude');
     const hasGeneralError = await form.getErrorMessage();
     
     // いずれかのエラー表示を確認
@@ -104,10 +104,10 @@ test.describe('素材作成', () => {
 
   test('キャンセルボタンで素材一覧に戻る', async ({ page }) => {
     // キャンセルボタンをクリック
-    await page.click('button:has-text("キャンセル"), a:has-text("キャンセル")');
+    await page.click('button:has-text("Cancel"), a:has-text("Cancel")');
 
     // 素材一覧ページに戻ることを確認
     await expect(page).toHaveURL('/materials');
-    await expect(page.locator('h1')).toHaveText('素材一覧');
+    await expect(page.locator('h1')).toHaveText('Materials');
   });
 });

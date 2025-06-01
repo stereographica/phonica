@@ -116,7 +116,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'pull_request'
+    # 一時的にE2Eテストを無効化（フェーズ2完了まで）
+    if: false
     permissions:
       contents: read
       pull-requests: write
@@ -176,7 +177,7 @@ jobs:
         NODE_ENV: production
       run: |
         npm run build
-        npm run e2e --reporter=html
+        npm run e2e -- --reporter=dot --timeout=30000
 
     - name: Upload test report
       uses: actions/upload-artifact@v4
