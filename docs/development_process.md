@@ -18,6 +18,12 @@ npx tsc --noEmit    # 型チェック（ファイル出力なし）
 npx prisma migrate dev    # マイグレーション実行
 npx prisma studio        # Prisma Studio起動（DB確認用）
 npx prisma generate      # Prisma Client生成
+
+# E2Eテスト
+npm run e2e              # E2Eテスト実行
+npm run e2e:ui           # UIモードでE2Eテスト実行
+npm run e2e:debug        # デバッグモードでE2Eテスト実行
+npm run e2e:report       # E2Eテストレポート表示
 ```
 
 ### アーキテクチャ概要
@@ -29,6 +35,7 @@ npx prisma generate      # Prisma Client生成
 - **UI Components**: shadcn/ui + Radix UI
 - **Styling**: Tailwind CSS
 - **Testing**: Jest + React Testing Library
+- **E2E Testing**: Playwright
 - **Background Jobs**: BullMQ + Redis
 
 ### ディレクトリ構造
@@ -40,6 +47,7 @@ npx prisma generate      # Prisma Client生成
 - `/src/types/` - TypeScript型定義
 - `/prisma/` - DBスキーマ・マイグレーション
 - `/docs/` - プロジェクトドキュメント
+- `/e2e/` - E2Eテスト（Playwright）
 
 ### データベーススキーマ
 主要エンティティ：
@@ -116,6 +124,11 @@ npx prisma generate      # Prisma Client生成
      - ユーザー中心のテストを書く（実装の詳細ではなく観察可能な動作に焦点）
      - 適切なモッキング戦略を使用
      - TDDの原則を正しく適用
+   - **E2Eテストの保守**: UI や操作フローを変更した場合は、必ず関連する E2E テストも更新してください：
+     - HTML構造を変更した場合はセレクターを更新
+     - 操作フローを変更した場合はテストステップを更新
+     - 新機能には対応するE2Eテストを追加
+     - 削除した機能のE2Eテストは削除
 
 3. 品質管理と問題対応
   - 各タスクの実行結果を迅速に検証してください。
@@ -125,6 +138,7 @@ npx prisma generate      # Prisma Client生成
     - [ ] `npx tsc --noEmit` - 型エラーなし
     - [ ] `npm run dev` - 開発サーバー起動確認
     - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
+    - [ ] UI変更時は関連するE2Eテストを更新
   - **プッシュ前の必須確認**: GitHub Actions と同等のローカルテストをすべて実施してください。CIで失敗すると手戻りが大きいため、以下のコマンドをすべて成功させてからプッシュしてください：
     ```bash
     # 1. CI環境と同じ条件でテストを実行
@@ -138,6 +152,9 @@ npx prisma generate      # Prisma Client生成
     
     # 4. セキュリティ監査
     npm audit --audit-level=moderate
+    
+    # 5. E2Eテスト（オプション：重要な機能変更時）
+    npm run e2e -- --project=chromium tests/smoke.spec.ts
     ```
   - **ビルドエラーの事前チェック**:
     - Next.js 15では`useSearchParams()`をSuspense boundaryでラップする必要があります
@@ -178,6 +195,8 @@ PRを作成する前に確認：
 - [ ] 開発サーバーが正常起動（`npm run dev`）
 - [ ] 全カバレッジ指標（Statements, Branches, Functions, Lines）が80%超
 - [ ] 新規ファイルには対応するテストファイルを作成
+- [ ] UI/フロー変更時はE2Eテストを更新済み
+- [ ] 変更した機能のE2Eテストがパス（`npm run e2e -- --project=chromium`）
 
 ## 重要な注意事項
 
@@ -233,6 +252,7 @@ ZIPファイル生成などのバックグラウンドタスクにBullMQを使�
   - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
   - [ ] 不要なconsole.logやデバッグコードを削除済み
   - [ ] CLAUDE.mdの更新が必要な場合は更新済み
+  - [ ] UI/フロー変更時は関連するE2Eテストを更新済み
 
   以下のフォーマットで依頼します。
 

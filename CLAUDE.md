@@ -18,7 +18,7 @@ npm run start        # Start production server
 ### Code Quality
 ```bash
 npm run lint         # Run ESLint
-npm test            # Run all tests
+npm test            # Run all unit tests
 npx tsc --noEmit    # Type check without emitting files
 ```
 
@@ -27,6 +27,14 @@ npx tsc --noEmit    # Type check without emitting files
 npx prisma migrate dev    # Run database migrations
 npx prisma studio        # Open Prisma Studio for database inspection
 npx prisma generate      # Generate Prisma Client
+```
+
+### E2E Testing
+```bash
+npm run e2e          # Run all E2E tests
+npm run e2e:ui       # Run E2E tests with UI mode (for debugging)
+npm run e2e:debug    # Run E2E tests in debug mode
+npm run e2e:report   # Show E2E test report
 ```
 
 ## Architecture
@@ -40,6 +48,7 @@ npx prisma generate      # Generate Prisma Client
 - **UI Components**: shadcn/ui with Radix UI primitives
 - **Styling**: Tailwind CSS
 - **Testing**: Jest with React Testing Library
+- **E2E Testing**: Playwright
 - **Background Jobs**: BullMQ with Redis
 
 ### Directory Structure
@@ -51,6 +60,7 @@ npx prisma generate      # Generate Prisma Client
 - `/src/types/` - TypeScript type definitions
 - `/prisma/` - Database schema and migrations
 - `/docs/` - Project documentation
+- `/e2e/` - End-to-end tests with Playwright
 
 ### Key Design Patterns
 
@@ -182,6 +192,12 @@ Please follow the structured development process documented in `docs/development
   - Avoiding tests that depend on implementation details
   - Using appropriate mocking strategies
   - Following TDD principles properly
+- **E2E Test Maintenance**: When modifying UI or user flows, ALWAYS update corresponding E2E tests:
+  - Update selectors if HTML structure changes
+  - Update test steps if user flow changes
+  - Add new E2E tests for new features
+  - Remove E2E tests for deleted features
+  - Run `npm run e2e` locally to verify changes before pushing
 
 ### Code Conventions
 - Use TypeScript strict mode
@@ -204,6 +220,8 @@ Before creating a PR, ensure:
 - [ ] Dev server runs without errors (`npm run dev`)
 - [ ] All coverage metrics (Statements, Branches, Functions, Lines) exceed 80%
 - [ ] New files have corresponding test files
+- [ ] E2E tests pass for modified features (`npm run e2e -- --project=chromium`)
+- [ ] E2E tests updated if UI/flow changed
 
 ### Important Notes
 - Do not change technology stack versions without approval

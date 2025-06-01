@@ -47,3 +47,9 @@ next-env.d.ts
 /src/generated/prisma
 
 /public/uploads
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/e2e-results/

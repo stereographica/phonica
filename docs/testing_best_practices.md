@@ -193,6 +193,82 @@ Object.defineProperty(dateInput, 'value', {
 - [Kent C. Dodds - Testing Implementation Details](https://kentcdodds.com/blog/testing-implementation-details)
 - [Next.js - Testing](https://nextjs.org/docs/testing)
 
+## 8. E2Eテストのベストプラクティス
+
+### 8.1 E2Eテストの目的
+
+E2Eテストは、実際のユーザーの操作フローを検証し、システム全体が正しく動作することを確認します。
+
+### 8.2 Playwrightを使用したE2Eテスト
+
+**テストの構成**:
+```typescript
+// e2e/tests/materials/materials-list.spec.ts
+import { test, expect } from '../../fixtures/test-fixtures';
+import { NavigationHelper } from '../../helpers/navigation';
+
+test.describe('素材一覧ページ', () => {
+  test('素材一覧ページが正しく表示される', async ({ page }) => {
+    // ユーザーの操作をシミュレート
+    await page.goto('/materials');
+    
+    // ユーザーが見る内容を検証
+    await expect(page.locator('h1')).toHaveText('素材一覧');
+  });
+});
+```
+
+### 8.3 E2Eテストの原則
+
+1. **ユーザー視点での記述**
+   - 実装の詳細ではなく、ユーザーの操作と期待される結果に焦点
+
+2. **独立性の確保**
+   - 各テストは他のテストに依存しない
+   - テストデータの作成と削除を各テストで管理
+
+3. **適切な待機処理**
+   ```typescript
+   // ❌ 悪い例：固定時間の待機
+   await page.waitForTimeout(3000);
+   
+   // ✅ 良い例：条件ベースの待機
+   await page.waitForSelector('h1:has-text("素材一覧")');
+   await page.waitForLoadState('networkidle');
+   ```
+
+4. **ヘルパー関数の活用**
+   ```typescript
+   // 再利用可能なヘルパーを作成
+   class NavigationHelper {
+     async goToMaterialsPage() {
+       await this.page.goto('/materials');
+       await this.page.waitForLoadState('networkidle');
+     }
+   }
+   ```
+
+### 8.4 E2Eテストとユニットテストの使い分け
+
+- **ユニットテスト**: 個々の関数やコンポーネントの動作
+- **統合テスト**: 複数のコンポーネントの連携
+- **E2Eテスト**: ユーザーの実際の操作フロー全体
+
+### 8.5 CI/CDでのE2Eテスト
+
+GitHub Actionsでの実行:
+- PRごとにスモークテストを実行
+- メインブランチへのマージ前に全E2Eテストを実行
+- 失敗時はスクリーンショットとトレースを保存
+
+### 8.6 E2Eテストの保守
+
+**画面変更時の対応**:
+- UIやフローの変更時は、必ず関連するE2Eテストも更新
+- セレクターの変更に追従
+- 新機能には対応するE2Eテストを追加
+- 削除された機能のテストは削除
+
 ---
 
 最終更新日: 2025年6月1日
