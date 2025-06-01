@@ -36,13 +36,15 @@ test.describe('素材作成', () => {
     await expect(page.locator('button[type="submit"]')).toHaveText('Create');
   });
 
-  test('必須フィールドが空の場合エラーが表示される', async ({ page }) => {
+  test('必須フィールドが空の場合エラーが表示される', async () => {
     // フォームを送信
     await form.submitForm();
 
     // バリデーションエラーの確認
-    await expect(await form.hasValidationError('Title')).toBeTruthy();
-    await expect(await form.hasValidationError('Audio File')).toBeTruthy();
+    const hasTitleError = await form.hasValidationError('Title');
+    const hasFileError = await form.hasValidationError('Audio File');
+    expect(hasTitleError).toBeTruthy();
+    expect(hasFileError).toBeTruthy();
   });
 
   test('有効な素材を作成できる', async ({ page }) => {
@@ -77,13 +79,13 @@ test.describe('素材作成', () => {
     // 成功メッセージまたはリダイレクトを確認
     // 実際の挙動に応じて調整が必要
     const successToast = page.locator('[role="alert"]:has-text("Created successfully")');
-    const isRedirected = page.url().includes('/materials/') && !page.url().includes('/new');
+    // const isRedirected = page.url().includes('/materials/') && !page.url().includes('/new');
     
     // いずれかの成功インジケーターを確認
     await expect(successToast.or(page.locator('h1:has-text("Materials")'))).toBeVisible({ timeout: 10000 });
   });
 
-  test('位置情報の入力バリデーションが機能する', async ({ page }) => {
+  test('位置情報の入力バリデーションが機能する', async () => {
     // 無効な緯度を入力
     await form.fillByLabel('Latitude', '91'); // 緯度は-90〜90の範囲
     await form.fillByLabel('Longitude', '180');
