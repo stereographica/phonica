@@ -53,7 +53,7 @@ const mockMaterialData = {
   longitude: 139.767125,
   memo: 'Original memo',
   tags: [{ id: '1', name: 'nature' }, { id: '2', name: 'park' }],
-  equipment: [{ id: '1', name: 'Recorder A' }, { id: '2', name: 'Mic B' }],
+  equipments: [{ id: '1', name: 'Recorder A' }, { id: '2', name: 'Mic B' }],
   rating: 4,
   locationName: 'Test Location',
   userId: 'user-123',

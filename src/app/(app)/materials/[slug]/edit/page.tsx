@@ -18,7 +18,7 @@ interface MaterialData {
   recordedDate: string; // ISO String
   memo: string | null;
   tags: { name: string }[]; // name の配列
-  equipment?: { id: string; name: string }[]; // 機材の配列
+  equipments?: { id: string; name: string }[]; // 機材の配列
   filePath: string;
   fileFormat: string | null;
   sampleRate: number | null;
@@ -95,7 +95,7 @@ export default function EditMaterialPage() {
       setLongitude(data.longitude?.toString() || '');
       setLocationName(data.locationName || '');
       setRating(data.rating?.toString() || '');
-      setSelectedEquipmentIds(data.equipment?.map(e => e.id) || []);
+      setSelectedEquipmentIds(data.equipments?.map(e => e.id) || []);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching data.');

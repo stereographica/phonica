@@ -56,7 +56,7 @@ export async function GET(
       id: material.id,
       slug: material.slug,
       title: material.title,
-      description: material.memo, // `memo` を `description`としてマップ (または `memo` のまま送信)
+      memo: material.memo, // フロントエンド側でmemoを期待しているため
       recordedDate: material.recordedAt.toISOString(),
       categoryName: null, // スキーマにCategoryがないためnull
       tags: material.tags.map(tag => ({
@@ -75,7 +75,6 @@ export async function GET(
       longitude: material.longitude,
       locationName: material.locationName, // スキーマに合わせて追加
       rating: material.rating,
-      notes: material.memo, // `memo` を `notes` としてもマップ (どちらか一方、または両方。仕様による)
       equipments: material.equipments.map(equipment => ({
         id: equipment.id,
         name: equipment.name,
