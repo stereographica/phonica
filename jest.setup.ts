@@ -3,6 +3,7 @@ import { mockDeep, mockReset } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
 import { prisma as prismaClient } from '@/lib/prisma'; // 実際のPrisma Clientインスタンス
 import fetchMock from 'jest-fetch-mock';
+import { TypedPrismaMock } from '@/types/test-types';
 
 // Prisma Client のモックを作成
 jest.mock('@/lib/prisma', () => ({
@@ -10,13 +11,58 @@ jest.mock('@/lib/prisma', () => ({
   prisma: mockDeep<PrismaClient>(),
 }));
 
-export const prismaMock = prismaClient as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
+export const prismaMock = prismaClient as unknown as TypedPrismaMock;
 
 // Global fetch mock
 fetchMock.enableMocks();
 
 // Global alert mock
 global.alert = jest.fn();
+
+// Global ResizeObserver mock
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
+// Global File mock
+global.File = class File {
+  constructor(
+    private parts: BlobPart[],
+    public name: string,
+    private options?: FilePropertyBag
+  ) {
+    this.size = parts.reduce((acc, part) => {
+      if (typeof part === 'string') return acc + part.length;
+      if (part instanceof ArrayBuffer) return acc + part.byteLength;
+      if (part instanceof Blob) return acc + part.size;
+      return acc;
+    }, 0);
+    this.type = options?.type || '';
+    this.lastModified = options?.lastModified || Date.now();
+  }
+
+  size: number;
+  type: string;
+  lastModified: number;
+
+  async text(): Promise<string> {
+    return this.parts.join('');
+  }
+
+  slice(start?: number, end?: number, contentType?: string): Blob {
+    return new Blob(this.parts, { type: contentType || this.type });
+  }
+
+  stream(): ReadableStream {
+    return new ReadableStream();
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    return new ArrayBuffer(0);
+  }
+} as any;
 
 // Global FormData mock
 // このモックは、NextRequestのformData()メソッドが返すPromise<FormData>を解決するために使われる
@@ -80,24 +126,35 @@ beforeEach(() => {
 // Mock NextResponse.json
 jest.mock('next/server', () => {
   const originalModule = jest.requireActual('next/server');
+  
+  // Next.js 15.3.3 互換のモック
+  class MockNextResponse extends Response {
+    static json(body: any, init?: ResponseInit) {
+      const response = new Response(JSON.stringify(body), {
+        ...init,
+        headers: {
+          'content-type': 'application/json',
+          ...(init?.headers || {}),
+        },
+      });
+      
+      // Response-like オブジェクトを返す
+      return Object.create(response, {
+        json: {
+          value: async () => body,
+        },
+        status: {
+          value: init?.status || 200,
+        },
+        ok: {
+          value: (init?.status || 200) >= 200 && (init?.status || 200) < 300,
+        },
+      });
+    }
+  }
+  
   return {
     ...originalModule,
-    NextResponse: {
-      ...originalModule.NextResponse,
-      json: jest.fn((body, init) => {
-        // 実際のレスポンスオブジェクトに近い形でモックする
-        // テストで status や headers を確認できるようにする
-        return {
-          json: async () => body, // .json() メソッドは Promise を返す body を持つオブジェクトを返す
-          status: init?.status || 200,
-          headers: new Headers(init?.headers),
-          ok: (init?.status || 200) >= 200 && (init?.status || 200) < 300,
-          redirect: jest.fn(),
-          text: async () => JSON.stringify(body),
-          clone: jest.fn(),
-          // 必要に応じて他のプロパティやメソッドも追加
-        } as unknown as Response; // Response 型にキャストして互換性を持たせる
-      }),
-    },
+    NextResponse: MockNextResponse,
   };
 }); 

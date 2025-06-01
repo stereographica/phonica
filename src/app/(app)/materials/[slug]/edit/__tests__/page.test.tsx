@@ -5,19 +5,19 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EditMaterialPage from '../page';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { useParams, useRouter } from 'next/navigation';
 // import '../../../../../../global.mock'; // fetch, alert, FormData などのグローバルモック (REMOVED)
 
 // next/navigation のモック
 const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
+const mockUseParams = jest.fn();
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
     back: mockRouterBack,
   }),
-  useParams: () => ({ slug: 'test-slug' }),
+  useParams: () => mockUseParams(),
   useSearchParams: () => ({
     get: jest.fn(),
   }),
@@ -56,6 +56,7 @@ beforeEach(() => {
   fetchMock.resetMocks();
   mockRouterPush.mockClear();
   mockRouterBack.mockClear();
+  mockUseParams.mockReturnValue({ slug: 'test-slug' });
   if (typeof mockAppend !== 'undefined') mockAppend.mockClear(); 
   (global.alert as jest.Mock).mockClear();
   fetchMock.mockResponseOnce(JSON.stringify(mockMaterialData));
@@ -190,78 +191,92 @@ describe('EditMaterialPage', () => {
     });
   });
 
-  test.skip('shows error if title is empty on submit', async () => {
-    await act(async () => {
-      render(<EditMaterialPage />);
+  test('shows error if title is empty on submit', async () => {
+    render(<EditMaterialPage />);
+    
+    // 初期ローディングが完了するまで待つ
+    await waitFor(() => {
+      expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument();
     });
-    await waitFor(() => expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument());
+    
+    // タイトル入力欄をクリアする
     const titleInput = screen.getByLabelText(/title/i) as HTMLInputElement;
-    await act(async () => {
-      await user.clear(titleInput);
-    });
-    const saveButton = screen.getByRole('button', { name: /update material/i });
-    await act(async () => {
-      await user.click(saveButton);
-    });
+    await user.clear(titleInput);
     
+    // タイトルが空であることを確認
+    expect(titleInput).toHaveValue('');
+    
+    // 送信ボタンをクリック - formのsubmitイベントをトリガー
+    const form = screen.getByTestId('edit-material-form');
+    fireEvent.submit(form);
+    
+    // エラーメッセージが表示されるまで待つ
     await waitFor(() => {
-      const alertTitle = screen.getByTestId('error-message');
-      expect(alertTitle).toBeInTheDocument();
-      expect(alertTitle).toHaveTextContent(/Title is required/i);
-    }, { timeout: 7000 });
+      const errorMessage = screen.getByRole('alert');
+      expect(errorMessage).toHaveTextContent(/Title is required/i);
+    });
 
+    // APIが呼ばれないことを確認
     expect(global.fetch).toHaveBeenCalledTimes(1); // Initial fetch only
     expect(global.alert).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  test.skip('shows error if recordedAt is empty on submit', async () => {
-    await act(async () => {
-      render(<EditMaterialPage />);
+  test('shows error if recordedAt is empty on submit', async () => {
+    render(<EditMaterialPage />);
+    
+    // 初期ローディングが完了するまで待つ
+    await waitFor(() => {
+      expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument();
     });
-    await waitFor(() => expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument());
+    
+    // 録音日時入力欄をクリアする
     const recordedAtInput = screen.getByLabelText(/recorded at/i) as HTMLInputElement;
-    await act(async () => {
-      await user.clear(recordedAtInput);
-    });
-    const saveButton = screen.getByRole('button', { name: /update material/i });
-    await act(async () => {
-      await user.click(saveButton);
-    });
-
-    await waitFor(() => {
-      const alertRecordedAt = screen.getByTestId('error-message');
-      expect(alertRecordedAt).toBeInTheDocument();
-      expect(alertRecordedAt).toHaveTextContent(/Recorded At is required/i);
-    }, { timeout: 7000 });
+    await user.clear(recordedAtInput);
     
+    // 録音日時が空であることを確認
+    expect(recordedAtInput).toHaveValue('');
+    
+    // 送信ボタンをクリック - formのsubmitイベントをトリガー
+    const form = screen.getByTestId('edit-material-form');
+    fireEvent.submit(form);
+
+    // エラーメッセージが表示されるまで待つ
+    await waitFor(() => {
+      const errorMessage = screen.getByRole('alert');
+      expect(errorMessage).toHaveTextContent(/Recorded At is required/i);
+    });
+    
+    // APIが呼ばれないことを確認
     expect(global.fetch).toHaveBeenCalledTimes(1); // Initial fetch only
     expect(global.alert).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  test.skip('shows API error if submission fails', async () => {
-    await act(async () => {
-      render(<EditMaterialPage />);
-    });
-    await waitFor(() => expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument());
-    fetchMock.mockResponseOnce(JSON.stringify({ error: 'Failed to Update' }), { status: 500 });
-    const saveButton = screen.getByRole('button', { name: /update material/i });
-    await act(async () => {
-      await user.click(saveButton);
-    });
-
+  test('shows API error if submission fails', async () => {
+    render(<EditMaterialPage />);
+    
     await waitFor(() => {
-      const alertApiError = screen.getByTestId('error-message');
-      expect(alertApiError).toBeInTheDocument();
+      expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument();
+    });
+    
+    // APIエラーをモック
+    fetchMock.mockResponseOnce(JSON.stringify({ error: 'Failed to Update' }), { status: 500 });
+    
+    const saveButton = screen.getByRole('button', { name: /update material/i });
+    await user.click(saveButton);
+
+    // エラーメッセージが表示されるまで待つ
+    await waitFor(() => {
+      const alertApiError = screen.getByRole('alert');
       expect(alertApiError).toHaveTextContent(/Failed to Update/i);
-    }, { timeout: 7000 });
+    });
 
     expect(global.alert).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  it.skip('submits the form with correctly formatted recordedAt', async () => {
+  it('submits the form with correctly formatted recordedAt', async () => {
     await act(async () => {
       render(<EditMaterialPage />);
     });
@@ -311,5 +326,39 @@ describe('EditMaterialPage', () => {
     // mockRouterPush が /materials で呼ばれることを期待するのではなく、
     // window.location.pathname が変更されるかなどを確認する必要があるかもしれません（Next.jsのテスト戦略による）。
     // ここでは、mockRouterBackの呼び出しを期待する元々のテスト意図を一旦コメントアウトします。
+  });
+
+  it('handles invalid date format when setting recordedAt', async () => {
+    fetchMock.resetMocks();
+    fetchMock.mockResponseOnce(JSON.stringify({
+      ...mockMaterialData,
+      recordedDate: 'invalid-date'
+    }));
+    
+    await act(async () => {
+      render(<EditMaterialPage />);
+    });
+    await waitFor(() => expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument());
+    
+    const recordedAtInput = screen.getByLabelText(/recorded at/i) as HTMLInputElement;
+    // Invalid date should result in empty value
+    expect(recordedAtInput.value).toBe('');
+  });
+
+  it('handles null recordedDate when setting initial values', async () => {
+    fetchMock.resetMocks();
+    fetchMock.mockResponseOnce(JSON.stringify({
+      ...mockMaterialData,
+      recordedDate: null
+    }));
+    
+    await act(async () => {
+      render(<EditMaterialPage />);
+    });
+    await waitFor(() => expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument());
+    
+    const recordedAtInput = screen.getByLabelText(/recorded at/i) as HTMLInputElement;
+    // Null date should result in empty value
+    expect(recordedAtInput.value).toBe('');
   });
 });

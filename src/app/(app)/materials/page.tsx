@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
@@ -12,481 +12,369 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle, ChevronDown, ChevronUp, Search, Trash2 } from 'lucide-react';
+import { PlusCircle, Search, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MaterialDetailModal } from '@/components/materials/MaterialDetailModal';
-import { DeleteConfirmationModal } from '@/components/materials/DeleteConfirmationModal';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import { Input } from '@/components/ui/input';
-import { useToast } from "@/hooks/use-toast";
-import { Material, Tag } from "@/types/material";
-import { PaginationState } from '@tanstack/react-table';
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Currently unused for tag filter
+import { Material } from '@/types/material';
 
-// 表示用の素材データの型 (Prismaの型とは異なる場合がある)
-// Prisma の Material モデルに合わせて調整
-// interface ApiResponse {
-//   data: Material[];
-//   pagination: {
-//     page: number;
-//     limit: number;
-//     totalPages: number;
-//     totalItems: number;
-//   };
-// }
+interface ApiResponse {
+  data: Material[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalItems: number;
+  };
+}
 
-// const DEBOUNCE_DELAY = 500; // Unused
-
-export default function MaterialsPage() {
+function MaterialsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
-
+  
+  // State
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Delete confirmation modal state
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
-
-  // Pagination state
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: searchParams.get('page') ? Number(searchParams.get('page')) - 1 : 0,
-    pageSize: searchParams.get('limit') ? Number(searchParams.get('limit')) : 10,
+  const [selectedMaterialSlug, setSelectedMaterialSlug] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+    totalItems: 0,
   });
-  // const [totalItems, setTotalItems] = useState(0); // Unused for now
-  const [totalPages, setTotalPages] = useState(0);
-
-  // Sorting state
-  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'recordedAt');
-  const [sortOrder, setSortOrder] = useState(searchParams.get('sortOrder') || 'desc');
-
-  // Filtering state
-  const [titleFilter, setTitleFilter] = useState(searchParams.get('title') || '');
-  const [tagFilter, setTagFilter] = useState(searchParams.get('tag') || '');
+  
+  // Filter state
   const [tempTitleFilter, setTempTitleFilter] = useState(searchParams.get('title') || '');
   const [tempTagFilter, setTempTagFilter] = useState(searchParams.get('tag') || '');
-
-  const lastReplacedUrlParams = useRef<string | null>(null);
-
+  
+  // Get current sort params (for future use)
+  // const currentSortBy = searchParams.get('sortBy') || 'recordedAt';
+  // const currentSortOrder = searchParams.get('sortOrder') || 'desc';
+  
+  // Update temp filters when URL changes
+  useEffect(() => {
+    setTempTitleFilter(searchParams.get('title') || '');
+    setTempTagFilter(searchParams.get('tag') || '');
+    // Reset navigation state when URL changes
+    setIsNavigating(false);
+  }, [searchParams]);
+  
+  // Fetch materials
   const fetchMaterials = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    const params = new URLSearchParams();
-    params.set('page', String(pagination.pageIndex + 1));
-    params.set('limit', String(pagination.pageSize));
-    if (titleFilter) params.set('title', titleFilter);
-    if (tagFilter) params.set('tag', tagFilter);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
-
-    // console.log('Fetching materials with params:', params.toString());
-
+    
     try {
+      // Build query params from URL
+      const params = new URLSearchParams();
+      
+      // Add all search params to the API call
+      searchParams.forEach((value, key) => {
+        params.set(key, value);
+      });
+      
+      // Set defaults if not present
+      if (!params.has('page')) params.set('page', '1');
+      if (!params.has('limit')) params.set('limit', '10');
+      if (!params.has('sortBy')) params.set('sortBy', 'recordedAt');
+      if (!params.has('sortOrder')) params.set('sortOrder', 'desc');
+      
       const response = await fetch(`/api/materials?${params.toString()}`);
+      
       if (!response.ok) {
-        let errorText = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorText = errorData.error || errorText;
-        } catch (e: unknown) {
-          const message = (e instanceof Error && e.message) ? e.message : String(e);
-          console.warn(`Failed to parse error JSON: ${message}`);
-        }
-        throw new Error(errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data = await response.json();
-      // console.log('Fetched data:', data);
-      setMaterials(data.data || []);
-      // setTotalItems(data.pagination.totalItems || 0); // Still unused
-      setTotalPages(data.pagination.totalPages || 0);
+      
+      const data: ApiResponse = await response.json();
+      setMaterials(data.data);
+      setPagination(data.pagination);
     } catch (err) {
-      // console.error('Error in fetchMaterials:', err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred');
-      }
-      setMaterials([]); // Clear materials on error
-      setTotalPages(0); // Reset total pages on error
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setMaterials([]);
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.pageIndex, pagination.pageSize, titleFilter, tagFilter, sortBy, sortOrder]);
-
-  // useEffect to update URL when filters or pagination change
-  useEffect(() => {
-    const newUrlParams = new URLSearchParams();
-    newUrlParams.set('page', String(pagination.pageIndex + 1));
-    newUrlParams.set('limit', String(pagination.pageSize));
-    if (titleFilter) newUrlParams.set('title', titleFilter); else newUrlParams.delete('title');
-    if (tagFilter) newUrlParams.set('tag', tagFilter); else newUrlParams.delete('tag');
-    if (sortBy) newUrlParams.set('sortBy', sortBy); else newUrlParams.delete('sortBy');
-    if (sortOrder) newUrlParams.set('sortOrder', sortOrder); else newUrlParams.delete('sortOrder');
-
-    const newSearchQuery = newUrlParams.toString();
-    const currentSearchQueryFromHook = searchParams.toString();
-
-    // Only replace if the new query is different from the current one from useSearchParams
-    // AND it's different from the last one we manually set via router.replace
-    if (newSearchQuery !== currentSearchQueryFromHook && newSearchQuery !== lastReplacedUrlParams.current) {
-      // console.log('[DEBUG useEffect router.replace] Replacing URL. New params:', newSearchQuery, 'Old params from hook:', currentSearchQueryFromHook, 'Last replaced:', lastReplacedUrlParams.current);
-      router.replace(`${pathname}?${newSearchQuery}`);
-      lastReplacedUrlParams.current = newSearchQuery; // Store what we just set
-    }
-  }, [pagination, titleFilter, tagFilter, sortBy, sortOrder, router, pathname, searchParams]);
-
-  // useEffect to fetch materials when searchParams change (i.e., URL changes)
-  useEffect(() => {
-    // console.log("searchParams changed, fetching materials:", searchParams.toString());
-    fetchMaterials();
-  }, [fetchMaterials]); // fetchMaterials の依存配列が実質的なトリガーとなる
-
-  const handleSort = (newSortBy: string) => {
-    if (sortBy === newSortBy) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(newSortBy);
-      setSortOrder('asc');
-    }
-    setPagination((prev: PaginationState) => ({ ...prev, pageIndex: 0 }));
-  };
-
-  const handlePageChange = (newPage: number) => {
-    // pageIndex is 0-based, newPage is 1-based
-    if (newPage -1 >= 0 && newPage -1 < totalPages) {
-      setPagination((prev: PaginationState) => ({ ...prev, pageIndex: newPage -1 }));
-    }
-  };
+  }, [searchParams]);
   
-  const handleTitleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTempTitleFilter(e.target.value);
-  };
-
-  const handleTagFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTempTagFilter(e.target.value);
-  };
-
-  const applyFilters = () => {
-    setPagination((prev: PaginationState) => ({ ...prev, pageIndex: 0 }));
-    setTitleFilter(tempTitleFilter);
-    setTagFilter(tempTagFilter);
-    // fetchMaterials will be called by the useEffect watching titleFilter and tagFilter
-  };
-
-  const handleViewDetails = (material: Material) => {
-    setSelectedMaterial(material);
+  // Fetch materials when component mounts or searchParams change
+  useEffect(() => {
+    fetchMaterials();
+  }, [fetchMaterials]);
+  
+  // Handlers
+  const handleMaterialClick = (slug: string) => {
+    setSelectedMaterialSlug(slug);
     setIsDetailModalOpen(true);
   };
-
-  const closeDetailModal = () => {
+  
+  const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
-    setSelectedMaterial(null);
+    setSelectedMaterialSlug(null);
   };
-
-  const openDeleteModal = (material: Material) => {
-    setMaterialToDelete(material);
-    setIsDeleteModalOpen(true);
-  };
-
-  const closeDeleteModal = () => {
-    setIsDeleteModalOpen(false);
-    setMaterialToDelete(null);
-  };
-
-  const handleDeleteMaterial = async () => {
-    if (!materialToDelete) return;
-
-    try {
-      const response = await fetch(`/api/materials/${materialToDelete.slug}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete material');
-      }
-      
-      toast({
-        title: "成功",
-        description: `素材「${materialToDelete.title}」を削除しました。`,
-      });
-      // Optimistic update (optional):
-      // setMaterials(prevMaterials => prevMaterials.filter(m => m.id !== materialToDelete.id));
-      // Or refetch:
-      fetchMaterials(); // Refetch to update the list
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      setError(errorMessage); // Display error to user
-      toast({
-        title: "エラー",
-        description: `素材の削除に失敗しました: ${errorMessage}`,
-        variant: "destructive",
-      });
-    } finally {
-      closeDeleteModal();
-    }
-  };
-
-  // Render functions for pagination (simplified for brevity, shadcn/ui has more robust components)
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-    const pageNumbers = [];
-    const maxPagesToShow = 5;
-    let startPage = Math.max(1, pagination.pageIndex + 1 - Math.floor(maxPagesToShow / 2));
-    const endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-
-    if (endPage - startPage + 1 < maxPagesToShow) {
-        startPage = Math.max(1, endPage - maxPagesToShow + 1);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
+  
+  const handleApplyFilters = () => {
+    const params = new URLSearchParams(searchParams);
+    
+    // Update or remove title filter
+    if (tempTitleFilter) {
+      params.set('title', tempTitleFilter);
+    } else {
+      params.delete('title');
     }
     
-    return (
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious 
-              href="#"
-              onClick={(e) => { e.preventDefault(); handlePageChange(pagination.pageIndex + 1 - 1); }}
-              className={pagination.pageIndex === 0 ? 'pointer-events-none opacity-50' : ''}
-            />
-          </PaginationItem>
-          {startPage > 1 && (
-            <>
-             <PaginationItem>
-                <PaginationLink href="#" onClick={(e) => { e.preventDefault(); handlePageChange(1); }}>1</PaginationLink>
-              </PaginationItem>
-              {startPage > 2 && <PaginationItem><PaginationEllipsis /></PaginationItem>}
-            </>
-          )}
-          {pageNumbers.map(number => (
-            <PaginationItem key={number}>
-              <PaginationLink 
-                href="#" 
-                onClick={(e) => { e.preventDefault(); handlePageChange(number); }}
-                isActive={pagination.pageIndex + 1 === number}
-              >
-                {number}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          {endPage < totalPages && (
-            <>
-              {endPage < totalPages -1 && <PaginationItem><PaginationEllipsis /></PaginationItem>}
-              <PaginationItem>
-                <PaginationLink href="#" onClick={(e) => { e.preventDefault(); handlePageChange(totalPages); }}>{totalPages}</PaginationLink>
-              </PaginationItem>
-            </>
-          )}
-          <PaginationItem>
-            <PaginationNext 
-              href="#"
-              onClick={(e) => { e.preventDefault(); handlePageChange(pagination.pageIndex + 1 + 1); }}
-              className={pagination.pageIndex === totalPages - 1 ? 'pointer-events-none opacity-50' : ''}
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    );
+    // Update or remove tag filter
+    if (tempTagFilter) {
+      params.set('tag', tempTagFilter);
+    } else {
+      params.delete('tag');
+    }
+    
+    // Reset to page 1 when filters change
+    params.set('page', '1');
+    
+    // Update URL
+    router.replace(`${pathname}?${params.toString()}`);
   };
-
+  
+  const handleSortChange = (sortBy: string, sortOrder: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('sortBy', sortBy);
+    params.set('sortOrder', sortOrder);
+    
+    // Update URL
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+  
+  const handlePageChange = (newPage: number) => {
+    // Prevent navigation if already navigating or on the requested page
+    if (isNavigating) {
+      return;
+    }
+    
+    const currentPage = parseInt(searchParams.get('page') || '1', 10);
+    if (currentPage === newPage) {
+      return;
+    }
+    
+    setIsNavigating(true);
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    
+    // Update URL
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+  
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+  
+  // Render loading state
   if (isLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading materials...</p></div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>Loading materials...</p>
+      </div>
+    );
   }
-
+  
+  // Render error state
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="text-red-500">Error: {error}</div>
+      </div>
+    );
+  }
+  
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Materials</h1>
         <Link href="/materials/new">
-          <Button variant="default">
-            <PlusCircle className="mr-2 h-4 w-4" /> New Material
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Material
           </Button>
         </Link>
       </div>
-
+      
+      {/* Filter Section */}
       <div className="mb-6 p-4 border rounded-lg bg-card text-card-foreground shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label htmlFor="titleFilter" className="block text-sm font-medium mb-1">Filter by Title</label>
-            <Input 
+            <label htmlFor="titleFilter" className="block text-sm font-medium mb-1">
+              Filter by Title
+            </label>
+            <Input
               id="titleFilter"
-              type="text" 
-              placeholder="Search by title..." 
-              value={tempTitleFilter} 
-              onChange={handleTitleFilterChange} 
+              type="text"
+              placeholder="Search by title..."
+              value={tempTitleFilter}
+              onChange={(e) => setTempTitleFilter(e.target.value)}
             />
           </div>
           <div>
-            <label htmlFor="tagFilter" className="block text-sm font-medium mb-1">Filter by Tag</label>
-             {/* For now, a simple input. Could be replaced with a Select with tag options later */}
-            <Input 
+            <label htmlFor="tagFilter" className="block text-sm font-medium mb-1">
+              Filter by Tag
+            </label>
+            <Input
               id="tagFilter"
-              type="text" 
-              placeholder="Search by tag..." 
-              value={tempTagFilter} 
-              onChange={handleTagFilterChange} 
+              type="text"
+              placeholder="Search by tag..."
+              value={tempTagFilter}
+              onChange={(e) => setTempTagFilter(e.target.value)}
             />
-            {/* Example for Select if tags are fetched for dropdown 
-            <Select onValueChange={handleTagFilterChange} value={tagFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by tag..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="nature">Nature</SelectItem>
-                <SelectItem value="urban">Urban</SelectItem>
-                <SelectItem value="ambient">Ambient</SelectItem>
-              </SelectContent>
-            </Select> 
-            */}
           </div>
-          <Button onClick={applyFilters} className="md:self-end">
-            <Search className="mr-2 h-4 w-4" /> Apply Filters
+          <Button onClick={handleApplyFilters} className="md:self-end">
+            <Search className="mr-2 h-4 w-4" />
+            Apply Filters
           </Button>
         </div>
       </div>
-
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 border border-red-400 rounded-md">
-          <p>Error: {error}</p>
+      
+      {/* Sort Controls */}
+      <div className="mb-4 flex justify-between items-center">
+        <div className="text-sm text-muted-foreground">
+          {pagination.totalItems} materials found
         </div>
-      )}
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead onClick={() => handleSort('title')} className="cursor-pointer">
-                Title {sortBy === 'title' && (sortOrder === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />)}
-              </TableHead>
-              <TableHead onClick={() => handleSort('recordedAt')} className="cursor-pointer">
-                Recorded Date {sortBy === 'recordedAt' && (sortOrder === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />)}
-              </TableHead>
-              <TableHead>Tags</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {materials.length > 0 ? (
-              materials.map((material) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <ArrowUpDown className="mr-2 h-4 w-4" />
+              Sort by
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleSortChange('recordedAt', 'desc')}>
+              Date (Newest First)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSortChange('recordedAt', 'asc')}>
+              Date (Oldest First)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSortChange('title', 'asc')}>
+              Title (A-Z)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSortChange('title', 'desc')}>
+              Title (Z-A)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      
+      {materials.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          No materials found
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Recorded At</TableHead>
+                <TableHead>Tags</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {materials.map((material) => (
                 <TableRow key={material.id}>
-                  <TableCell className="font-medium">
-                    <span 
-                      onClick={() => handleViewDetails(material)} 
-                      className="hover:underline cursor-pointer"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleViewDetails(material); }}
+                  <TableCell>
+                    <button
+                      onClick={() => handleMaterialClick(material.slug)}
+                      className="text-blue-600 hover:underline text-left"
                     >
                       {material.title}
-                    </span>
+                    </button>
                   </TableCell>
-                  <TableCell>{new Date(material.recordedAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDate(material.recordedAt)}</TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {material.tags.slice(0, 2).map((tag: Tag) => (
+                    <div className="flex gap-1 flex-wrap">
+                      {material.tags.map((tag) => (
                         <span
-                          key={tag.name}
-                          className="px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded-full"
+                          key={tag.id}
+                          className="px-2 py-1 text-xs bg-gray-100 rounded"
                         >
                           {tag.name}
                         </span>
                       ))}
-                      {material.tags.length > 2 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{material.tags.length - 2} more
-                        </span>
-                      )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>アクション</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => router.push(`/materials/${material.slug}/edit`)}
-                        >
-                          編集
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => openDeleteModal(material)}
-                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          削除
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <TableCell>
+                    {/* Actions will be added later */}
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">
-                  No materials found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="mt-6 flex justify-center">
-        {renderPagination()}
-      </div>
-
-      {selectedMaterial && (
-        <MaterialDetailModal
-          materialSlug={selectedMaterial.slug}
-          isOpen={isDetailModalOpen}
-          onClose={closeDetailModal}
-          onMaterialDeleted={() => {
-            fetchMaterials(); // Refetch materials after deletion
-            closeDetailModal(); // Ensure detail modal is closed
-          }}
-          onMaterialEdited={(slug) => {
-            router.push(`/materials/${slug}/edit`);
-            closeDetailModal(); // Ensure detail modal is closed
-          }}
-        />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
-      {materialToDelete && (
-        <DeleteConfirmationModal
-          isOpen={isDeleteModalOpen}
-          onClose={closeDeleteModal}
-          onConfirm={handleDeleteMaterial}
-          materialTitle={materialToDelete.title}
-        />
+      
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(pagination.page - 1)}
+            disabled={pagination.page === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          
+          <div className="text-sm text-muted-foreground">
+            Page {pagination.page} of {pagination.totalPages}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       )}
+      
+      <MaterialDetailModal
+        isOpen={isDetailModalOpen}
+        materialSlug={selectedMaterialSlug}
+        onClose={handleCloseDetailModal}
+        onMaterialDeleted={() => {
+          fetchMaterials();
+          handleCloseDetailModal();
+        }}
+        onMaterialEdited={() => {
+          fetchMaterials();
+        }}
+      />
     </div>
   );
-} 
+}
+
+export default function MaterialsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <MaterialsPageContent />
+    </Suspense>
+  );
+}

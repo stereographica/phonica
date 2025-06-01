@@ -6,8 +6,7 @@ import { prismaMock } from '../../../../../../jest.setup'; // Prismaモックを
 import { NextRequest } from 'next/server';
 import { Equipment, Prisma } from '@prisma/client';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createMockRequest(method: string, body?: any, searchParams?: URLSearchParams): NextRequest {
+function createMockRequest(method: string, body?: Record<string, unknown>, searchParams?: URLSearchParams): NextRequest {
   const url = new URL(`http://localhost/api/master/equipment${searchParams ? `?${searchParams.toString()}` : ''}`);
   const request = new Request(url.toString(), {
     method,

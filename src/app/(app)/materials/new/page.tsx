@@ -38,8 +38,8 @@ export default function NewMaterialPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log('[handleSubmit] called');
-    console.log('[handleSubmit] recordedAt state:', recordedAt);
+    // console.log('[handleSubmit] called');
+    // console.log('[handleSubmit] recordedAt state:', recordedAt);
     setError(null);
 
     if (!selectedFile) {
@@ -86,10 +86,10 @@ export default function NewMaterialPage() {
     if (locationName) formData.append('locationName', locationName);
     if (rating) formData.append('rating', String(rating));
 
-    console.log('Submitting FormData:', Object.fromEntries(formData.entries())); // デバッグ用コメント解除
+    // console.log('Submitting FormData:', Object.fromEntries(formData.entries())); // デバッグ用コメント解除
 
     try {
-      console.log('Calling fetch with:', '/api/materials', formData); // デバッグ用コメント解除
+      // console.log('Calling fetch with:', '/api/materials', formData); // デバッグ用コメント解除
       const response = await fetch('/api/materials', {
         method: 'POST',
         body: formData,
@@ -103,10 +103,9 @@ export default function NewMaterialPage() {
       alert('Material saved successfully!');
       router.push('/materials');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save material:', err);
-      setError(err.message || 'An unknown error occurred.');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsSubmitting(false);
     }
