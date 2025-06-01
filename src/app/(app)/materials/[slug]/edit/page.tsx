@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react'; // Loader2 を追加
+import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
 
 // APIから返される素材データの型 (GET /api/materials/[slug] のレスポンスに合わせる)
 interface MaterialData {
@@ -17,6 +18,7 @@ interface MaterialData {
   recordedDate: string; // ISO String
   memo: string | null;
   tags: { name: string }[]; // name の配列
+  equipment?: { id: string; name: string }[]; // 機材の配列
   filePath: string;
   fileFormat: string | null;
   sampleRate: number | null;
@@ -49,6 +51,7 @@ export default function EditMaterialPage() {
   const [longitude, setLongitude] = useState<number | string>('');
   const [locationName, setLocationName] = useState('');
   const [rating, setRating] = useState<number | string>('');
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +95,7 @@ export default function EditMaterialPage() {
       setLongitude(data.longitude?.toString() || '');
       setLocationName(data.locationName || '');
       setRating(data.rating?.toString() || '');
+      setSelectedEquipmentIds(data.equipment?.map(e => e.id) || []);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching data.');
@@ -159,6 +163,7 @@ export default function EditMaterialPage() {
     if (longitude) formData.append('longitude', String(longitude));
     if (locationName) formData.append('locationName', locationName); else formData.append('locationName', '');
     if (rating) formData.append('rating', String(rating));
+    if (selectedEquipmentIds.length > 0) formData.append('equipmentIds', selectedEquipmentIds.join(','));
 
     if (selectedFile) {
       formData.append('file', selectedFile);
@@ -325,6 +330,18 @@ export default function EditMaterialPage() {
           <div className="space-y-2 mt-4">
             <Label htmlFor="locationName">Location Name (Optional)</Label>
             <Input id="locationName" value={locationName} onChange={(e) => setLocationName(e.target.value)} placeholder="e.g., Yoyogi Park" />
+          </div>
+        </div>
+
+        {/* Equipment Section */}
+        <div className="space-y-4 p-6 border rounded-lg">
+          <h2 className="text-xl font-semibold">Equipment</h2>
+          <div className="space-y-2">
+            <Label htmlFor="equipment">Used Equipment</Label>
+            <EquipmentMultiSelect
+              selectedEquipmentIds={selectedEquipmentIds}
+              onChange={setSelectedEquipmentIds}
+            />
           </div>
         </div>
 

@@ -23,6 +23,18 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
+// EquipmentMultiSelectのモック
+jest.mock('@/components/materials/EquipmentMultiSelect', () => ({
+  EquipmentMultiSelect: ({ selectedEquipmentIds, onChange }: { selectedEquipmentIds: string[]; onChange: (ids: string[]) => void }) => {
+    return (
+      <div data-testid="equipment-multi-select">
+        <div>Equipment: {selectedEquipmentIds.join(', ')}</div>
+        <button onClick={() => onChange(['eq-1', 'eq-2'])}>Change Equipment</button>
+      </div>
+    );
+  },
+}));
+
 // FormData の append のモックを取得 (global.mock.ts で定義されている想定)
 // eslint-disable-next-line no-var
 declare var mockAppend: jest.Mock; 
@@ -41,7 +53,7 @@ const mockMaterialData = {
   longitude: 139.767125,
   memo: 'Original memo',
   tags: [{ id: '1', name: 'nature' }, { id: '2', name: 'park' }],
-  equipments: [{ id: '1', name: 'Recorder A' }],
+  equipment: [{ id: '1', name: 'Recorder A' }, { id: '2', name: 'Mic B' }],
   rating: 4,
   locationName: 'Test Location',
   userId: 'user-123',
@@ -90,7 +102,9 @@ describe('EditMaterialPage', () => {
     expect((screen.getByLabelText(/longitude/i) as HTMLInputElement).value).toBe(mockMaterialData.longitude.toString());
     expect(screen.getByLabelText(/location name/i)).toHaveValue(mockMaterialData.locationName);
     expect(screen.getByLabelText(/tags/i)).toHaveValue(mockMaterialData.tags.map(t => t.name).join(', '));
-    // expect(screen.getByLabelText("Equipment (comma separated)")).toHaveValue(mockMaterialData.equipments.map(e => e.name).join(', '));
+    // 機材セレクターが表示されているか
+    expect(screen.getByTestId('equipment-multi-select')).toBeInTheDocument();
+    expect(screen.getByText('Equipment: 1, 2')).toBeInTheDocument();
     expect(screen.getByLabelText(/memo/i)).toHaveValue(mockMaterialData.memo);
     expect((screen.getByLabelText(/rating/i) as HTMLInputElement).value).toBe(mockMaterialData.rating.toString());
     expect(screen.getByText(`Current file: ${mockMaterialData.filePath}`)).toBeInTheDocument();
@@ -130,6 +144,15 @@ describe('EditMaterialPage', () => {
     await act(async () => {
       fireEvent.change(recordedAtInput, { target: { value: newRecordedAt } });
     });
+    
+    // 機材を変更
+    await act(async () => {
+      await user.click(screen.getByText('Change Equipment'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Equipment: eq-1, eq-2')).toBeInTheDocument();
+    });
+    
     fetchMock.mockResponseOnce(JSON.stringify({ material: { ...mockMaterialData, title: 'Updated Title via Test' } }), { status: 200 });
     const saveButton = screen.getByRole('button', { name: /update material/i });
     await act(async () => {
@@ -141,6 +164,7 @@ describe('EditMaterialPage', () => {
     if (typeof mockAppend !== 'undefined') {
         expect(mockAppend).toHaveBeenCalledWith('title', 'Updated Title via Test');
         expect(mockAppend).toHaveBeenCalledWith('recordedAt', new Date(newRecordedAt).toISOString());
+        expect(mockAppend).toHaveBeenCalledWith('equipmentIds', 'eq-1,eq-2');
     }
     await waitFor(() => {
       expect(global.alert).toHaveBeenCalledWith('Material updated successfully!');
