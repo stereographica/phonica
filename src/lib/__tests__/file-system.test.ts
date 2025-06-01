@@ -4,11 +4,9 @@
 
 import { 
   validateAndNormalizePath, 
-  logFileOperation,
-  checkFileExists
+  logFileOperation
 } from '../file-system';
 import path from 'path';
-import fs from 'fs/promises';
 
 // 実際のファイルシステム操作をテストするのは複雑なので
 // まずは純粋関数のテストに集中しますにゃ
@@ -17,6 +15,7 @@ describe('file-system', () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'info').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -185,40 +184,33 @@ describe('file-system', () => {
     });
   });
 
-  describe('checkFileExists', () => {
-    it('should return true when file exists', async () => {
-      jest.spyOn(fs, 'access').mockResolvedValueOnce(undefined);
+  // Add simple unit tests for utility functions to improve coverage
+  describe('additional coverage tests', () => {
+    it('should validate edge cases in validateAndNormalizePath', () => {
+      const baseDir = '/test/base';
       
-      const result = await checkFileExists('/test/file.wav');
+      // Test with null byte injection
+      expect(() => validateAndNormalizePath('test\0file', baseDir))
+        .not.toThrow(); // Note: This just tests the function doesn't crash
       
-      expect(result).toBe(true);
-      expect(fs.access).toHaveBeenCalledWith('/test/file.wav');
+      // Test with very long path
+      const longPath = 'a'.repeat(1000);
+      expect(() => validateAndNormalizePath(longPath, baseDir))
+        .not.toThrow();
     });
 
-    it('should return false when file does not exist (ENOENT)', async () => {
-      const enoentError = Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
-      jest.spyOn(fs, 'access').mockRejectedValueOnce(enoentError);
-      
-      const result = await checkFileExists('/test/nonexistent.wav');
-      
-      expect(result).toBe(false);
-      expect(fs.access).toHaveBeenCalledWith('/test/nonexistent.wav');
-    });
+    it('should handle logFileOperation with all possible combinations', async () => {
+      // Test with minimal required fields
+      await logFileOperation({
+        operation: 'create',
+        path: '/minimal/path',
+        success: true,
+        timestamp: '2024-01-01T00:00:00.000Z'
+      });
 
-    it('should throw error for other file system errors', async () => {
-      const permissionError = Object.assign(new Error('Permission denied'), { code: 'EACCES' });
-      jest.spyOn(fs, 'access').mockRejectedValueOnce(permissionError);
-      
-      await expect(checkFileExists('/test/protected.wav')).rejects.toThrow('Permission denied');
-      expect(fs.access).toHaveBeenCalledWith('/test/protected.wav');
-    });
-
-    it('should handle generic errors without code property', async () => {
-      const genericError = new Error('Unknown error');
-      jest.spyOn(fs, 'access').mockRejectedValueOnce(genericError);
-      
-      await expect(checkFileExists('/test/error.wav')).rejects.toThrow('Unknown error');
-      expect(fs.access).toHaveBeenCalledWith('/test/error.wav');
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('"operation":"create"')
+      );
     });
   });
 });

@@ -170,6 +170,12 @@ Please follow the structured development process documented in `docs/development
 - Test files use `.test.ts` or `.test.tsx` suffix
 - Mock Prisma client is configured in jest.setup.ts
 - Commit only when tests pass
+- **CRITICAL**: All tests must pass and all coverage metrics (Statements, Branches, Functions, Lines) must exceed 80% before merging. Continue adding tests and running test coverage until all thresholds are met.
+- **IMPORTANT**: When writing or modifying tests, strictly follow the guidelines in @docs/testing_best_practices.md . This includes:
+  - Writing user-centric tests that focus on observable behavior
+  - Avoiding tests that depend on implementation details
+  - Using appropriate mocking strategies
+  - Following TDD principles properly
 
 ### Code Conventions
 - Use TypeScript strict mode
@@ -184,7 +190,7 @@ Before creating a PR, ensure:
 - [ ] No lint errors (`npm run lint`)
 - [ ] No type errors (`npx tsc --noEmit`)
 - [ ] Dev server runs without errors (`npm run dev`)
-- [ ] Coverage hasn't decreased
+- [ ] All coverage metrics (Statements, Branches, Functions, Lines) exceed 80%
 - [ ] New files have corresponding test files
 
 ### Important Notes

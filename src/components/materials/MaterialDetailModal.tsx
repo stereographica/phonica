@@ -58,7 +58,7 @@ interface MaterialDetailModalProps {
   materialSlug: string | null;
   isOpen: boolean;
   onClose: () => void;
-  onMaterialDeleted?: () => void;
+  onMaterialDeleted?: (slug: string) => void;
   onMaterialEdited?: (slug: string) => void;
 }
 
@@ -153,7 +153,7 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
         description: `素材「${detailedMaterial.title}」を削除しました。`,
       });
       if (onMaterialDeleted) {
-        onMaterialDeleted();
+        onMaterialDeleted(detailedMaterial.slug);
       }
       handleClose(); // Close the detail modal as well
     } catch (error) {
@@ -172,10 +172,11 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
     if (!detailedMaterial) return;
     if (onMaterialEdited) {
         onMaterialEdited(detailedMaterial.slug);
+        handleClose(); // Close modal after callback
     } else {
         router.push(`/materials/${detailedMaterial.slug}/edit`);
+        handleClose(); // Close modal after navigating to edit
     }
-    handleClose(); // Close modal after navigating to edit
   };
 
   const handleDownload = () => {

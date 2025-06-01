@@ -19,6 +19,13 @@ fetchMock.enableMocks();
 // Global alert mock
 global.alert = jest.fn();
 
+// Global ResizeObserver mock
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
 // Global File mock
 global.File = class File {
   constructor(

@@ -1,5 +1,57 @@
 # 開発プロセス
 
+## 開発環境セットアップ
+
+### 開発コマンド
+```bash
+# 開発
+npm run dev          # 開発サーバー起動（Turbopack使用）
+npm run build        # プロダクションビルド
+npm run start        # プロダクションサーバー起動
+
+# コード品質
+npm run lint         # ESLint実行
+npm test            # 全テスト実行
+npx tsc --noEmit    # 型チェック（ファイル出力なし）
+
+# データベース
+npx prisma migrate dev    # マイグレーション実行
+npx prisma studio        # Prisma Studio起動（DB確認用）
+npx prisma generate      # Prisma Client生成
+```
+
+### アーキテクチャ概要
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Database**: PostgreSQL + Prisma ORM
+- **State Management**: Jotai
+- **Data Fetching**: TanStack Query
+- **UI Components**: shadcn/ui + Radix UI
+- **Styling**: Tailwind CSS
+- **Testing**: Jest + React Testing Library
+- **Background Jobs**: BullMQ + Redis
+
+### ディレクトリ構造
+- `/src/app/` - Next.js App Router
+  - `(app)/` - アプリケーションページ（共通レイアウト）
+  - `(api)/` - APIルートグループ
+- `/src/components/` - Reactコンポーネント（機能別）
+- `/src/lib/` - ユーティリティ・共通ロジック
+- `/src/types/` - TypeScript型定義
+- `/prisma/` - DBスキーマ・マイグレーション
+- `/docs/` - プロジェクトドキュメント
+
+### データベーススキーマ
+主要エンティティ：
+- **Material**: 音声録音と関連メタデータ
+- **Project**: 素材のグループ
+- **Tag**: カテゴリ分類用ラベル
+- **Equipment**: 録音機材マスタデータ
+
+多対多リレーション: materials ↔ projects/tags/equipment
+
+## 開発プロセス詳細
+
 1. 指示の分析と計画
   - GitHub の issues には、対応しなければならない開発タスクが登録されています
   - ユーザが優先度の高いタスクを実行するように指示した場合は、この issues から `priority: {critical|high|medium|low}` のタグから優先度が高い順にを参照したうえで、タスクを選択してください
@@ -16,6 +68,13 @@
     - 共通化可能な処理の特定
 
   このセクションは、後続のプロセス全体を導くものなので、時間をかけてでも、十分に詳細かつ包括的な分析を行ってください。
+
+### 設計パターン
+
+1. **APIルート**: `/src/app/api/` 配下でRESTful規約に従う
+2. **コンポーネント構造**: 機能別に整理（materials, master等）
+3. **フォーム処理**: react-hook-form + zod検証
+4. **テスト**: 各コンポーネント・APIルートに対応するテストファイル
 
 2. タスクの実行
   - 最新のmainブランチを取得してから作業を開始します：
@@ -52,7 +111,12 @@
      1. `npm test` を実行して、現在のカバレッジを取得
      2. 今の状態から最もカバレッジが上がるテストコードを考察してから追加
      3. 再度カバレッジを計測して、数値が向上していることを確認
-     4. ユーザが満足するまで、テスト生成を繰り返してください
+     4. **重要**: 全てのテストに成功し、Statements, Branches, Functions, Lines の各カバレッジが80%を超えていないとマージが出来ないため、超えるまでテストの追加とテスト実行を繰り返す
+   - **テストベストプラクティス**: テストを書く・修正する際は、必ず `docs/testing_best_practices.md` のガイドラインに従ってください：
+     - ユーザー中心のテストを書く（実装の詳細ではなく観察可能な動作に焦点）
+     - 適切なモッキング戦略を使用
+     - TDDの原則を正しく適用
+
 3. 品質管理と問題対応
   - 各タスクの実行結果を迅速に検証してください。
   - 以下の品質チェックを実施してください：
@@ -60,6 +124,7 @@
     - [ ] `npm run lint` - lintエラーなし
     - [ ] `npx tsc --noEmit` - 型エラーなし
     - [ ] `npm run dev` - 開発サーバー起動確認
+    - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
   - GitHub Actions と同等のローカルテストを実施してください：
     ```bash
     # CI環境と同じ条件でテストを実行
@@ -85,6 +150,37 @@
     - 検証項目と期待される結果
     - 実際の結果と差異
     - 必要な対応策（該当する場合）
+
+## コード規約
+
+- TypeScript strict modeを使用
+- 既存のコンポーネント構造パターンに従う
+- パスエイリアス（`@/` でsrcディレクトリ）を使用
+- APIルートでは適切なエラーハンドリングを実装
+- コミット前にデバッグコードとconsole.logを削除
+
+## 品質チェックリスト
+
+PRを作成する前に確認：
+- [ ] 全テストがパス（`npm test`）
+- [ ] lintエラーなし（`npm run lint`）
+- [ ] 型エラーなし（`npx tsc --noEmit`）
+- [ ] 開発サーバーが正常起動（`npm run dev`）
+- [ ] 全カバレッジ指標（Statements, Branches, Functions, Lines）が80%超
+- [ ] 新規ファイルには対応するテストファイルを作成
+
+## 重要な注意事項
+
+- 技術スタックのバージョンは承認なしに変更しない
+- 既存の類似機能を確認し、重複実装を避ける
+- UI/UXデザイン変更は事前承認が必要
+- 指示されたら docs/issues.md のissueに対処
+- 開発中に発見した問題は GitHub issue を作成
+
+## バックグラウンドジョブ
+
+ZIPファイル生成などのバックグラウンドタスクにBullMQを使用。ジョブキュー管理にはRedisが必要。
+
 4. 最終確認
   - すべてのタスクが完了したら、成果物全体を評価してください。
   - 当初の指示内容との整合性を確認し、必要に応じて調整を行ってください。
@@ -124,7 +220,7 @@
 
   ## セルフチェックリスト
   - [ ] 新規ファイルにはテストファイルも作成済み
-  - [ ] カバレッジが低下していない
+  - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
   - [ ] 不要なconsole.logやデバッグコードを削除済み
   - [ ] CLAUDE.mdの更新が必要な場合は更新済み
 
