@@ -19,6 +19,18 @@ jest.mock('next/navigation', () => ({
 // window.alert のモック
 global.alert = jest.fn();
 
+// EquipmentMultiSelectのモック
+jest.mock('@/components/materials/EquipmentMultiSelect', () => ({
+  EquipmentMultiSelect: ({ selectedEquipmentIds, onChange }: { selectedEquipmentIds: string[]; onChange: (ids: string[]) => void }) => {
+    return (
+      <div data-testid="equipment-multi-select">
+        <button onClick={() => onChange(['equipment-1', 'equipment-2'])}>Select Equipment</button>
+        <div>Selected: {selectedEquipmentIds.join(', ')}</div>
+      </div>
+    );
+  },
+}));
+
 describe('NewMaterialPage', () => {
   beforeEach(() => {
     // 各テストの前にモックをリセット
@@ -56,6 +68,9 @@ describe('NewMaterialPage', () => {
     
     // 録音日時入力フィールドが表示されるか
     expect(screen.getByLabelText(/recorded at/i)).toBeInTheDocument();
+
+    // 機材選択フィールドが表示されるか
+    expect(screen.getByTestId('equipment-multi-select')).toBeInTheDocument();
 
     // 保存ボタンが表示されるか
     expect(screen.getByRole('button', { name: /save material/i })).toBeInTheDocument();
@@ -230,6 +245,13 @@ describe('NewMaterialPage', () => {
     await user.type(screen.getByLabelText(/Tags/i), 'ambient, field recording, test');
     await user.type(screen.getByLabelText(/Rating/i), '5');
     await user.type(screen.getByTestId('memo-textarea'), 'This is a full test memo.');
+    
+    // 機材を選択
+    await user.click(screen.getByText('Select Equipment'));
+    // モックにより自動的にequipment-1とequipment-2が選択される
+    await waitFor(() => {
+      expect(screen.getByText('Selected: equipment-1, equipment-2')).toBeInTheDocument();
+    });
 
     // フォーム送信
     await submitForm();

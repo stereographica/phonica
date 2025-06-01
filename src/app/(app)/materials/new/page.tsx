@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 // import { Checkbox } from '@/components/ui/checkbox'; // Not used yet
 import { ArrowLeft, TagsIcon } from 'lucide-react'; // Removed unused icons
+import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
 
 export default function NewMaterialPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function NewMaterialPage() {
   const [longitude, setLongitude] = useState<number | string>('');
   const [locationName, setLocationName] = useState('');
   const [rating, setRating] = useState<number | string>('');
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export default function NewMaterialPage() {
     if (longitude) formData.append('longitude', String(longitude));
     if (locationName) formData.append('locationName', locationName);
     if (rating) formData.append('rating', String(rating));
+    if (selectedEquipmentIds.length > 0) formData.append('equipmentIds', selectedEquipmentIds.join(','));
 
     // console.log('Submitting FormData:', Object.fromEntries(formData.entries())); // デバッグ用コメント解除
 
@@ -212,7 +215,19 @@ export default function NewMaterialPage() {
           </div>
         </div>
 
-        {/* Section 6: Tags & Rating */}
+        {/* Section 6: Equipment */}
+        <div className="space-y-4 p-6 border rounded-lg">
+          <h2 className="text-xl font-semibold">Equipment</h2>
+          <div className="space-y-2">
+            <Label htmlFor="equipment">Used Equipment</Label>
+            <EquipmentMultiSelect
+              selectedEquipmentIds={selectedEquipmentIds}
+              onChange={setSelectedEquipmentIds}
+            />
+          </div>
+        </div>
+
+        {/* Section 7: Tags & Rating */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Details</h2>
           <div className="space-y-2">
@@ -234,7 +249,7 @@ export default function NewMaterialPage() {
           </div>
         </div>
 
-        {/* Section 7: Memo */}
+        {/* Section 8: Memo */}
         <div className="space-y-4 p-6 border rounded-lg">
           <h2 className="text-xl font-semibold">Memo</h2>
           <div className="space-y-2">
