@@ -421,8 +421,11 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
       expect(screen.getByText(mockMaterial.title)).toBeInTheDocument();
     });
 
-    // Check if recorded date is properly formatted (using the actual format from the component)
-    expect(screen.getByText(/2023\/1\/15/)).toBeInTheDocument();
+    // Check if recorded date is properly formatted
+    // toLocaleDateString() can return different formats based on locale
+    // In CI (English locale), it's likely "1/15/2023"
+    // Using a more flexible pattern to match both formats
+    expect(screen.getByText(/(?:2023\/1\/15|1\/15\/2023)/)).toBeInTheDocument();
   });
 
   it('displays material metadata correctly', async () => {

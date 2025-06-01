@@ -51,7 +51,7 @@ module.exports = {
   //   '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/__mocks__/fileMock.js',
   // },
   // Babelがnode_modules内の一部のライブラリもトランスパイルするように設定 (例: ES6+構文を使っているライブラリ)
-  // transformIgnorePatterns: [
-  //   '/node_modules/(?!some-es6-module)/.+',
-  // ],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(msgpackr|bullmq)/)/',
+  ],
 }; 
