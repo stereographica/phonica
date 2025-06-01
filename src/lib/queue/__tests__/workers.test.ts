@@ -79,6 +79,7 @@ describe('Workers - Production Environment', () => {
     });
 
     // Re-import to get fresh module
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { startWorkers: startWorkersNew } = require('../workers');
     
     const consoleSpy = jest.spyOn(console, 'log');

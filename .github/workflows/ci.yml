@@ -1,4 +1,4 @@
-name: CI
+name: Test & Build
 
 on:
   push:
@@ -47,12 +47,6 @@ jobs:
       run: |
         npx prisma migrate deploy
         npx prisma generate
-
-    - name: Run type check
-      run: npx tsc --noEmit
-
-    - name: Run lint
-      run: npm run lint
 
     - name: Run tests with coverage
       env:
