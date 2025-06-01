@@ -103,8 +103,8 @@ describe('/api/projects', () => {
           });
         }
 
-        const skip = (args && typeof args === 'object' && 'skip' in args ? args.skip : 0) || 0;
-        const take = (args && typeof args === 'object' && 'take' in args ? args.take : 10) || 10;
+        const skip = (args && typeof args === 'object' && 'skip' in args ? Number(args.skip) : 0) || 0;
+        const take = (args && typeof args === 'object' && 'take' in args ? Number(args.take) : 10) || 10;
         return filteredProjects.slice(skip, skip + take);
       });
        

@@ -300,7 +300,7 @@ describe('/api/projects/[id]', () => {
 
     it('should delete a project successfully', async () => {
       prismaMock.project.findUnique.mockResolvedValue(mockProject);
-      prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => {
         return await callback(prismaMock);
       });
       prismaMock.project.update.mockResolvedValue(mockProject);
