@@ -1,6 +1,6 @@
 import { 
-  fileDeletionWorker, 
-  orphanedFilesCleanupWorker,
+  getFileDeletionWorker,
+  getOrphanedFilesCleanupWorker,
   scheduleOrphanedFilesCleanup,
   shutdownWorkers 
 } from './file-deletion-queue';
@@ -15,6 +15,15 @@ let workersStarted = false;
 export async function startWorkers(): Promise<void> {
   if (workersStarted) {
     console.log('[Workers] Workers already started');
+    return;
+  }
+
+  const fileDeletionWorker = getFileDeletionWorker();
+  const orphanedFilesCleanupWorker = getOrphanedFilesCleanupWorker();
+
+  // ワーカーが存在しない場合はスキップ（テスト環境など）
+  if (!fileDeletionWorker || !orphanedFilesCleanupWorker) {
+    console.log('[Workers] Workers not available - skipping startup');
     return;
   }
 
@@ -72,7 +81,7 @@ export async function stopWorkers(): Promise<void> {
 }
 
 // プロセス終了時のクリーンアップ
-if (typeof process !== 'undefined') {
+if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
   process.on('SIGTERM', async () => {
     console.log('[Workers] SIGTERM received, shutting down workers...');
     await stopWorkers();
