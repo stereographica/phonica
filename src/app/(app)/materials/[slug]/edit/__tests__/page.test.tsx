@@ -159,7 +159,8 @@ describe('EditMaterialPage', () => {
       await user.click(saveButton);
     });
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(2); 
+      // Initial fetch + Equipment fetch + Update fetch = 3
+      expect(fetchMock).toHaveBeenCalledTimes(3); 
     });
     if (typeof mockAppend !== 'undefined') {
         expect(mockAppend).toHaveBeenCalledWith('title', 'Updated Title via Test');
