@@ -19,10 +19,47 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/test_db npm run seed:test
 
 ## テストの実行
 
-```bash
-# すべてのE2Eテストを実行
-npm run e2e
+### 🚀 段階的実行（推奨）
 
+実行時間を短縮し、効率的にテストを行うための段階的アプローチ：
+
+#### レベル1: スモークテスト（1-2分）
+```bash
+# 基本動作確認 - 最初に実行
+npm run e2e:smoke
+```
+
+#### レベル2: 機能別テスト（各2-4分）
+```bash
+# マスターデータ機能のテスト
+npm run e2e:master
+
+# 素材管理機能のテスト
+npm run e2e:materials
+```
+
+#### レベル3: ワークフローテスト（5-7分）
+```bash
+# 統合ワークフローのテスト
+npm run e2e:workflows
+```
+
+### 🌐 ブラウザ別実行
+
+```bash
+# 開発時（Chromiumのみ - 最速）
+npm run e2e:chrome
+
+# PR作成前（主要ブラウザ）
+npm run e2e:cross-browser
+
+# リリース前（全ブラウザ）
+npm run e2e
+```
+
+### 🔍 デバッグ・詳細実行
+
+```bash
 # UIモードでテストを実行（デバッグに便利）
 npm run e2e:ui
 
@@ -32,11 +69,30 @@ npm run e2e:debug
 # テストレポートを表示
 npm run e2e:report
 
-# 特定のテストファイルを実行
-npm run e2e tests/materials/materials-list.spec.ts
+# 特定のテストを実行（grep使用）
+npm run e2e:chrome -- --grep "Equipment.*validation"
 
 # ヘッドレスモードを無効にして実行
-npm run e2e -- --headed
+npm run e2e:chrome -- --headed
+```
+
+### E2Eデータベース管理コマンド
+
+```bash
+# E2Eデータベースを作成
+npm run e2e:db:create
+
+# マイグレーションを実行
+npm run e2e:db:migrate
+
+# テストデータを投入
+npm run e2e:db:seed
+
+# データベースを削除
+npm run e2e:db:drop
+
+# フルセットアップ（作成+マイグレーション+シード）
+npm run e2e:db:setup
 ```
 
 ## ディレクトリ構造
@@ -137,17 +193,29 @@ test('テーブルとモーダルの操作', async ({ page }) => {
 - `PLAYWRIGHT_BASE_URL`: テストのベースURL（デフォルト: http://localhost:3000）
 - `DATABASE_URL`: テストデータ投入先のデータベースURL
 - `REDIS_URL`: バックグラウンドジョブ用のRedis URL
+- `POSTGRES_USER`: PostgreSQLユーザー名（デフォルト: phonica_user）
+- `POSTGRES_PASSWORD`: PostgreSQLパスワード（デフォルト: phonica_password）
+- `POSTGRES_HOST`: PostgreSQLホスト（デフォルト: localhost）
+- `POSTGRES_PORT`: PostgreSQLポート（デフォルト: 5432）
 
 ## テストデータの管理
+
+### E2E専用データベース
+
+E2Eテストは専用のデータベース（`phonica_e2e_test`）を使用します：
+
+1. **自動管理**: `npm run e2e`実行時に自動的に作成・削除
+2. **手動管理**: 個別のコマンドで管理可能
+3. **分離環境**: 開発データベースと完全に分離
 
 ### テストデータの投入
 
 ```bash
-# デフォルトのテストデータベースに投入
-npm run seed:test
+# E2E専用データベースにテストデータを投入
+npm run e2e:db:seed
 
-# 特定のデータベースに投入
-DATABASE_URL=postgresql://user:pass@localhost:5432/e2e_test npm run seed:test
+# カスタムデータベースに投入
+DATABASE_URL=postgresql://user:pass@localhost:5432/custom_db npm run seed:test
 ```
 
 ### テストデータの内容

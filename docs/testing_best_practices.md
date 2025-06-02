@@ -269,6 +269,188 @@ GitHub Actionsでの実行:
 - 新機能には対応するE2Eテストを追加
 - 削除された機能のテストは削除
 
+### 8.7 E2Eテストの実行時間短縮戦略
+
+**問題**: 全テストを一度に実行すると時間がかかりすぎ、開発効率が低下する
+
+**解決策**: タグベースの段階的実行
+
+```typescript
+// テストにタグを付ける
+test.describe('@smoke @critical Equipment Master', () => {
+  test('基本動作確認', async ({ page }) => {
+    // スモークテスト
+  });
+});
+
+test.describe('@master Equipment Master', () => {
+  test('機材の登録・編集・削除', async ({ page }) => {
+    // 機能テスト
+  });
+});
+```
+
+**実行戦略**:
+```bash
+# 開発時（1-2分）
+npm run e2e:smoke        # 基本動作のみ確認
+
+# コミット前（2-4分）
+npm run e2e:materials    # 変更した機能のみ
+
+# PR作成前（5-10分）
+npm run e2e:smoke        # スモークテスト
+npm run e2e:cross-browser -- --grep "@critical"  # 重要機能のクロスブラウザ確認
+```
+
+### 8.8 react-hook-formのバリデーションテスト
+
+**問題**: react-hook-formの'onSubmit'モードでは、フィールドのfocus/blur操作ではバリデーションが発火しない
+
+**解決策**:
+```typescript
+// ❌ 悪い例：フィールド操作でバリデーションを期待
+await nameInput.focus();
+await nameInput.fill('');
+await nameInput.blur();
+await expect(page.getByText('Name is required')).toBeVisible(); // 失敗する
+
+// ✅ 良い例：フォーム送信でバリデーションを発火
+await page.click('button[type="submit"]');
+await page.waitForTimeout(500); // バリデーション表示を待つ
+await expect(page.locator('[role="dialog"]').getByText('Name is required.')).toBeVisible();
+```
+
+### 8.9 ダミーファイルアップロードのテスト
+
+**Playwrightでのファイルアップロード方法**:
+```typescript
+// 実ファイルを使用する場合
+const testFilePath = path.join(process.cwd(), 'test-files', 'test.wav');
+await page.locator('input[type="file"]').setInputFiles(testFilePath);
+
+// ダミーファイルを生成する場合
+const fileContent = Buffer.from('dummy audio content');
+await page.locator('input[type="file"]').setInputFiles({
+  name: 'test-audio.wav',
+  mimeType: 'audio/wav',
+  buffer: fileContent
+});
+```
+
+### 8.10 動的UIのテスト戦略
+
+**問題**: モーダルやドロップダウンなど、動的に表示される要素のテストが不安定
+
+**解決策**:
+```typescript
+// モーダルの開閉をヘルパーで管理
+class ModalHelper {
+  async waitForOpen() {
+    await this.page.waitForSelector('[role="dialog"]', { state: 'visible' });
+  }
+  
+  async waitForClose() {
+    await this.page.waitForSelector('[role="dialog"]', { state: 'hidden' });
+  }
+}
+
+// 使用例
+await modal.waitForOpen();
+await expect(modal.getTitle()).resolves.toBe('Edit Equipment');
+await modal.clickButton('Save');
+await modal.waitForClose();
+```
+
+### 8.11 テストデータ管理のベストプラクティス
+
+**マルチ言語対応のテストデータ**:
+```typescript
+// シードデータに多様なコンテンツを含める
+const testMaterials = [
+  { title: '🌄 森の朝', location: '東京都' },        // 絵文字 + 日本語
+  { title: 'Ocean Waves', location: 'California' }, // 英語
+  { title: 'カフェの午後 ☕', location: 'Kyoto' },   // 混在
+];
+```
+
+**テストの独立性を保つ**:
+- 各テスト実行でE2Eデータベースを再作成
+- テストごとに必要なデータのみを作成
+- テスト終了時のクリーンアップは不要（次回実行時に再作成）
+
+### 8.12 E2Eテストのデバッグテクニック
+
+**1. 特定のテストのみ実行**:
+```bash
+# grepパターンで絞り込み
+npm run e2e:chrome -- --grep "Equipment.*validation"
+```
+
+**2. ヘッドレスモードを無効化**:
+```bash
+npm run e2e:chrome -- --headed
+```
+
+**3. デバッグポイントの挿入**:
+```typescript
+test('デバッグが必要なテスト', async ({ page }) => {
+  await page.goto('/materials');
+  await page.pause(); // ここで一時停止してDevToolsで確認
+  await page.click('button');
+});
+```
+
+**4. スクリーンショットの活用**:
+```typescript
+// 失敗時に自動的にスクリーンショットが保存される設定
+use: {
+  screenshot: 'only-on-failure',
+  trace: 'on-first-retry',
+}
+```
+
+### 8.13 パフォーマンスを考慮したE2Eテスト設計
+
+**並列実行の最適化**:
+- 独立したテストは並列実行可能
+- データベース操作を伴うテストは順次実行
+- ブラウザコンテキストの適切な分離
+
+**待機時間の最適化**:
+```typescript
+// ❌ 悪い例：固定の待機時間
+await page.waitForTimeout(5000);
+
+// ✅ 良い例：条件ベースの待機
+await page.waitForResponse(response => 
+  response.url().includes('/api/materials') && 
+  response.status() === 200
+);
+```
+
+### 8.14 E2Eテストのアンチパターン
+
+**1. 実装の詳細に依存したテスト**:
+- CSSクラス名に依存しない
+- 内部の状態管理に依存しない
+- APIの呼び出し回数を検証しない
+
+**2. 脆弱なセレクター**:
+```typescript
+// ❌ 悪い例
+await page.click('.MuiButton-root.MuiButton-containedPrimary');
+
+// ✅ 良い例
+await page.click('button:has-text("Save")');
+await page.click('[role="button"][aria-label="Save"]');
+```
+
+**3. テスト間の依存関係**:
+- 前のテストの結果に依存しない
+- 共有状態を作らない
+- 各テストで必要なセットアップを行う
+
 ---
 
-最終更新日: 2025年6月1日
+最終更新日: 2025年6月2日

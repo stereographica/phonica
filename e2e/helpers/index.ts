@@ -4,6 +4,7 @@ export { FormHelper } from './form';
 export { WaitHelper } from './wait';
 export { TableHelper } from './table';
 export { ModalHelper } from './modal';
+export { CrossBrowserHelper } from './cross-browser';
 
 // ヘルパーのタイプ定義
 export type { Page } from '@playwright/test';

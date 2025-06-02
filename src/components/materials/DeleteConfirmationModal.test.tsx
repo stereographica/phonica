@@ -22,14 +22,12 @@ describe('DeleteConfirmationModal', () => {
       />
     );
 
-    expect(screen.getByText('削除確認')).toBeInTheDocument();
+    expect(screen.getByText('Delete Confirmation')).toBeInTheDocument();
     expect(
-      screen.getByText(
-        `素材「${materialTitle}」を本当に削除しますか？この操作は元に戻せません。`
-      )
+      screen.getByText(/Are you sure you want to delete.*Test Material Title.*\? This action cannot be undone\./)
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '削除する' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
 
   test('does not render when isOpen is false', () => {
@@ -41,7 +39,7 @@ describe('DeleteConfirmationModal', () => {
         materialTitle={materialTitle}
       />
     );
-    expect(screen.queryByText('削除確認')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delete Confirmation')).not.toBeInTheDocument();
   });
 
   test('calls onClose when cancel button is clicked', () => {
@@ -53,7 +51,7 @@ describe('DeleteConfirmationModal', () => {
         materialTitle={materialTitle}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(mockOnClose).toHaveBeenCalled();
     expect(mockOnConfirm).not.toHaveBeenCalled();
   });
@@ -67,7 +65,7 @@ describe('DeleteConfirmationModal', () => {
         materialTitle={materialTitle}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: '削除する' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(mockOnConfirm).toHaveBeenCalledTimes(1);
     expect(mockOnClose).toHaveBeenCalled();
   });
@@ -82,9 +80,7 @@ describe('DeleteConfirmationModal', () => {
       />
     );
     expect(
-      screen.getByText(
-        '素材「選択されたアイテム」を本当に削除しますか？この操作は元に戻せません。'
-      )
+      screen.getByText(/Are you sure you want to delete.*selected item.*\? This action cannot be undone\./)
     ).toBeInTheDocument();
   });
 }); 

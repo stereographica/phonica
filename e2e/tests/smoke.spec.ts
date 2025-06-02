@@ -1,24 +1,24 @@
 import { test, expect } from '../fixtures/test-fixtures';
 
-test.describe('スモークテスト', () => {
-  test('アプリケーションが起動する', async ({ page }) => {
+test.describe('@smoke @critical Smoke Test', () => {
+  test('application launches successfully', async ({ page }) => {
     await page.goto('/');
     
-    // ページが正しくロードされることを確認
-    // Next.jsのデフォルトタイトルの場合もあるため、どちらかを許可
+    // Verify page loads correctly
+    // Allow either Phonica or Next.js default title
     await expect(page).toHaveTitle(/Phonica|Next\.js/i);
     
-    // メインコンテンツが表示されることを確認
+    // Verify main content is displayed
     await expect(page.locator('main')).toBeVisible();
   });
 
-  test('主要なページにアクセスできる', async ({ page }) => {
+  test('can access main pages', async ({ page }) => {
     const pages = [
       { url: '/', title: 'Phonica' },
       { url: '/materials', title: 'Materials' },
-      { url: '/materials/new', title: 'Create Material' },
+      { url: '/materials/new', title: 'New Material' },
       { url: '/master/equipment', title: 'Equipment Master' },
-      { url: '/master/tags', title: 'Tag Master' },
+      { url: '/master/tags', title: 'Tag Management' },
     ];
 
     for (const pageInfo of pages) {
@@ -38,7 +38,7 @@ test.describe('スモークテスト', () => {
     }
   });
 
-  test('サイドバーナビゲーションが機能する', async ({ page }) => {
+  test('sidebar navigation works correctly', async ({ page }) => {
     await page.goto('/');
     
     // サイドバーが存在することを確認
@@ -50,8 +50,8 @@ test.describe('スモークテスト', () => {
       'Dashboard',
       'Materials',
       'Master Data',
-      'Equipment',
-      'Tags',
+      // 'Equipment', // Master Dataの下位項目
+      // 'Tags', // Master Dataの下位項目
     ];
     
     for (const linkText of links) {
@@ -65,7 +65,7 @@ test.describe('スモークテスト', () => {
     }
   });
 
-  test('レスポンシブデザインが機能する', async ({ page }) => {
+  test('responsive design works correctly', async ({ page }) => {
     // デスクトップサイズ
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/materials');
