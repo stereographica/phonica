@@ -198,13 +198,12 @@ test.describe('@workflow Complete User Journey', () => {
     await expect(materialCell).toBeVisible({ timeout: 10000 });
 
     // 4. タイトル検索機能をテスト
+    // まず現在のフィルターをクリアするために、ページをリロード
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    
     // 検索フィールドに「forest」を入力
     const titleSearchInput = page.locator('input#titleFilter');
-    
-    // Firefox/WebKitでは入力値のクリアに問題がある場合があるため、完全にクリアする
-    await titleSearchInput.click();
-    await titleSearchInput.fill('');
-    await page.waitForTimeout(100); // 入力のクリアが反映されるまで待機
     await titleSearchInput.fill('forest');
     
     // Firefox/WebKitでは入力値が確実に反映されるまで待機

@@ -252,7 +252,16 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // ボタンを確実に取得してクリック
     const materialButton = page.locator(`button:has-text("${uniqueTagTestTitle}")`);
     await expect(materialButton).toBeVisible({ timeout: 5000 });
-    await materialButton.scrollIntoViewIfNeeded();
+    
+    // Firefoxでは scrollIntoViewIfNeeded が不安定なので使わない
+    if (browserName !== 'firefox') {
+      try {
+        await materialButton.scrollIntoViewIfNeeded();
+      } catch (e) {
+        console.log('ScrollIntoView failed, continuing without scroll');
+      }
+    }
+    
     await materialButton.click();
     
     // Firefoxでは長めのタイムアウトを設定

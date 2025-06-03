@@ -46,16 +46,32 @@ test.describe('エラーハンドリング機能', () => {
       const materialRow = page.locator(`tbody tr:has-text("${materialTitle}")`);
       await expect(materialRow).toBeVisible({ timeout: 10000 });
       
-      // WebKitでは追加の待機が必要
-      if (browserName === 'webkit') {
+      // WebKit/Firefoxでは追加の待機が必要
+      if (browserName === 'webkit' || browserName === 'firefox') {
         await page.waitForTimeout(1000);
       }
       
-      // ボタンを確実に取得してクリック
-      const materialButton = materialRow.locator('button').first();
-      await expect(materialButton).toBeVisible();
-      await materialButton.scrollIntoViewIfNeeded();
-      await materialButton.click();
+      // Firefoxの場合は要素を再取得して確実にクリック
+      if (browserName === 'firefox') {
+        // 要素を再取得してクリック（DOM更新に対応）
+        const freshMaterialRow = page.locator(`tbody tr:has-text("${materialTitle}")`).first();
+        await expect(freshMaterialRow).toBeVisible();
+        const freshMaterialButton = freshMaterialRow.locator('button').first();
+        await expect(freshMaterialButton).toBeVisible();
+        await freshMaterialButton.click();
+      } else {
+        // その他のブラウザは通常の処理
+        const materialButton = materialRow.locator('button').first();
+        await expect(materialButton).toBeVisible();
+        
+        try {
+          await materialButton.scrollIntoViewIfNeeded();
+        } catch (e) {
+          console.log('ScrollIntoView failed, continuing without scroll');
+        }
+        
+        await materialButton.click();
+      }
       
       // WebKitでは長めのタイムアウトを設定
       const dialogTimeout = browserName === 'webkit' ? 10000 : 5000;
@@ -152,16 +168,32 @@ test.describe('エラーハンドリング機能', () => {
       const materialRow = page.locator(`tbody tr:has-text("${materialTitle}")`);
       await expect(materialRow).toBeVisible({ timeout: 10000 });
       
-      // WebKitでは追加の待機が必要
-      if (browserName === 'webkit') {
+      // WebKit/Firefoxでは追加の待機が必要
+      if (browserName === 'webkit' || browserName === 'firefox') {
         await page.waitForTimeout(1000);
       }
       
-      // ボタンを確実に取得してクリック
-      const materialButton = materialRow.locator('button').first();
-      await expect(materialButton).toBeVisible();
-      await materialButton.scrollIntoViewIfNeeded();
-      await materialButton.click();
+      // Firefoxの場合は要素を再取得して確実にクリック
+      if (browserName === 'firefox') {
+        // 要素を再取得してクリック（DOM更新に対応）
+        const freshMaterialRow = page.locator(`tbody tr:has-text("${materialTitle}")`).first();
+        await expect(freshMaterialRow).toBeVisible();
+        const freshMaterialButton = freshMaterialRow.locator('button').first();
+        await expect(freshMaterialButton).toBeVisible();
+        await freshMaterialButton.click();
+      } else {
+        // その他のブラウザは通常の処理
+        const materialButton = materialRow.locator('button').first();
+        await expect(materialButton).toBeVisible();
+        
+        try {
+          await materialButton.scrollIntoViewIfNeeded();
+        } catch (e) {
+          console.log('ScrollIntoView failed, continuing without scroll');
+        }
+        
+        await materialButton.click();
+      }
       
       // WebKitでは長めのタイムアウトを設定
       const dialogTimeout = browserName === 'webkit' ? 10000 : 5000;
