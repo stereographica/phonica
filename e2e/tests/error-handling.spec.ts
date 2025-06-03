@@ -38,9 +38,9 @@ test.describe('エラーハンドリング機能', () => {
       await page.waitForLoadState('networkidle');
       
       // 作成した素材を検索
-      await page.fill('input[placeholder="Search by title"]', materialTitle);
-      await page.click('button:has-text("Search")');
-      await page.waitForTimeout(1000);
+      await page.fill('input[placeholder="Search by title..."]', materialTitle);
+      await page.click('button:has-text("Apply Filters")');
+      await page.waitForLoadState('networkidle');
       
       // 素材の詳細モーダルを開く
       const materialButton = page.locator(`tbody tr:has-text("${materialTitle}")`).locator('button').first();
@@ -79,8 +79,10 @@ test.describe('エラーハンドリング機能', () => {
       await page.fill('[role="dialog"] input[name="manufacturer"]', 'テストメーカー');
       await page.click('[role="dialog"] button[type="submit"]');
       
-      // 一覧が更新されるのを待つ
-      await page.waitForTimeout(1000);
+      // 一覧が更新されるのを待つ（APIレスポンスを待つ）
+      await page.waitForResponse(response => 
+        response.url().includes('/api/master/equipment') && response.status() === 200
+      );
 
       // 作成した機材の削除ボタンをクリック
       const equipmentRow = page.locator(`tr:has-text("${equipmentName}")`);
@@ -128,9 +130,9 @@ test.describe('エラーハンドリング機能', () => {
       await page.waitForLoadState('networkidle');
       
       // 作成した素材を検索
-      await page.fill('input[placeholder="Search by title"]', materialTitle);
-      await page.click('button:has-text("Search")');
-      await page.waitForTimeout(1000);
+      await page.fill('input[placeholder="Search by title..."]', materialTitle);
+      await page.click('button:has-text("Apply Filters")');
+      await page.waitForLoadState('networkidle');
       
       // 素材の詳細モーダルを開く
       const materialButton = page.locator(`tbody tr:has-text("${materialTitle}")`).locator('button').first();
@@ -182,8 +184,10 @@ test.describe('エラーハンドリング機能', () => {
       await page.fill('[role="dialog"] input[name="manufacturer"]', 'エラーテスト');
       await page.click('[role="dialog"] button[type="submit"]');
       
-      // 一覧が更新されるのを待つ
-      await page.waitForTimeout(1000);
+      // 一覧が更新されるのを待つ（APIレスポンスを待つ）
+      await page.waitForResponse(response => 
+        response.url().includes('/api/master/equipment') && response.status() === 200
+      );
       
       // 削除APIをモックしてエラーを返すように設定（特定の機材名のみ）
       await page.route('**/api/master/equipment/*', (route, request) => {
@@ -218,13 +222,22 @@ test.describe('エラーハンドリング機能', () => {
       await page.goto('/materials/new');
       await page.waitForLoadState('networkidle');
 
+      // HTML5バリデーションを無効化してフォームを送信
+      await page.evaluate(() => {
+        const form = document.querySelector('form[data-testid="new-material-form"]') as HTMLFormElement;
+        if (form) {
+          // required属性を一時的に削除
+          form.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+        }
+      });
+
       // 必須フィールドを空のまま送信
       await page.click('button:has-text("Save Material")');
 
-      // エラーアラートが表示されることを確認（クライアントサイドバリデーション）
-      await page.waitForTimeout(500); // フォーム処理を待つ
-      const alert = page.locator('p[role="alert"]').filter({ hasText: /Please select an audio file|Title is required/ });
+      // エラーアラートが表示されることを確認
+      const alert = page.locator('p[role="alert"]');
       await expect(alert).toBeVisible();
+      await expect(alert).toHaveText(/Please select an audio file|Title is required/);
     });
   });
 
