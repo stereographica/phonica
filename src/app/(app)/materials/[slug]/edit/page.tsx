@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react'; // Loader2 を追加
 import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
+import { useNotification } from '@/hooks/use-notification';
 
 // APIから返される素材データの型 (GET /api/materials/[slug] のレスポンスに合わせる)
 interface MaterialData {
@@ -34,6 +35,7 @@ export default function EditMaterialPage() {
   const router = useRouter();
   const params = useParams();
   const slugFromParams = typeof params.slug === 'string' ? params.slug : null; // 修正: params.id -> params.slug
+  const { notifyError, notifySuccess } = useNotification();
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [material, setMaterial] = useState<MaterialData | null>(null);
@@ -180,17 +182,12 @@ export default function EditMaterialPage() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      alert('Material updated successfully!');
+      notifySuccess('update', 'material');
       router.push('/materials');
 
     } catch (err) {
       console.error('Failed to update material:', err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred.');
-      }
-    } finally {
+      notifyError(err, { operation: 'update', entity: 'material' });
       setIsSubmitting(false);
     }
   };

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { EquipmentFormModal } from '@/components/master/EquipmentFormModal';
+import { useNotification } from '@/hooks/use-notification';
 import type { Equipment } from '@prisma/client';
 
 export default function EquipmentPage() {
@@ -26,6 +27,7 @@ export default function EquipmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const { notifyError, notifySuccess } = useNotification();
 
   const fetchEquipments = async () => {
     setIsLoading(true);
@@ -76,14 +78,11 @@ export default function EquipmentPage() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       // 成功したら一覧を再読み込み
-      fetchEquipments(); 
+      fetchEquipments();
+      notifySuccess('delete', 'equipment');
     } catch (e: unknown) {
       console.error("Failed to delete equipment:", e);
-      if (e instanceof Error) {
-        alert(`Error deleting equipment: ${e.message || 'Unknown error'}`);
-      } else {
-        alert('An unknown error occurred while deleting equipment.');
-      }
+      notifyError(e, { operation: 'delete', entity: 'equipment' });
     }
   };
 

@@ -10,9 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 // import { Checkbox } from '@/components/ui/checkbox'; // Not used yet
 import { ArrowLeft, TagsIcon } from 'lucide-react'; // Removed unused icons
 import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
+import { useNotification } from '@/hooks/use-notification';
 
 export default function NewMaterialPage() {
   const router = useRouter();
+  const { notifyError, notifySuccess } = useNotification();
   const [title, setTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recordedAt, setRecordedAt] = useState('');
@@ -102,6 +104,9 @@ export default function NewMaterialPage() {
       // JSONレスポンスは不要
       await response.json();
       
+      // 成功通知を表示
+      notifySuccess('create', 'material');
+      
       // 成功後、リダイレクト前に状態をリセット
       setIsSubmitting(false);
       
@@ -109,7 +114,7 @@ export default function NewMaterialPage() {
       await router.push('/materials');
     } catch (err: unknown) {
       console.error('Failed to save material:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      notifyError(err, { operation: 'create', entity: 'material' });
       setIsSubmitting(false);
     }
   };
