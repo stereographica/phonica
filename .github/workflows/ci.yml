@@ -171,6 +171,10 @@ jobs:
       - name: Run E2E tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
           REDIS_URL: redis://localhost:6379
           NODE_ENV: production
           CI: true

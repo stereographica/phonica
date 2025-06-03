@@ -45,10 +45,19 @@ export async function createMaterial(formData: FormData) {
     const uniqueFileName = `${fileNamePrefix}${uuidv4()}${fileExtension}`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
     const filePathInFilesystem = path.join(uploadDir, uniqueFileName);
-    await fs.mkdir(uploadDir, { recursive: true });
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filePathInFilesystem, fileBuffer);
     const filePathForDb = `/uploads/materials/${uniqueFileName}`;
+    
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(filePathInFilesystem, fileBuffer);
+    } catch (fileError) {
+      console.error('Error saving file:', fileError);
+      return {
+        success: false,
+        error: 'Failed to save file. Please try again.'
+      };
+    }
 
     // タイムスタンプを追加してslugをユニークにする
     const timestamp = Date.now();
@@ -102,12 +111,12 @@ export async function createMaterial(formData: FormData) {
         recordedAt: new Date(recordedAt),
         memo: (memo === "null" || memo === "") ? null : memo,
         fileFormat: (fileFormat === "null" || fileFormat === "") ? null : fileFormat,
-        sampleRate: sampleRateStr ? parseInt(sampleRateStr) : null,
-        bitDepth: bitDepthStr ? parseInt(bitDepthStr) : null,
-        latitude: latitudeStr ? (parseFloat(latitudeStr) || null) : null,
-        longitude: longitudeStr ? (parseFloat(longitudeStr) || null) : null,
+        sampleRate: sampleRateStr ? (isNaN(parseInt(sampleRateStr)) ? null : parseInt(sampleRateStr)) : null,
+        bitDepth: bitDepthStr ? (isNaN(parseInt(bitDepthStr)) ? null : parseInt(bitDepthStr)) : null,
+        latitude: latitudeStr ? (isNaN(parseFloat(latitudeStr)) ? null : parseFloat(latitudeStr)) : null,
+        longitude: longitudeStr ? (isNaN(parseFloat(longitudeStr)) ? null : parseFloat(longitudeStr)) : null,
         locationName: (locationName === "null" || locationName === "") ? null : locationName,
-        rating: ratingStr ? parseInt(ratingStr) : null,
+        rating: ratingStr ? (isNaN(parseInt(ratingStr)) ? null : parseInt(ratingStr)) : null,
         tags: { connectOrCreate: tagsToConnect },
         equipments: { 
           connect: equipmentsToConnect 
@@ -184,10 +193,19 @@ export async function updateMaterial(slug: string, formData: FormData) {
       const uniqueFileName = `${fileNamePrefix}${uuidv4()}${fileExtension}`;
       const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'materials');
       const filePathInFilesystem = path.join(uploadDir, uniqueFileName);
-      await fs.mkdir(uploadDir, { recursive: true });
-      const fileBuffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(filePathInFilesystem, fileBuffer);
-      filePathForDb = `/uploads/materials/${uniqueFileName}`;
+      
+      try {
+        await fs.mkdir(uploadDir, { recursive: true });
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+        await fs.writeFile(filePathInFilesystem, fileBuffer);
+        filePathForDb = `/uploads/materials/${uniqueFileName}`;
+      } catch (fileError) {
+        console.error('Error saving file:', fileError);
+        return {
+          success: false,
+          error: 'Failed to save file. Please try again.'
+        };
+      }
 
       // 古いファイルを削除キューに追加（実装済みの場合）
       // TODO: ファイル削除キューの処理
@@ -241,12 +259,12 @@ export async function updateMaterial(slug: string, formData: FormData) {
         recordedAt: new Date(recordedAt),
         memo: (memo === "null" || memo === "") ? null : memo,
         fileFormat: (fileFormat === "null" || fileFormat === "") ? null : fileFormat,
-        sampleRate: sampleRateStr ? parseInt(sampleRateStr) : null,
-        bitDepth: bitDepthStr ? parseInt(bitDepthStr) : null,
-        latitude: latitudeStr ? (parseFloat(latitudeStr) || null) : null,
-        longitude: longitudeStr ? (parseFloat(longitudeStr) || null) : null,
+        sampleRate: sampleRateStr ? (isNaN(parseInt(sampleRateStr)) ? null : parseInt(sampleRateStr)) : null,
+        bitDepth: bitDepthStr ? (isNaN(parseInt(bitDepthStr)) ? null : parseInt(bitDepthStr)) : null,
+        latitude: latitudeStr ? (isNaN(parseFloat(latitudeStr)) ? null : parseFloat(latitudeStr)) : null,
+        longitude: longitudeStr ? (isNaN(parseFloat(longitudeStr)) ? null : parseFloat(longitudeStr)) : null,
         locationName: (locationName === "null" || locationName === "") ? null : locationName,
-        rating: ratingStr ? parseInt(ratingStr) : null,
+        rating: ratingStr ? (isNaN(parseInt(ratingStr)) ? null : parseInt(ratingStr)) : null,
         tags: {
           set: [], // 既存のタグをクリア
           connectOrCreate: tagsToConnect
