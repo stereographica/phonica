@@ -6,6 +6,19 @@ import userEvent from '@testing-library/user-event';
 import { EquipmentFormModal } from '../EquipmentFormModal'; // EquipmentFormData は不要なので削除
 import type { Equipment } from '@prisma/client';
 
+// useNotificationフックのモック
+const mockNotifyError = jest.fn();
+const mockNotifySuccess = jest.fn();
+
+jest.mock('@/hooks/use-notification', () => ({
+  useNotification: () => ({
+    notifyError: mockNotifyError,
+    notifySuccess: mockNotifySuccess,
+    notifyInfo: jest.fn(),
+    notifyWarning: jest.fn(),
+  }),
+}));
+
 // fetch のモック
 global.fetch = jest.fn();
 
@@ -26,6 +39,8 @@ describe('EquipmentFormModal', () => {
   beforeEach(() => {
     jest.clearAllMocks(); // 各テストの前にモックをクリア
     (fetch as jest.Mock).mockClear(); // fetchモックもクリア
+    mockNotifyError.mockClear();
+    mockNotifySuccess.mockClear();
   });
 
   // 1. 新規追加モードでの表示
@@ -144,6 +159,9 @@ describe('EquipmentFormModal', () => {
       }),
     });
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+    
+    // 成功通知が呼ばれることを確認
+    expect(mockNotifySuccess).toHaveBeenCalledWith('create', 'equipment');
   });
 
   // 5. 更新時の正常系サブミット
@@ -185,6 +203,9 @@ describe('EquipmentFormModal', () => {
       }),
     });
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+    
+    // 成功通知が呼ばれることを確認
+    expect(mockNotifySuccess).toHaveBeenCalledWith('update', 'equipment');
   });
 
   // 6. APIエラー時の処理 (例: 409 Conflict - Name already exists)
@@ -211,6 +232,11 @@ describe('EquipmentFormModal', () => {
     expect(await screen.findByText('Failed to create equipment: Name already exists.')).toBeInTheDocument();
     expect(mockOnSuccess).not.toHaveBeenCalled();
     expect(mockOnOpenChange).not.toHaveBeenCalledWith(false); // モーダルは閉じない
+    
+    // エラー通知が呼ばれることを確認
+    await waitFor(() => {
+      expect(mockNotifyError).toHaveBeenCalled();
+    });
   });
   
   // 7. APIエラー時の処理 (汎用エラー)
@@ -233,6 +259,11 @@ describe('EquipmentFormModal', () => {
     fireEvent.click(screen.getByText('Add Equipment'));
 
     expect(await screen.findByText('Internal Server Error')).toBeInTheDocument();
+    
+    // エラー通知が呼ばれることを確認
+    await waitFor(() => {
+      expect(mockNotifyError).toHaveBeenCalled();
+    });
   });
 
   // 9. APIエラー時の処理 (err が Error インスタンスでない場合)
@@ -254,6 +285,11 @@ describe('EquipmentFormModal', () => {
     // ここではフォールバックメッセージを期待
     expect(await screen.findByText('An unknown error occurred.')).toBeInTheDocument();
     expect(mockOnSuccess).not.toHaveBeenCalled();
+    
+    // エラー通知が呼ばれることを確認
+    await waitFor(() => {
+      expect(mockNotifyError).toHaveBeenCalled();
+    });
   });
 
   // 8. キャンセルボタンの動作 (テスト番号を10に変更)

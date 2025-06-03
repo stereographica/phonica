@@ -141,15 +141,23 @@ test.describe('@master @critical Equipment Master', () => {
       throw e;
     }
 
-    // データの再取得を待つ
+    // データの再取得を待つ（タイムアウトを短くして、失敗してもテストを続行）
     const getResponse = await page.waitForResponse(response => 
       response.url().includes('/api/master/equipment') && 
       response.request().method() === 'GET' &&
-      response.status() === 200
+      response.status() === 200,
+      { timeout: 3000 }
     ).catch(() => null);
 
+    // レスポンスが取得できない場合は手動でページを更新
+    if (!getResponse) {
+      console.log('No GET response detected, manually refreshing data...');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+    }
+
     // 少し待機してDOMの更新を確実にする
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
     
     // 編集が反映されない場合はページをリロード
     const editedVisible = await page.locator(`td:has-text("${editedEquipmentName}")`).first().isVisible();
@@ -167,39 +175,65 @@ test.describe('@master @critical Equipment Master', () => {
     await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).not.toBeVisible();
   });
 
-  test('Can delete equipment (via dropdown menu)', async ({ page }) => {
-    // テーブルに機材が存在する場合のみテスト
-    const rowCount = await table.getRowCount();
+  test('Can delete equipment (via dropdown menu)', async ({ page, browserName }) => {
+    // テスト用の機材を作成（削除テスト用）
+    const uniqueEquipmentName = `Delete Test Equipment ${browserName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // 新しい機材を作成
+    await page.click('button:has-text("Add Equipment")');
+    await modal.waitForOpen();
+    
+    await page.fill('[role="dialog"] input[name="name"]', uniqueEquipmentName);
+    await page.fill('[role="dialog"] input[name="type"]', 'Test Type');
+    await page.fill('[role="dialog"] input[name="manufacturer"]', 'Test Manufacturer');
+    await modal.clickButton('Add Equipment');
+    await modal.waitForClose();
+    
+    // 作成した機材が表示されるまで待機
+    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).toBeVisible({ timeout: 10000 });
+    
+    // 作成した機材の行を取得
+    const targetRow = page.locator(`tbody tr:has(td:has-text("${uniqueEquipmentName}"))`);
 
-    if (rowCount > 0) {
-      // 最初の行の機材名を取得
-      const firstRow = page.locator('tbody tr').first();
-      const firstEquipmentName = await table.getCellInRow(firstRow, 0);
+    // アクションメニューを開く
+    const actionButton = targetRow.locator('button:has(.sr-only:text("Open menu"))');
+    await actionButton.click();
 
-      // アクションメニューを開く
-      const actionButton = firstRow.locator('button:has(.sr-only:text("Open menu"))');
-      await actionButton.click();
+    // 削除オプションをクリック
+    // confirmダイアログのハンドラーを設定
+    page.on('dialog', async dialog => {
+      expect(dialog.message()).toContain('Are you sure you want to delete this equipment?');
+      await dialog.accept();
+    });
+    
+    await page.click('[role="menuitem"]:has-text("Delete")');
 
-      // 削除オプションをクリック
-      // confirmダイアログのハンドラーを設定
-      page.on('dialog', async dialog => {
-        expect(dialog.message()).toContain('Are you sure you want to delete this equipment?');
-        await dialog.accept();
-      });
-      
-      await page.click('[role="menuitem"]:has-text("Delete")');
+    // 削除APIの完了を待つ
+    const deleteResponse = await page.waitForResponse(response => 
+      response.url().includes('/api/master/equipment/') && 
+      response.request().method() === 'DELETE'
+    );
 
-      // 削除APIの完了を待つ
-      await page.waitForResponse(response => 
-        response.url().includes('/api/master/equipment/') && 
-        response.request().method() === 'DELETE'
-      );
+    // 削除が成功したことを確認
+    expect(deleteResponse.status()).toBe(200);
 
-      // 削除された機材が表示されなくなることを確認
-      if (firstEquipmentName) {
-        await expect(page.locator(`td:has-text("${firstEquipmentName}")`)).not.toBeVisible({ timeout: 10000 });
-      }
+    // データの再取得を待つ（削除後の自動更新）
+    const refreshResponse = await page.waitForResponse(response => 
+      response.url().includes('/api/master/equipment') && 
+      response.request().method() === 'GET' &&
+      response.status() === 200,
+      { timeout: 5000 }
+    ).catch(() => null);
+
+    // 自動更新されない場合は手動でリロード
+    if (!refreshResponse) {
+      console.log('No automatic refresh detected, manually reloading...');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
     }
+
+    // 削除された機材が表示されなくなることを確認
+    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).not.toBeVisible({ timeout: 10000 });
   });
 
   test('Shows error when required fields are empty', async ({ page }) => {

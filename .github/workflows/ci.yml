@@ -119,6 +119,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    name: E2E Tests (${{ matrix.browser }})
 
     services:
       postgres:
@@ -159,7 +164,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Setup test database
         env:
@@ -168,7 +173,7 @@ jobs:
           npx prisma migrate deploy
           npx prisma generate
 
-      - name: Run E2E tests
+      - name: Run E2E tests - ${{ matrix.browser }}
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           POSTGRES_USER: postgres
@@ -180,28 +185,51 @@ jobs:
           CI: true
         run: |
           npm run build
-          npm run e2e -- --workers=1 --reporter=dot
+          npm run e2e -- --project=${{ matrix.browser }} --workers=1 --reporter=dot
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}
           path: playwright-report/
           retention-days: 30
 
+  e2e-summary:
+    runs-on: ubuntu-latest
+    needs: e2e
+    if: always()
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
       - name: Comment E2E test results
-        if: always()
         uses: actions/github-script@v7
         with:
           script: |
-            const status = '${{ job.status }}' === 'success' ? '✅ E2Eテスト成功' : '❌ E2Eテスト失敗';
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId
+            });
+            
+            const e2eJobs = jobs.data.jobs.filter(job => job.name.startsWith('E2E Tests'));
+            const results = e2eJobs.map(job => {
+              const browser = job.name.match(/\((.+)\)/)?.[1] || 'Unknown';
+              const status = job.conclusion === 'success' ? '✅' : '❌';
+              return `- ${browser}: ${status}`;
+            }).join('\n');
+            
+            const overallStatus = e2eJobs.every(job => job.conclusion === 'success') 
+              ? '✅ すべてのE2Eテストが成功しました' 
+              : '❌ 一部のE2Eテストが失敗しました';
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## 🧪 E2Eテスト結果\n\n${status}\n\n- ブラウザ: Chromium, Firefox, WebKit\n- 実行時刻: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+              body: `## 🧪 E2Eテスト結果\n\n${overallStatus}\n\n### ブラウザ別結果:\n${results}\n\n- 実行時刻: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
             });
 
   deploy-preview:

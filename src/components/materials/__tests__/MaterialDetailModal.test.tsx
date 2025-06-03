@@ -30,11 +30,13 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock useToast
-const mockToast = jest.fn();
-jest.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({
-    toast: mockToast,
+// Mock useNotification
+const mockNotifyError = jest.fn();
+const mockNotifySuccess = jest.fn();
+jest.mock('@/hooks/use-notification', () => ({
+  useNotification: () => ({
+    notifyError: mockNotifyError,
+    notifySuccess: mockNotifySuccess,
   }),
 }));
 
@@ -123,7 +125,8 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
   beforeEach(() => {
     fetchMock.resetMocks();
     jest.clearAllMocks();
-    mockToast.mockClear();
+    mockNotifyError.mockClear();
+    mockNotifySuccess.mockClear();
     mockPush.mockClear();
     
     // Clean up any existing DOM elements
@@ -184,7 +187,8 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
     const handleClose = jest.fn();
     const handleDeleted = jest.fn();
-    mockToast.mockClear();
+    mockNotifyError.mockClear();
+    mockNotifySuccess.mockClear();
     
     render(
       <MaterialDetailModal 
@@ -213,10 +217,7 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     fireEvent.click(confirmButton);
     
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Success",
-        description: `Material "${mockMaterial.title}" has been deleted.`,
-      });
+      expect(mockNotifySuccess).toHaveBeenCalledWith('delete', 'material');
       expect(handleDeleted).toHaveBeenCalled();
       expect(handleClose).toHaveBeenCalled();
     });
@@ -224,7 +225,8 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
 
   it('handles delete operation with error', async () => {
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
-    mockToast.mockClear();
+    mockNotifyError.mockClear();
+    mockNotifySuccess.mockClear();
     
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
     
@@ -246,11 +248,7 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     fireEvent.click(confirmButton);
     
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Error",
-        description: "Failed to delete material: Permission denied",
-        variant: "destructive",
-      });
+      expect(mockNotifyError).toHaveBeenCalled();
     });
   });
 

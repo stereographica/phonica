@@ -136,10 +136,24 @@ test.describe('@workflow Complete User Journey', () => {
     
     // Firefox/WebKitでは追加の待機が必要
     if (browserName === 'firefox' || browserName === 'webkit') {
-      await page.waitForTimeout(3000);
-      // ページをリロードして最新のデータを取得
-      await page.reload();
-      await page.waitForLoadState('networkidle');
+      try {
+        // API応答を待つか、データが表示されるかのいずれか早い方
+        await Promise.race([
+          page.waitForResponse(response => 
+            response.url().includes('/api/materials') && response.status() === 200,
+            { timeout: 5000 }
+          ),
+          page.waitForFunction(() => {
+            const rows = document.querySelectorAll('tbody tr');
+            return rows.length > 0;
+          }, { timeout: 5000 })
+        ]);
+      } catch (e) {
+        // タイムアウトの場合はページをリロードして再試行
+        console.log('Initial data load timeout, reloading page...');
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+      }
     }
     
     // データが読み込まれるまで待機
@@ -184,13 +198,12 @@ test.describe('@workflow Complete User Journey', () => {
     await expect(materialCell).toBeVisible({ timeout: 10000 });
 
     // 4. タイトル検索機能をテスト
+    // まず現在のフィルターをクリアするために、ページをリロード
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    
     // 検索フィールドに「forest」を入力
     const titleSearchInput = page.locator('input#titleFilter');
-    
-    // Firefox/WebKitでは入力値のクリアに問題がある場合があるため、完全にクリアする
-    await titleSearchInput.click();
-    await titleSearchInput.fill('');
-    await page.waitForTimeout(100); // 入力のクリアが反映されるまで待機
     await titleSearchInput.fill('forest');
     
     // Firefox/WebKitでは入力値が確実に反映されるまで待機
@@ -277,12 +290,32 @@ test.describe('@workflow Complete User Journey', () => {
 
     // 6. ワークフロー完了確認
     // 作成した素材が一覧にあることを確認するため、再度タイトルフィルターを使用
-    await titleSearchInput.fill(uniqueMaterialTitle);
-    await page.click('button:has-text("Apply Filters")');
-    await page.waitForLoadState('networkidle');
     
-    // 素材が表示されることを最終確認
-    await expect(page.locator(`td:has-text("${uniqueMaterialTitle}")`).first()).toBeVisible();
+    // Firefoxでは前のフィルター操作の影響が残ることがあるため、
+    // ページをリロードしてから検索する
+    const currentBrowserName = crossBrowser.getBrowserName();
+    if (currentBrowserName === 'firefox') {
+      console.log('Reloading page for Firefox before final check...');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
+      
+      // titleSearchInputを再取得
+      const freshTitleSearchInput = page.locator('input#titleFilter');
+      await freshTitleSearchInput.fill(uniqueMaterialTitle);
+      await page.click('button:has-text("Apply Filters")');
+      await page.waitForLoadState('networkidle');
+      
+      // Firefoxでは追加の待機
+      await page.waitForTimeout(2000);
+    } else {
+      await titleSearchInput.fill(uniqueMaterialTitle);
+      await page.click('button:has-text("Apply Filters")');
+      await page.waitForLoadState('networkidle');
+    }
+    
+    // 素材が表示されることを最終確認（タイムアウトを延長）
+    await expect(page.locator(`td:has-text("${uniqueMaterialTitle}")`).first()).toBeVisible({ timeout: 15000 });
     
     console.log('✅ Complete user journey test passed successfully!');
   });

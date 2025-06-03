@@ -44,7 +44,7 @@ async function runE2ETests() {
         // Next.jsの起動完了を検知
         if (output.includes('Ready in') || output.includes('✓ Ready')) {
           serverReady = true;
-          setTimeout(resolve, 3000); // 追加の待機時間を延長
+          setTimeout(resolve, 1000); // 待機時間を短縮
         }
       });
       

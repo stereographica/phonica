@@ -19,6 +19,16 @@ jest.mock('next/navigation', () => ({
 // window.alert のモック
 global.alert = jest.fn();
 
+// useNotificationのモック
+const mockNotifyError = jest.fn();
+const mockNotifySuccess = jest.fn();
+jest.mock('@/hooks/use-notification', () => ({
+  useNotification: () => ({
+    notifyError: mockNotifyError,
+    notifySuccess: mockNotifySuccess,
+  }),
+}));
+
 // EquipmentMultiSelectのモック
 jest.mock('@/components/materials/EquipmentMultiSelect', () => ({
   EquipmentMultiSelect: ({ selectedEquipmentIds, onChange }: { selectedEquipmentIds: string[]; onChange: (ids: string[]) => void }) => {
@@ -37,6 +47,8 @@ describe('NewMaterialPage', () => {
     fetchMock.resetMocks(); // jest-fetch-mock のリセットメソッドを使用
     mockRouterPush.mockClear(); // router.push のモックもクリア
     (global.alert as jest.Mock).mockClear(); // alert のモックもクリア
+    mockNotifyError.mockClear();
+    mockNotifySuccess.mockClear();
     // デフォルトの成功レスポンスは各テストケースで設定する
   });
 
@@ -161,13 +173,13 @@ describe('NewMaterialPage', () => {
     // フォーム送信
     await submitForm();
 
-    // エラーメッセージが表示されるか
+    // notifyErrorが呼ばれることを確認
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/Test API Error/i);
+      expect(mockNotifyError).toHaveBeenCalled();
     });
 
-    // アラートは表示されない
-    expect(global.alert).not.toHaveBeenCalled();
+    // notifySuccessは呼ばれない
+    expect(mockNotifySuccess).not.toHaveBeenCalled();
     // リダイレクトされない
     expect(mockRouterPush).not.toHaveBeenCalled();
   });

@@ -110,9 +110,25 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // 5. 機材を編集して素材への影響を確認
     await navigation.goToEquipmentMasterPage();
     
+    // ページが完全に読み込まれるまで待機
+    await page.waitForLoadState('networkidle');
+    
+    // Firefoxでは追加の待機が必要
+    if (browserName === 'firefox') {
+      await page.waitForTimeout(1000);
+    }
+    
     // 作成した機材を編集
     const testEquipmentRow = page.locator(`tbody tr:has(td:has-text("${uniqueEquipmentName}"))`);
-    await testEquipmentRow.locator('button:has(.sr-only:text("Open menu"))').click();
+    await expect(testEquipmentRow).toBeVisible({ timeout: 10000 });
+    
+    // メニューボタンを待機して表示を確認
+    const menuButton = testEquipmentRow.locator('button:has(.sr-only:text("Open menu"))');
+    await expect(menuButton).toBeVisible({ timeout: 5000 });
+    await menuButton.click();
+    
+    // メニューアイテムが表示されるまで待機
+    await page.waitForSelector('[role="menuitem"]:has-text("Edit")', { state: 'visible' });
     await page.click('[role="menuitem"]:has-text("Edit")');
 
     await crossBrowser.waitForModalOpen();
@@ -133,16 +149,24 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // 6. 素材詳細で更新された機材名が反映されていることを確認
     await navigation.goToMaterialsPage();
     
-    // WebKitでは素材一覧ページに戻った時にフィルターがクリアされる可能性があるため、再度検索
-    if (browserName === 'webkit') {
+    // WebKitとFirefoxでは素材一覧ページに戻った時にフィルターがクリアされる可能性があるため、再度検索
+    if (browserName === 'webkit' || browserName === 'firefox') {
       const titleFilter2 = page.locator('input#titleFilter');
       await titleFilter2.fill(uniqueMaterialTitle);
       await page.click('button:has-text("Apply Filters")');
       await page.waitForLoadState('networkidle');
       await expect(page.locator(`td:has-text("${uniqueMaterialTitle}")`)).toBeVisible({ timeout: 10000 });
+      
+      // Firefoxでは追加の待機が必要
+      if (browserName === 'firefox') {
+        await page.waitForTimeout(500);
+      }
     }
     
-    await page.locator(`button:has-text("${uniqueMaterialTitle}")`).click();
+    // より安定したセレクタで素材を選択
+    const materialRow = page.locator(`tbody tr:has-text("${uniqueMaterialTitle}")`);
+    await expect(materialRow).toBeVisible({ timeout: 10000 });
+    await materialRow.locator('button').first().click();
     await crossBrowser.waitForModalOpen();
 
     // 機材情報の更新は実装されていない場合スキップ
@@ -203,10 +227,48 @@ test.describe('@workflow Data Integrity Workflow', () => {
       undefined, // ダイアログメッセージなし
       '/materials' // ナビゲーション先
     );
+    
+    // ページが完全に読み込まれるまで待機
+    await page.waitForLoadState('networkidle');
+    
+    // Firefox/WebKitでは特別な処理が必要
+    const browserName = page.context().browser()?.browserType().name() || 'unknown';
+    if (browserName === 'firefox' || browserName === 'webkit') {
+      // タイトルフィルターを使用して確実に見つける
+      const titleFilter = page.locator('input#titleFilter');
+      await titleFilter.fill(uniqueTagTestTitle);
+      await page.click('button:has-text("Apply Filters")');
+      await page.waitForLoadState('networkidle');
+    }
+    
     await crossBrowser.waitForElementVisible(`td:has-text("${uniqueTagTestTitle}")`);
 
     // 3. 素材詳細でタグが正しく表示されることを確認
-    await page.locator(`button:has-text("${uniqueTagTestTitle}")`).click();
+    // Firefoxでは追加の待機が必要
+    if (browserName === 'firefox') {
+      await page.waitForTimeout(1000);
+    }
+    
+    // ボタンを確実に取得してクリック
+    const materialButton = page.locator(`button:has-text("${uniqueTagTestTitle}")`);
+    await expect(materialButton).toBeVisible({ timeout: 5000 });
+    
+    // Firefoxでは scrollIntoViewIfNeeded が不安定なので使わない
+    if (browserName !== 'firefox') {
+      try {
+        await materialButton.scrollIntoViewIfNeeded();
+      } catch (e) {
+        console.log('ScrollIntoView failed, continuing without scroll');
+      }
+    }
+    
+    await materialButton.click();
+    
+    // Firefoxでは長めのタイムアウトを設定
+    if (browserName === 'firefox') {
+      await page.waitForTimeout(500);
+    }
+    
     await crossBrowser.waitForModalOpen();
 
     // タグが表示されることを確認（一部が含まれていることを確認）
