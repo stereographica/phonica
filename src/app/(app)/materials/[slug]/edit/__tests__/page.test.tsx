@@ -7,6 +7,16 @@ import userEvent from '@testing-library/user-event';
 import EditMaterialPage from '../page';
 // import '../../../../../../global.mock'; // fetch, alert, FormData などのグローバルモック (REMOVED)
 
+// useNotificationのモック
+const mockNotifyError = jest.fn();
+const mockNotifySuccess = jest.fn();
+jest.mock('@/hooks/use-notification', () => ({
+  useNotification: () => ({
+    notifyError: mockNotifyError,
+    notifySuccess: mockNotifySuccess,
+  }),
+}));
+
 // next/navigation のモック
 const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
@@ -35,9 +45,11 @@ jest.mock('@/components/materials/EquipmentMultiSelect', () => ({
   },
 }));
 
-// FormData の append のモックを取得 (global.mock.ts で定義されている想定)
-// eslint-disable-next-line no-var
-declare var mockAppend: jest.Mock; 
+// FormDataのモック
+const mockFormDataAppend = jest.fn();
+global.FormData = jest.fn(() => ({
+  append: mockFormDataAppend,
+})) as unknown as typeof FormData; 
 
 const mockMaterialData = {
   id: '1',
@@ -69,8 +81,9 @@ beforeEach(() => {
   mockRouterPush.mockClear();
   mockRouterBack.mockClear();
   mockUseParams.mockReturnValue({ slug: 'test-slug' });
-  if (typeof mockAppend !== 'undefined') mockAppend.mockClear(); 
-  (global.alert as jest.Mock).mockClear();
+  mockNotifyError.mockClear();
+  mockNotifySuccess.mockClear();
+  mockFormDataAppend.mockClear(); 
   fetchMock.mockResponseOnce(JSON.stringify(mockMaterialData));
 });
 
@@ -154,21 +167,22 @@ describe('EditMaterialPage', () => {
     });
     
     fetchMock.mockResponseOnce(JSON.stringify({ material: { ...mockMaterialData, title: 'Updated Title via Test' } }), { status: 200 });
-    const saveButton = screen.getByRole('button', { name: /update material/i });
-    await act(async () => {
-      await user.click(saveButton);
-    });
+    
+    // フォームをsubmitイベントで送信
+    const form = screen.getByTestId('edit-material-form');
+    fireEvent.submit(form);
+    
+    // フォーム送信後の処理を待つ
     await waitFor(() => {
-      // Initial fetch + Equipment fetch + Update fetch = 3
-      expect(fetchMock).toHaveBeenCalledTimes(3); 
+      // 更新APIが呼ばれたことを確認
+      const updateCall = fetchMock.mock.calls.find(call => call[1]?.method === 'PUT');
+      expect(updateCall).toBeDefined();
     });
-    if (typeof mockAppend !== 'undefined') {
-        expect(mockAppend).toHaveBeenCalledWith('title', 'Updated Title via Test');
-        expect(mockAppend).toHaveBeenCalledWith('recordedAt', new Date(newRecordedAt).toISOString());
-        expect(mockAppend).toHaveBeenCalledWith('equipmentIds', 'eq-1,eq-2');
-    }
+    expect(mockFormDataAppend).toHaveBeenCalledWith('title', 'Updated Title via Test');
+    expect(mockFormDataAppend).toHaveBeenCalledWith('recordedAt', new Date(newRecordedAt).toISOString());
+    expect(mockFormDataAppend).toHaveBeenCalledWith('equipmentIds', 'eq-1,eq-2');
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Material updated successfully!');
+      expect(mockNotifySuccess).toHaveBeenCalledWith('update', 'material');
     });
     await waitFor(() => {
       expect(mockRouterPush).toHaveBeenCalledWith('/materials');
@@ -186,18 +200,16 @@ describe('EditMaterialPage', () => {
       await user.upload(fileInput, file);
     });
     fetchMock.mockResponseOnce(JSON.stringify({ material: { ...mockMaterialData, filePath: 'new-audio.mp3' } }), { status: 200 });
-    const saveButton = screen.getByRole('button', { name: /update material/i });
-    await act(async () => {
-      await user.click(saveButton);
-    });
+    const form = screen.getByTestId('edit-material-form');
+    fireEvent.submit(form);
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // 更新APIが呼ばれたことを確認
+      const updateCall = fetchMock.mock.calls.find(call => call[1]?.method === 'PUT');
+      expect(updateCall).toBeDefined();
     });
-    if (typeof mockAppend !== 'undefined') {
-        expect(mockAppend).toHaveBeenCalledWith('audioFile', file);
-    }
+    expect(mockFormDataAppend).toHaveBeenCalledWith('file', file);
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Material updated successfully!');
+      expect(mockNotifySuccess).toHaveBeenCalledWith('update', 'material');
     });
     await waitFor(() => {
       expect(mockRouterPush).toHaveBeenCalledWith('/materials');
@@ -243,7 +255,7 @@ describe('EditMaterialPage', () => {
 
     // APIが呼ばれないことを確認
     expect(global.fetch).toHaveBeenCalledTimes(1); // Initial fetch only
-    expect(global.alert).not.toHaveBeenCalled();
+    expect(mockNotifySuccess).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
@@ -274,7 +286,7 @@ describe('EditMaterialPage', () => {
     
     // APIが呼ばれないことを確認
     expect(global.fetch).toHaveBeenCalledTimes(1); // Initial fetch only
-    expect(global.alert).not.toHaveBeenCalled();
+    expect(mockNotifySuccess).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
@@ -288,16 +300,16 @@ describe('EditMaterialPage', () => {
     // APIエラーをモック
     fetchMock.mockResponseOnce(JSON.stringify({ error: 'Failed to Update' }), { status: 500 });
     
-    const saveButton = screen.getByRole('button', { name: /update material/i });
+    // ボタンのテキストが「Update Material」（isSubmittingがfalseの時）であることを確認
+    const saveButton = screen.getByRole('button', { name: /^Update Material$/i });
     await user.click(saveButton);
 
-    // エラーメッセージが表示されるまで待つ
+    // notifyErrorが呼ばれるまで待つ
     await waitFor(() => {
-      const alertApiError = screen.getByRole('alert');
-      expect(alertApiError).toHaveTextContent(/Failed to Update/i);
+      expect(mockNotifyError).toHaveBeenCalled();
     });
 
-    expect(global.alert).not.toHaveBeenCalled();
+    expect(mockNotifySuccess).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
@@ -313,15 +325,15 @@ describe('EditMaterialPage', () => {
     });
     expect(recordedAtInput.value).toBe(inputValue);
     fetchMock.mockResponseOnce(JSON.stringify({ material: mockMaterialData }), { status: 200 });
-    const saveButton = screen.getByRole('button', { name: /update material/i });
-    await act(async () => {
-      await user.click(saveButton);
+    const form = screen.getByTestId('edit-material-form');
+    fireEvent.submit(form);
+    await waitFor(() => {
+      // 更新APIが呼ばれたことを確認
+      const updateCall = fetchMock.mock.calls.find(call => call[1]?.method === 'PUT');
+      expect(updateCall).toBeDefined();
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const expectedSubmittedDate = new Date(inputValue).toISOString();
-    if (typeof mockAppend !== 'undefined') {
-        expect(mockAppend).toHaveBeenCalledWith('recordedAt', expectedSubmittedDate);
-    }
+    expect(mockFormDataAppend).toHaveBeenCalledWith('recordedAt', expectedSubmittedDate);
     // const requestBody = (fetchMock.mock.calls[1][1]?.body as FormData); // 未使用のためコメントアウト
   });
 

@@ -183,6 +183,7 @@ export default function EditMaterialPage() {
       }
 
       notifySuccess('update', 'material');
+      setIsSubmitting(false);
       router.push('/materials');
 
     } catch (err) {
