@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, AlertTriangle, Edit, Trash2, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useToast } from "@/hooks/use-toast";
+import { useNotification } from "@/hooks/use-notification";
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 // Mapコンポーネントをdynamic import (クライアントサイドでのみレンダリング)
@@ -64,7 +64,7 @@ interface MaterialDetailModalProps {
 
 export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialDeleted, onMaterialEdited }: MaterialDetailModalProps) {
   const router = useRouter();
-  const { toast } = useToast();
+  const { notifyError, notifySuccess } = useNotification();
   const [detailedMaterial, setDetailedMaterial] = useState<DetailedMaterial | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -148,21 +148,13 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete material');
       }
-      toast({
-        title: "Success",
-        description: `Material "${detailedMaterial.title}" has been deleted.`,
-      });
+      notifySuccess('delete', 'material');
       if (onMaterialDeleted) {
         onMaterialDeleted(detailedMaterial.slug);
       }
       handleClose(); // Close the detail modal as well
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      toast({
-        title: "Error",
-        description: `Failed to delete material: ${errorMessage}`,
-        variant: "destructive",
-      });
+      notifyError(error, { operation: 'delete', entity: 'material' });
     } finally {
       handleCloseDeleteModal();
     }
@@ -188,7 +180,7 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
         link.click();
         document.body.removeChild(link);
     } else {
-        toast({ title: "Error", description: "Download URL not found.", variant: "destructive" });
+        notifyError('Download URL not found', { operation: 'download', entity: 'material' });
     }
   };
 
