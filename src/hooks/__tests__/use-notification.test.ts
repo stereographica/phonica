@@ -125,6 +125,7 @@ describe("useNotification", () => {
       expect(mockToast).toHaveBeenCalledWith({
         title: "成功",
         description: "素材を登録しました。",
+        variant: "success",
         duration: 3000,
       });
     });
@@ -139,6 +140,7 @@ describe("useNotification", () => {
       expect(mockToast).toHaveBeenCalledWith({
         title: "成功",
         description: "データを更新しました。",
+        variant: "success",
         duration: 3000,
       });
     });
@@ -153,6 +155,7 @@ describe("useNotification", () => {
       expect(mockToast).toHaveBeenCalledWith({
         title: "成功",
         description: "タグを削除しました。",
+        variant: "success",
         duration: 2000,
       });
     });

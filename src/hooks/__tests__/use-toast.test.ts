@@ -392,7 +392,7 @@ describe('use-toast', () => {
       let toastId: string;
 
       act(() => {
-        const toastResult = result.current.toast({ title: 'Test Toast' });
+        const toastResult = result.current.toast({ title: 'Test Toast', duration: Infinity }); // 自動dismissを無効化
         toastId = toastResult.id;
       });
 
