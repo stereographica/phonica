@@ -40,8 +40,6 @@ export default function NewMaterialPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // console.log('[handleSubmit] called');
-    // console.log('[handleSubmit] recordedAt state:', recordedAt);
     setError(null);
 
     if (!selectedFile) {
@@ -89,27 +87,29 @@ export default function NewMaterialPage() {
     if (rating) formData.append('rating', String(rating));
     if (selectedEquipmentIds.length > 0) formData.append('equipmentIds', selectedEquipmentIds.join(','));
 
-    // console.log('Submitting FormData:', Object.fromEntries(formData.entries())); // デバッグ用コメント解除
-
     try {
-      // console.log('Calling fetch with:', '/api/materials', formData); // デバッグ用コメント解除
+      // Fetch APIを使用して従来の方法で送信
       const response = await fetch('/api/materials', {
         method: 'POST',
         body: formData,
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      alert('Material saved successfully!');
-      router.push('/materials');
-
+      // JSONレスポンスは不要
+      await response.json();
+      
+      // 成功後、リダイレクト前に状態をリセット
+      setIsSubmitting(false);
+      
+      // すぐにリダイレクト
+      await router.push('/materials');
     } catch (err: unknown) {
       console.error('Failed to save material:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-    } finally {
       setIsSubmitting(false);
     }
   };

@@ -135,20 +135,75 @@ export async function GET(request: NextRequest) {
 // 新しい素材を登録するPOST処理
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    const title = formData.get('title') as string | null;
-    const recordedAt = formData.get('recordedAt') as string | null;
-    const memo = formData.get('memo') as string | null;
-    const tagsStr = formData.get('tags') as string | null;
-    const fileFormat = formData.get('fileFormat') as string | null;
-    const sampleRateStr = formData.get('sampleRate') as string | null;
-    const bitDepthStr = formData.get('bitDepth') as string | null;
-    const latitudeStr = formData.get('latitude') as string | null;
-    const longitudeStr = formData.get('longitude') as string | null;
-    const locationName = formData.get('locationName') as string | null;
-    const ratingStr = formData.get('rating') as string | null;
-    const equipmentsStr = formData.get('equipmentIds') as string | null;
+    let formData: FormData;
+    let file: File | null = null;
+    let title: string | null = null;
+    let recordedAt: string | null = null;
+    let memo: string | null = null;
+    let tagsStr: string | null = null;
+    let fileFormat: string | null = null;
+    let sampleRateStr: string | null = null;
+    let bitDepthStr: string | null = null;
+    let latitudeStr: string | null = null;
+    let longitudeStr: string | null = null;
+    let locationName: string | null = null;
+    let ratingStr: string | null = null;
+    let equipmentsStr: string | null = null;
+
+    // FormDataのパースを試みる
+    try {
+      // Content-Typeヘッダーをチェック
+      const contentType = request.headers.get('content-type') || '';
+      
+      // FormDataのパースを試みる前に、ヘッダーのバリデーション
+      if (!contentType.includes('multipart/form-data')) {
+        return NextResponse.json(
+          { error: "Invalid content type. Expected multipart/form-data." },
+          { status: 400 }
+        );
+      }
+      
+      // Firefox/WebKitの場合、FormDataのパースに問題があることがあるため、
+      // 一度クローンしてからパースを試みる
+      // 将来の実装のためにコメントアウト
+      // const clonedRequest = request.clone();
+      
+      try {
+        formData = await request.formData();
+      } catch (initialError) {
+        console.warn('Initial FormData parse failed, trying alternative method:', initialError);
+        // 代替方法: バイトデータを直接読み取って手動でパース（将来の実装用）
+        // 現時点では、エラーを返す
+        throw initialError;
+      }
+      
+      file = formData.get('file') as File | null;
+      title = formData.get('title') as string | null;
+      recordedAt = formData.get('recordedAt') as string | null;
+      memo = formData.get('memo') as string | null;
+      tagsStr = formData.get('tags') as string | null;
+      fileFormat = formData.get('fileFormat') as string | null;
+      sampleRateStr = formData.get('sampleRate') as string | null;
+      bitDepthStr = formData.get('bitDepth') as string | null;
+      latitudeStr = formData.get('latitude') as string | null;
+      longitudeStr = formData.get('longitude') as string | null;
+      locationName = formData.get('locationName') as string | null;
+      ratingStr = formData.get('rating') as string | null;
+      equipmentsStr = formData.get('equipmentIds') as string | null;
+    } catch (formDataError) {
+      console.error('FormData parse error:', formDataError);
+      
+      // Firefox/WebKitでのFormDataパースエラーの回避策
+      // サーバーアクションを使用することを推奨
+      return NextResponse.json(
+        { 
+          error: "Failed to parse form data. This is a known issue with Firefox/WebKit. Please use the server action method or try using Chrome.",
+          details: formDataError instanceof Error ? formDataError.message : String(formDataError),
+          recommendation: "The application now uses server actions by default which should work across all browsers."
+        },
+        { status: 400 }
+      );
+    }
 
     if (!title || !recordedAt || !file) {
       return NextResponse.json(
@@ -168,7 +223,9 @@ export async function POST(request: NextRequest) {
     await fs.writeFile(filePathInFilesystem, fileBuffer);
     const filePathForDb = `/uploads/materials/${uniqueFileName}`;
 
-    const slug = slugify(title);
+    // タイムスタンプを追加してslugをユニークにする
+    const timestamp = Date.now();
+    const slug = `${slugify(title)}-${timestamp}`;
 
     const tagsToConnect = tagsStr
       ? await Promise.all(
@@ -233,6 +290,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newMaterial, { status: 201 });
   } catch (error: unknown) {
     console.error("Error creating material:", error);
+    
+    // より詳細なエラー情報をログに記録
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause
+      });
+    }
+    
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002' && 
         'meta' in error && error.meta && typeof error.meta === 'object' && 'target' in error.meta &&
         Array.isArray(error.meta.target) && error.meta.target.includes('slug')) {
@@ -241,6 +308,18 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+    
+    // 開発環境では詳細なエラー情報を返す
+    if (process.env.NODE_ENV !== 'production') {
+      return NextResponse.json(
+        { 
+          error: "Failed to create material",
+          details: error instanceof Error ? error.message : String(error)
+        },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to create material" },
       { status: 500 }

@@ -34,23 +34,21 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>削除確認</AlertDialogTitle>
+          <AlertDialogTitle>Delete Confirmation</AlertDialogTitle>
           <AlertDialogDescription>
-            素材「{materialTitle || '選択されたアイテム'}」を本当に削除しますか？この操作は元に戻せません。
+            Are you sure you want to delete &ldquo;{materialTitle || 'selected item'}&rdquo;? This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>キャンセル</AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               onConfirm();
               onClose(); // Close modal after confirmation
             }}
-            // Destructive variant for delete buttons if available and appropriate
-            // For shadcn/ui, you might need to style the button manually or use a variant
-            // e.g., className="bg-red-600 hover:bg-red-700"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            削除する
+            Delete
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

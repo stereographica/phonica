@@ -149,8 +149,8 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
         throw new Error(errorData.error || 'Failed to delete material');
       }
       toast({
-        title: "成功",
-        description: `素材「${detailedMaterial.title}」を削除しました。`,
+        title: "Success",
+        description: `Material "${detailedMaterial.title}" has been deleted.`,
       });
       if (onMaterialDeleted) {
         onMaterialDeleted(detailedMaterial.slug);
@@ -159,8 +159,8 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       toast({
-        title: "エラー",
-        description: `素材の削除に失敗しました: ${errorMessage}`,
+        title: "Error",
+        description: `Failed to delete material: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -188,7 +188,7 @@ export function MaterialDetailModal({ materialSlug, isOpen, onClose, onMaterialD
         link.click();
         document.body.removeChild(link);
     } else {
-        toast({ title: "エラー", description: "ダウンロードURLが見つかりません。", variant: "destructive" });
+        toast({ title: "Error", description: "Download URL not found.", variant: "destructive" });
     }
   };
 

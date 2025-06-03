@@ -18,6 +18,42 @@ npx tsc --noEmit    # 型チェック（ファイル出力なし）
 npx prisma migrate dev    # マイグレーション実行
 npx prisma studio        # Prisma Studio起動（DB確認用）
 npx prisma generate      # Prisma Client生成
+
+# E2Eテスト
+
+## 🚀 基本実行
+npm run e2e              # 全E2Eテストを並列実行（推奨）
+npm run e2e:with-report  # テスト実行後にHTMLレポートを表示
+
+## 🌐 ブラウザ別実行（開発時のみ推奨）
+npm run e2e:chrome       # Chromiumのみで実行（最速）
+npm run e2e:cross-browser # 主要ブラウザで実行
+
+## 📋 機能別実行（必要な場合のみ）
+npm run e2e:smoke        # スモークテストのみ
+npm run e2e:master       # マスターデータ機能のみ
+npm run e2e:materials    # 素材管理機能のみ
+npm run e2e:workflows    # ワークフローテストのみ
+
+## 🔍 デバッグ・詳細実行
+npm run e2e:ui           # UIモードでデバッグ
+npm run e2e:debug        # デバッグモード
+npm run e2e:report       # 最後のテストレポートを表示
+
+# 特定のテストを実行
+npm run e2e -- --grep "Equipment.*validation"
+
+## ⚠️ 注意事項
+- `npm run e2e` は並列実行により高速化されています
+- CI環境では自動的に同時実行プロセスが1に制限されます
+- 段階的実行は特定の機能のみをテストしたい場合に使用してください
+
+## データベース管理
+npm run e2e:db:create    # E2Eテストデータベース作成
+npm run e2e:db:migrate   # マイグレーション実行
+npm run e2e:db:seed      # テストデータ投入
+npm run e2e:db:drop      # データベース削除
+npm run e2e:db:setup     # 完全セットアップ
 ```
 
 ### アーキテクチャ概要
@@ -29,6 +65,7 @@ npx prisma generate      # Prisma Client生成
 - **UI Components**: shadcn/ui + Radix UI
 - **Styling**: Tailwind CSS
 - **Testing**: Jest + React Testing Library
+- **E2E Testing**: Playwright
 - **Background Jobs**: BullMQ + Redis
 
 ### ディレクトリ構造
@@ -40,6 +77,17 @@ npx prisma generate      # Prisma Client生成
 - `/src/types/` - TypeScript型定義
 - `/prisma/` - DBスキーマ・マイグレーション
 - `/docs/` - プロジェクトドキュメント
+- `/e2e/` - E2Eテスト（Playwright）
+  - `fixtures/` - テスト設定とカスタムフィクスチャ
+  - `helpers/` - 共通操作用の再利用可能なテストヘルパークラス
+  - `tests/` - 機能エリア別に整理されたテストファイル
+    - `master/` - マスターデータ管理テスト（Equipment, Tags）
+    - `materials/` - 素材CRUD・一覧テスト
+    - `workflows/` - 複雑なユーザージャーニーと統合テスト
+- `/scripts/` - E2Eテストインフラストラクチャ
+  - `e2e-db-setup.ts` - E2Eデータベースライフサイクル管理
+  - `run-e2e-with-db.ts` - 分離されたデータベースでのE2Eテスト実行
+  - `seed-test-data.ts` - 多言語コンテンツを含むテストデータ管理
 
 ### データベーススキーマ
 主要エンティティ：
@@ -89,7 +137,7 @@ npx prisma generate      # Prisma Client生成
     - refactor/issue-{番号}-{簡潔な説明}（リファクタリング）
   - **重要**: mainブランチへの直接コミット・プッシュは禁止です。必ず別ブランチで作業し、PRを経由してください。
   - 実装前にissueのステータスを「status: in progress」に更新します。
-  - 必要に応じてTodoWriteツールでタスク管理を行います。
+  - TodoWriteツールでタスク管理を行います（タスクの追跡と進捗管理のため推奨）。
   - 特定したステップを一つずつ実行してください。
   - テストをパスした時点でコミットを作成します。テストをパスしていないコードをコミットしてはいけません。
   - 各ステップの完了後、簡潔に進捗を報告してください。
@@ -116,6 +164,23 @@ npx prisma generate      # Prisma Client生成
      - ユーザー中心のテストを書く（実装の詳細ではなく観察可能な動作に焦点）
      - 適切なモッキング戦略を使用
      - TDDの原則を正しく適用
+   - **E2Eテストの保守**: UI や操作フローを変更した場合は、必ず関連する E2E テストも更新してください：
+     - HTML構造を変更した場合はセレクターを更新
+     - 操作フローを変更した場合はテストステップを更新
+     - 新機能には対応するE2Eテストを追加（適切なカテゴリ：master/, materials/, workflows/）
+     - **重要: テストタグの付与** - 新しいテストには必ず適切なタグを付ける：
+       - `@smoke` - 基本動作確認用の重要なテスト
+       - `@master` - マスターデータ機能のテスト
+       - `@materials` - 素材管理機能のテスト
+       - `@workflow` - 統合ワークフローのテスト
+       - `@critical` - 絶対に失敗してはいけない重要テスト
+     - **テスト実行戦略**：
+       - 開発中: 変更したテストのみ実行 `npm run e2e -- --grep "test-name"`
+       - コミット前: 全E2Eテスト実行 `npm run e2e` または関連機能のみ（例: `npm run e2e:materials`）
+       - PR作成前: 全E2Eテスト実行 `npm run e2e`（推奨）
+     - 削除した機能のE2Eテストは削除
+     - 共通パターンが変更された場合は `/e2e/helpers/` のヘルパークラスを更新
+     - データモデル変更時はシードデータとワークフローテストの両方を更新
 
 3. 品質管理と問題対応
   - 各タスクの実行結果を迅速に検証してください。
@@ -125,6 +190,7 @@ npx prisma generate      # Prisma Client生成
     - [ ] `npx tsc --noEmit` - 型エラーなし
     - [ ] `npm run dev` - 開発サーバー起動確認
     - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
+    - [ ] UI変更時は関連するE2Eテストを更新
   - **プッシュ前の必須確認**: GitHub Actions と同等のローカルテストをすべて実施してください。CIで失敗すると手戻りが大きいため、以下のコマンドをすべて成功させてからプッシュしてください：
     ```bash
     # 1. CI環境と同じ条件でテストを実行
@@ -138,11 +204,26 @@ npx prisma generate      # Prisma Client生成
     
     # 4. セキュリティ監査
     npm audit --audit-level=moderate
+    
+    # 5. E2Eテスト
+    # 全E2Eテストを実行（推奨）
+    npm run e2e
+    
+    # または、変更した機能のみテスト（高速化したい場合）
+    npm run e2e:smoke       # 基本動作確認（必須）
+    npm run e2e:master      # マスターデータ変更時
+    npm run e2e:materials   # 素材管理変更時
+    npm run e2e:workflows   # ワークフロー変更時
     ```
   - **ビルドエラーの事前チェック**:
     - Next.js 15では`useSearchParams()`をSuspense boundaryでラップする必要があります
     - 動的インポートやサーバーサイドレンダリングに関するエラーに注意
     - CI環境特有の問題（ロケール依存の日付フォーマット等）を考慮
+  - **よくあるCI失敗パターン**:
+    - `useSearchParams()` がSuspense boundaryでラップされていない
+    - 日付フォーマットのロケール間の違い（柔軟なパターンを使用）
+    - ESModuleインポート問題（jest.config.jsのtransformIgnorePatternsを確認）
+    - テスト環境でのRedis/BullMQの初期化
   - タスク内で発生したエラーについては確実に解決していることを確認してください。
   - 実施したタスク外で発生している既存のエラーについては、GitHub の issue を確認し、該当する対応用 issue が作成されていない場合はステップ 8 で追加してください。
   - エラーや不整合が発生した場合は、以下のプロセスで対応してください：
@@ -178,6 +259,9 @@ PRを作成する前に確認：
 - [ ] 開発サーバーが正常起動（`npm run dev`）
 - [ ] 全カバレッジ指標（Statements, Branches, Functions, Lines）が80%超
 - [ ] 新規ファイルには対応するテストファイルを作成
+- [ ] UI/フロー変更時はE2Eテストを更新済み
+- [ ] E2Eテストがパス（`npm run e2e` または変更した機能のみ: `npm run e2e:smoke`, `npm run e2e:master`, `npm run e2e:materials`, `npm run e2e:workflows`）
+- [ ] 新規E2Eテストには適切なタグを付与（@smoke, @master, @materials, @workflow, @critical）
 
 ## 重要な注意事項
 
@@ -186,6 +270,99 @@ PRを作成する前に確認：
 - UI/UXデザイン変更は事前承認が必要
 - 指示されたら docs/issues.md のissueに対処
 - 開発中に発見した問題は GitHub issue を作成
+
+## E2Eテスト管理とスクリプト
+
+`scripts/` ディレクトリには、開発中にメンテナンスが必要なE2Eテストの重要なインフラストラクチャが含まれています。
+
+### E2Eインフラストラクチャを更新するタイミング
+
+**データベーススキーマ変更時** 🗄️
+- **条件**: Prismaモデル、フィールド、リレーションシップを追加・修正する場合
+- **対応**: `seed-test-data.ts` を更新して新しいフィールドと現実的なテストデータを含める
+- **例**: 新しいMaterialフィールドには対応するテストデータエントリが必要
+
+**新機能実装時** 🚀
+- **条件**: 新しいページ、コンポーネント、ユーザーフローを追加する場合
+- **対応**:
+  1. 適切なディレクトリ（`/e2e/tests/`）に対応するE2Eテストを追加
+  2. 新しいエンティティタイプが必要な場合はシードデータを更新
+  3. 新しいユーザージャーニー用のワークフローテストを更新
+
+**UI構造変更時** 🎨
+- **条件**: HTML構造、CSSクラス、コンポーネント階層を変更する場合
+- **対応**: E2Eテストとヘルパークラスのセレクターを更新
+- **重要**: フォームフィールド、ボタン、ナビゲーション要素の変更
+
+**APIエンドポイント変更時** 🔧
+- **条件**: APIルート、リクエスト/レスポンス形式、バリデーションを修正する場合
+- **対応**: これらのエンドポイントと対話する対応するE2Eテストを更新
+
+### E2Eテストメンテナンスチェックリスト
+
+変更時に確認：
+- [ ] シードデータに新機能のテストケースを含める
+- [ ] テストセレクターが更新されたUI構造と一致
+- [ ] ワークフローテストが新しいユーザーパスをカバー
+- [ ] 未実装機能のスキップテストが適切にマーク
+- [ ] テストデータに多様なコンテンツ（多言語、エッジケース）を含む
+
+### テストデータ戦略
+
+シードデータの設計：
+- **多言語コンテンツ**: 日本語、英語、絵文字の組み合わせ
+- **現実的なシナリオ**: 実世界のフィールドレコーディング例
+- **エッジケース**: 様々なデータ形式、長さ、タイプ
+- **リレーションシップ**: 包括的なテストのための複雑な多対多関連
+
+### E2E問題のデバッグ
+
+一般的なシナリオと解決策：
+- **データベース接続問題**: PostgreSQLサービスと認証情報を確認
+- **ポート競合**: スクリプトが自動でポート競合を検出・適応
+- **タイミング問題**: 必要に応じて `run-e2e-with-db.ts` のタイムアウトを増加
+- **シードデータ失敗**: Prismaスキーマとシードスクリプトの互換性を確認
+
+### パフォーマンス考慮事項
+- 分離を確保するため、各テスト実行でE2Eデータベースを再作成
+- 高速シード用に最適化されたテストデータ（約21素材、8機材、8タグ）
+- 自動テスト実行のための開発サーバー起動監視
+
+### E2Eテストのタグ付けベストプラクティス
+
+新しいE2Eテストを作成する際は、以下のようにタグを付けてください：
+
+```typescript
+// スモークテストの例
+test.describe('@smoke @critical Simple Functionality Check', () => {
+  test('Application starts up', async ({ page }) => {
+    // 基本的な起動確認
+  });
+});
+
+// 機能テストの例
+test.describe('@materials Create Material', () => {
+  test('can create a valid material', async ({ page }) => {
+    // 素材作成のテスト
+  });
+});
+
+// ワークフローテストの例
+test.describe('@workflow Complete User Journey', () => {
+  test('新規ユーザーの素材管理完全フロー', async ({ page }) => {
+    // 統合的なユーザーフロー
+  });
+});
+```
+
+**タグの使い分け**：
+- `@smoke`: アプリケーションの基本動作を確認する最小限のテスト
+- `@critical`: 絶対に失敗してはいけない重要な機能のテスト
+- `@master`: 機材・タグなどのマスターデータ管理機能
+- `@materials`: 素材の作成・編集・一覧表示などの機能
+- `@workflow`: 複数機能にまたがる統合的なユーザーフロー
+
+複数のタグを組み合わせることも可能です（例: `@smoke @critical`）。
 
 ## バックグラウンドジョブ
 
@@ -233,6 +410,7 @@ ZIPファイル生成などのバックグラウンドタスクにBullMQを使�
   - [ ] 全てのカバレッジ指標（Statements, Branches, Functions, Lines）が80%を超えている
   - [ ] 不要なconsole.logやデバッグコードを削除済み
   - [ ] CLAUDE.mdの更新が必要な場合は更新済み
+  - [ ] UI/フロー変更時は関連するE2Eテストを更新済み
 
   以下のフォーマットで依頼します。
 

@@ -132,9 +132,8 @@ describe('NewMaterialPage', () => {
       }),
     });
 
-    // 成功時の処理を確認
+    // 成功時の処理を確認 - alertは削除されたので、リダイレクトのみを確認
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Material saved successfully!');
       expect(mockRouterPush).toHaveBeenCalledWith('/materials');
     });
   });
@@ -269,9 +268,8 @@ describe('NewMaterialPage', () => {
       }),
     });
 
-    // 成功時の処理を確認
+    // 成功時の処理を確認 - alertは削除されたので、リダイレクトのみを確認
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Material saved successfully!');
       expect(mockRouterPush).toHaveBeenCalledWith('/materials');
     });
   });

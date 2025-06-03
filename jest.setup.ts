@@ -104,6 +104,12 @@ export const mockFsPromises = {
 
 jest.mock('fs/promises', () => mockFsPromises);
 
+// UUID mock
+export const mockUuidV4 = jest.fn(() => 'test-uuid');
+jest.mock('uuid', () => ({
+  v4: mockUuidV4,
+}));
+
 beforeEach(() => {
   mockReset(prismaMock);
   fetchMock.resetMocks();
@@ -121,6 +127,10 @@ beforeEach(() => {
   mockFsPromises.rename.mockClear();
   mockFsPromises.writeFile.mockClear();
   mockFsPromises.mkdir.mockClear();
+  
+  // UUID mock もクリア
+  mockUuidV4.mockClear();
+  mockUuidV4.mockReturnValue('test-uuid');
 });
 
 // Mock NextResponse.json

@@ -9,6 +9,10 @@ module.exports = {
     '**/__tests__/**/*.[jt]s?(x)',
     '**/?(*.)+(spec|test).[jt]s?(x)'
   ], // テストファイルのパターンを明示
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/e2e/'
+  ], // E2Eテストを除外
   collectCoverage: true,
   coverageDirectory: "coverage",
   coverageProvider: "v8",

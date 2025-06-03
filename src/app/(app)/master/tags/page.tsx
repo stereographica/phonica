@@ -27,36 +27,84 @@ interface Tag {
   materialCount: number;
 }
 
-// ダミーデータ
+// Dummy data
 const dummyTags: Tag[] = [
   {
     id: '1',
-    name: '自然音',
+    name: '🌿 自然音',
     slug: 'nature-sound',
     materialCount: 12,
   },
   {
     id: '2',
-    name: '鳥',
+    name: '🐦 鳥のさえずり',
     slug: 'bird',
     materialCount: 8,
   },
   {
     id: '3',
-    name: '都市音',
+    name: '🏙️ 都市音',
     slug: 'urban-sound',
-    materialCount: 5,
+    materialCount: 15,
   },
   {
     id: '4',
-    name: '雨',
+    name: '☔ 雨音',
     slug: 'rain',
+    materialCount: 6,
+  },
+  {
+    id: '5',
+    name: 'Field Recording',
+    slug: 'field-recording',
+    materialCount: 23,
+  },
+  {
+    id: '6',
+    name: 'Binaural Audio',
+    slug: 'binaural-audio',
+    materialCount: 4,
+  },
+  {
+    id: '7',
+    name: 'ASMR 🎧',
+    slug: 'asmr',
+    materialCount: 9,
+  },
+  {
+    id: '8',
+    name: '🎵 環境音',
+    slug: 'ambient-sounds',
+    materialCount: 18,
+  },
+  {
+    id: '9',
+    name: 'Wildlife Sounds 🦁',
+    slug: 'wildlife-sounds',
+    materialCount: 7,
+  },
+  {
+    id: '10',
+    name: 'Ocean Waves 🌊',
+    slug: 'ocean-waves',
+    materialCount: 5,
+  },
+  {
+    id: '11',
+    name: '交通音 🚗',
+    slug: 'traffic-sounds',
     materialCount: 3,
+  },
+  {
+    id: '12',
+    name: 'White Noise',
+    slug: 'white-noise',
+    materialCount: 2,
   },
 ];
 
 export default function TagsMasterPage() {
-  // TODO: 将来的にはServer ActionやAPIからデータを取得
+  // TODO: Fetch data from Server Action or API in the future
   const tags = dummyTags;
 
   // TODO: タグのリネーム、削除、統合の処理
