@@ -283,11 +283,10 @@ describe('/api/materials', () => {
         { id: 'equip-2', name: 'Headphones Deluxe', type: 'Headphones', manufacturer: 'AudioTech', memo: null, createdAt: new Date(), updatedAt: new Date() }
       ]);
 
-      const dynamicFilePath = `/uploads/materials/${uuidv4()}.wav`; // 動的なファイルパスを生成
-      const dynamicSlug = `new-sound-${Date.now()}`; // 動的なslugを生成
+      const dynamicFilePath = `/uploads/materials/test-dummy-test-uuid.wav`; // モックされたUUIDを使用
       const createdMaterialResponse = {
         id: 'mat-created',
-        slug: dynamicSlug,
+        slug: 'new-sound-123456', // 固定値を使用
         title: validMaterialData.title,
         filePath: dynamicFilePath, // expect.stringMatching から具体的な文字列に変更
         recordedAt: new Date(validMaterialData.recordedAt),
@@ -319,7 +318,7 @@ describe('/api/materials', () => {
 
       expect(response.status).toBe(201);
       expect(responseBody.title).toBe(validMaterialData.title);
-      expect(responseBody.slug).toBe(dynamicSlug);
+      expect(responseBody.slug).toMatch(/^new-sound-\d+$/); // 実際に生成されるslugのパターンを検証
       expect(responseBody.filePath).toBe(dynamicFilePath); // toMatch から toBe に変更し、具体的な値を比較
       expect(responseBody.tags).toHaveLength(2);
       expect(responseBody.tags[0].name).toBe('new');
@@ -327,9 +326,9 @@ describe('/api/materials', () => {
       expect(prismaMock.material.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           title: validMaterialData.title,
-          filePath: expect.stringMatching(/^\/uploads\/materials\/test-dummy-[a-f0-9-]+\.wav$/),
+          filePath: '/uploads/materials/test-dummy-test-uuid.wav', // モックされたUUIDを使用
           memo: validMaterialData.memo,
-          slug: expect.stringMatching(/^new-sound-\d+$/),
+          slug: expect.stringMatching(/^new-sound-\d+$/), // slugのパターンを検証
           recordedAt: expect.any(Date),
           fileFormat: validMaterialData.fileFormat,
           sampleRate: validMaterialData.sampleRate,
