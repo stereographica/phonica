@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { useNotification } from '@/hooks/use-notification';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ export function EquipmentFormModal({
 }: EquipmentFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { notifyError, notifySuccess } = useNotification();
 
   const isEditMode = !!initialData;
 
@@ -112,12 +114,16 @@ export function EquipmentFormModal({
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
+      // 成功通知を表示
+      notifySuccess(isEditMode ? 'update' : 'create', 'equipment');
+
       if (onSuccess) {
         onSuccess();
       }
       onOpenChange(false);
     } catch (err: unknown) {
       console.error('Failed to save equipment:', err);
+      notifyError(err, { operation: isEditMode ? 'update' : 'create', entity: 'equipment' });
       if (err instanceof Error) {
         setError(err.message || 'An unknown error occurred.');
       } else {

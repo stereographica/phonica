@@ -41,6 +41,7 @@ export function useNotification() {
       toast({
         title: "成功",
         description: message,
+        variant: "success",
         duration: options?.duration || 3000,
       });
     },
