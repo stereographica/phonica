@@ -13,6 +13,10 @@ export class ToastHelper {
     
     // すべてのToast要素を取得
     const toasts = this.page.locator('[role="status"]');
+    
+    // 少なくとも1つのToastが表示されるまで待つ
+    await expect(toasts.first()).toBeVisible({ timeout: 5000 });
+    
     const count = await toasts.count();
     
     if (count === 0) {
@@ -20,7 +24,12 @@ export class ToastHelper {
     }
     
     // 最後のToast（最新）を返す
-    return toasts.nth(count - 1);
+    const latestToast = toasts.nth(count - 1);
+    
+    // 選択したToastが実際に存在することを確認
+    await expect(latestToast).toBeVisible({ timeout: 5000 });
+    
+    return latestToast;
   }
 
   /**

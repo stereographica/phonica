@@ -43,9 +43,23 @@ test.describe('エラーハンドリング機能', () => {
       await page.waitForLoadState('networkidle');
       
       // 素材の詳細モーダルを開く
-      const materialButton = page.locator(`tbody tr:has-text("${materialTitle}")`).locator('button').first();
+      const materialRow = page.locator(`tbody tr:has-text("${materialTitle}")`);
+      await expect(materialRow).toBeVisible({ timeout: 10000 });
+      
+      // WebKitでは追加の待機が必要
+      if (browserName === 'webkit') {
+        await page.waitForTimeout(1000);
+      }
+      
+      // ボタンを確実に取得してクリック
+      const materialButton = materialRow.locator('button').first();
+      await expect(materialButton).toBeVisible();
+      await materialButton.scrollIntoViewIfNeeded();
       await materialButton.click();
-      await page.waitForSelector('[role="dialog"]', { state: 'visible' });
+      
+      // WebKitでは長めのタイムアウトを設定
+      const dialogTimeout = browserName === 'webkit' ? 10000 : 5000;
+      await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: dialogTimeout });
 
       // 削除ボタンをクリック
       await page.click('button:has-text("Delete")');
@@ -135,9 +149,23 @@ test.describe('エラーハンドリング機能', () => {
       await page.waitForLoadState('networkidle');
       
       // 素材の詳細モーダルを開く
-      const materialButton = page.locator(`tbody tr:has-text("${materialTitle}")`).locator('button').first();
+      const materialRow = page.locator(`tbody tr:has-text("${materialTitle}")`);
+      await expect(materialRow).toBeVisible({ timeout: 10000 });
+      
+      // WebKitでは追加の待機が必要
+      if (browserName === 'webkit') {
+        await page.waitForTimeout(1000);
+      }
+      
+      // ボタンを確実に取得してクリック
+      const materialButton = materialRow.locator('button').first();
+      await expect(materialButton).toBeVisible();
+      await materialButton.scrollIntoViewIfNeeded();
       await materialButton.click();
-      await page.waitForSelector('[role="dialog"]', { state: 'visible' });
+      
+      // WebKitでは長めのタイムアウトを設定
+      const dialogTimeout = browserName === 'webkit' ? 10000 : 5000;
+      await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: dialogTimeout });
       
       // Editボタンをクリックして編集ページへ移動
       const editButton = page.locator('[role="dialog"] button:has-text("Edit")');
@@ -153,7 +181,7 @@ test.describe('エラーハンドリング機能', () => {
       // 保存ボタンをクリック
       await page.click('button:has-text("Update Material")');
 
-      // 成功Toast通知が表示されることを確認
+      // 成功Toast通知が表示されることを確認（リダイレクト前に確認）
       const toastHelper = new ToastHelper(page);
       await toastHelper.expectSuccessToast('素材を更新しました');
 
