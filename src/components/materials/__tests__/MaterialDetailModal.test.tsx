@@ -203,19 +203,19 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     
     // Confirm delete in modal
     await waitFor(() => {
-      const confirmButton = screen.getByRole('button', { name: /削除する/i });
+      const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
       expect(confirmButton).toBeInTheDocument();
     });
     
     fetchMock.mockResponseOnce(JSON.stringify({ success: true }));
     
-    const confirmButton = screen.getByRole('button', { name: /削除する/i });
+    const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
     fireEvent.click(confirmButton);
     
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith({
-        title: "成功",
-        description: `素材「${mockMaterial.title}」を削除しました。`,
+        title: "Success",
+        description: `Material "${mockMaterial.title}" has been deleted.`,
       });
       expect(handleDeleted).toHaveBeenCalled();
       expect(handleClose).toHaveBeenCalled();
@@ -236,19 +236,19 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     
     // Wait for delete modal
     await waitFor(() => {
-      const confirmButton = screen.getByRole('button', { name: /削除する/i });
+      const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
       expect(confirmButton).toBeInTheDocument();
     });
     
     fetchMock.mockResponseOnce(JSON.stringify({ error: 'Permission denied' }), { status: 403 });
     
-    const confirmButton = screen.getByRole('button', { name: /削除する/i });
+    const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
     fireEvent.click(confirmButton);
     
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith({
-        title: "エラー",
-        description: "素材の削除に失敗しました: Permission denied",
+        title: "Error",
+        description: "Failed to delete material: Permission denied",
         variant: "destructive",
       });
     });
@@ -353,7 +353,7 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
 
     // Wait for confirmation modal
     await waitFor(() => {
-      const confirmButton = screen.getByRole('button', { name: /削除する/i });
+      const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
       expect(confirmButton).toBeInTheDocument();
     });
 
@@ -361,7 +361,7 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     fetchMock.mockResponseOnce(JSON.stringify({ success: true }));
 
     // Confirm deletion
-    const confirmButton = screen.getByRole('button', { name: /削除する/i });
+    const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
