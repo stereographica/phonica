@@ -168,6 +168,7 @@ Please follow the structured development process documented in `docs/development
   - `npm run lint` - No lint errors
   - `npx tsc --noEmit` - No type errors
   - `npm run dev` - Dev server runs
+  - `npm run e2e` - **MANDATORY**: E2E tests must pass (this is a required CI check)
 - **MANDATORY**: Run GitHub Actions equivalent tests locally before pushing. ALL must pass:
   ```bash
   # 1. Test with CI environment settings
@@ -181,6 +182,9 @@ Please follow the structured development process documented in `docs/development
   
   # 4. Security audit
   npm audit --audit-level=moderate
+  
+  # 5. E2E tests - REQUIRED: These are mandatory CI checks
+  npm run e2e
   ```
 - **Common CI Failures to Check**:
   - `useSearchParams()` must be wrapped in Suspense boundary
@@ -275,9 +279,9 @@ Please follow the structured development process documented in `docs/development
 - [ ] Build succeeds: `DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build`
 - [ ] Lint & type check pass: `npm run lint && npx tsc --noEmit`
 - [ ] Security audit passes: `npm audit --audit-level=moderate`
-- [ ] E2E tests pass: `npm run e2e` (or at minimum the affected feature tests)
+- [ ] E2E tests pass: `npm run e2e` - **REQUIRED: This is a mandatory check in CI**
 
-Before creating a commit, ensure:
+Before creating a PR, ensure:
 - [ ] All unit tests pass locally (`npm test`)
 - [ ] Code changes match the actual implementation (no UI text mismatches)
 - [ ] Test assertions match the actual UI/API responses
@@ -286,6 +290,8 @@ Before creating a commit, ensure:
 - [ ] Modified components have updated tests if behavior changed
 - [ ] No hardcoded Japanese text in tests if UI uses English (or vice versa)
 - [ ] Mock data in tests matches actual API response structure
+- [ ] E2E tests pass completely: `npm run e2e` - **MANDATORY for PR approval**
+- [ ] No E2E test failures or skipped tests due to missing implementations
 
 ### Important Notes
 - Do not change technology stack versions without approval
@@ -293,6 +299,8 @@ Before creating a commit, ensure:
 - UI/UX design changes require prior approval
 - Address issues listed in docs/issues.md when instructed
 - Create GitHub issues for any problems found during development
+- **CRITICAL**: E2E tests and Deploy Preview are MANDATORY CI checks - PRs will NOT be merged without these passing
+- **IMPORTANT**: Always run `npm run e2e` locally before pushing to avoid CI failures
 
 ### E2E Test Management and Scripts
 
