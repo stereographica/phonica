@@ -152,8 +152,10 @@ Please follow the structured development process documented in `docs/development
 - **IMPORTANT**: Never commit or push directly to the main branch. Always work on a separate branch and use PR
 - Update issue status to `status: in progress`
 - Use TodoWrite tool for task management
-- Commit only when tests pass
+- **MANDATORY**: Commit only when ALL tests pass - no exceptions
 - Follow TDD: Write tests before implementation
+- **CRITICAL**: When modifying UI text or behavior, update ALL related tests immediately
+- **IMPORTANT**: Run tests after EVERY change to catch mismatches early
 - For coverage improvement:
   1. Run `npm test` to check current coverage
   2. Identify code paths that increase coverage most
@@ -185,6 +187,10 @@ Please follow the structured development process documented in `docs/development
   - Date formatting differences between locales (use flexible patterns)
   - ESModule import issues (check transformIgnorePatterns in jest.config.js)
   - Redis/BullMQ initialization in test environment
+  - **UI text mismatches**: Tests expecting different language than implementation
+  - **Alert/Toast removal**: Tests expecting alerts that were removed from code
+  - **Mock response mismatches**: Test mocks not matching actual API responses
+  - **Component behavior changes**: Tests not updated after refactoring
 - Fix all errors in current task
 - For existing errors outside task scope: Check if GitHub issue exists, create if needed (Step 8)
 
@@ -258,22 +264,28 @@ Please follow the structured development process documented in `docs/development
 - Remove debug code and console.logs before committing
 
 ### Quality Checklist
-**BEFORE PUSHING** (CI failures cause significant delays):
-- [ ] CI environment tests pass: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false`
-- [ ] Build succeeds: `DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build`
-- [ ] Lint & type check pass: `npm run lint && npx tsc --noEmit`
-- [ ] Security audit passes: `npm audit --audit-level=moderate`
-
-Before creating a PR, ensure:
+**BEFORE COMMITTING** (CI failures cause significant delays and waste everyone's time):
 - [ ] All tests pass (`npm test`)
 - [ ] No lint errors (`npm run lint`)
 - [ ] No type errors (`npx tsc --noEmit`)
 - [ ] Dev server runs without errors (`npm run dev`)
+
+**BEFORE PUSHING** (Run CI-equivalent tests to prevent failures):
+- [ ] CI environment tests pass: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db NODE_ENV=test npm test -- --coverage --watchAll=false`
+- [ ] Build succeeds: `DATABASE_URL=postgresql://user:password@localhost:5432/dummy_db npm run build`
+- [ ] Lint & type check pass: `npm run lint && npx tsc --noEmit`
+- [ ] Security audit passes: `npm audit --audit-level=moderate`
+- [ ] E2E tests pass: `npm run e2e` (or at minimum the affected feature tests)
+
+Before creating a commit, ensure:
+- [ ] All unit tests pass locally (`npm test`)
+- [ ] Code changes match the actual implementation (no UI text mismatches)
+- [ ] Test assertions match the actual UI/API responses
 - [ ] All coverage metrics (Statements, Branches, Functions, Lines) exceed 80%
 - [ ] New files have corresponding test files
-- [ ] E2E tests pass (`npm run e2e` or feature-specific: `npm run e2e:smoke`, `npm run e2e:master`, `npm run e2e:materials`, `npm run e2e:workflows`)
-- [ ] E2E tests updated if UI/flow changed
-- [ ] New E2E tests have appropriate tags (@smoke, @master, @materials, @workflow, @critical)
+- [ ] Modified components have updated tests if behavior changed
+- [ ] No hardcoded Japanese text in tests if UI uses English (or vice versa)
+- [ ] Mock data in tests matches actual API response structure
 
 ### Important Notes
 - Do not change technology stack versions without approval
@@ -375,3 +387,36 @@ When using multipart/form-data with FormData in Next.js 15 + Turbopack, Firefox 
 - For faster feedback during debugging, run specific tests using grep patterns
 - Use staged execution approach (smoke → feature → workflow) for systematic testing
 - Always verify fixes with complete test runs, not partial results
+
+## Critical Testing Rules to Prevent CI Failures
+
+### 🚨 MANDATORY Test Execution Before Git Operations
+
+1. **Before EVERY commit**:
+   - Run `npm test` and ensure ALL tests pass
+   - Even small changes can break tests (e.g., removing an alert, changing button text)
+   - NEVER commit with failing tests - fix them first
+
+2. **Before EVERY push**:
+   - Run full CI simulation locally
+   - This prevents embarrassing CI failures and saves time
+   - CI failures block PR merging and delay the entire team
+
+3. **Common Test-Breaking Changes**:
+   - Removing `alert()` calls → Update tests to not expect alerts
+   - Changing UI text (Japanese ↔ English) → Update all test assertions
+   - Modifying API responses → Update mock data in tests
+   - Changing component behavior → Update behavioral tests
+   - Adding/removing form fields → Update form submission tests
+
+4. **Test-First Mindset**:
+   - When changing ANY code, ask: "Which tests might this break?"
+   - Update tests IMMEDIATELY after changing implementation
+   - Run tests BEFORE committing, not after CI fails
+
+### 🛡️ Zero-Tolerance Policy
+- **NO EXCUSES**: "I forgot to run tests" is not acceptable
+- **NO SHORTCUTS**: "It's a small change" - small changes break tests too
+- **NO DELAYS**: Fix test failures immediately, not after pushing
+
+Remember: Every CI failure wastes time, breaks flow, and delays delivery. Test locally, commit confidently.
