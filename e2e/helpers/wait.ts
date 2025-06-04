@@ -65,7 +65,7 @@ export class WaitHelper {
    * トーストメッセージが表示されるまで待機
    */
   async waitForToast(text?: string) {
-    const toastSelector = '[role="alert"][data-radix-collection-item]';
+    const toastSelector = '[role="status"][data-radix-collection-item]';
     await this.waitForElementVisible(toastSelector);
     
     if (text) {

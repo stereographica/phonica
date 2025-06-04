@@ -428,3 +428,23 @@ When using multipart/form-data with FormData in Next.js 15 + Turbopack, Firefox 
 - **NO DELAYS**: Fix test failures immediately, not after pushing
 
 Remember: Every CI failure wastes time, breaks flow, and delays delivery. Test locally, commit confidently.
+
+## Pre-commit Hook Requirements
+
+### 🔒 MANDATORY Pre-commit Hook Execution
+
+1. **Pre-commit hook exists and MUST pass**:
+   - The repository has a pre-commit hook that runs ALL tests
+   - You CANNOT commit unless ALL tests pass successfully
+   - This includes unit tests, lint, type check, and E2E tests
+
+2. **DO NOT modify or bypass pre-commit hooks**:
+   - NEVER delete or modify `.husky/pre-commit` file
+   - NEVER reduce the number of tests executed in pre-commit hook
+   - NEVER use `--no-verify` flag unless explicitly instructed by the user
+
+3. **Complete problem resolution**:
+   - For ALL test cases, DO NOT skip tests to bypass failures
+   - MUST fix all failing tests before committing
+   - MUST resolve the root cause of test failures, not work around them
+   - If a test is genuinely outdated, update it properly rather than skipping
