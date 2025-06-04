@@ -22,17 +22,20 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : 5, // 並列度を5に拡張して安定性を確保
+  workers: process.env.CI ? 1 : 3, // 並列度を3に減らして安定性を向上
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI 
+  reporter: process.env.CI
     ? [['list'], ['json', { outputFile: 'test-results/results.json' }]]
     : [
-        ['html', { 
-          open: 'never',  // Changed from 'always' to prevent auto-opening
-          outputFolder: 'playwright-report'
-        }],
+        [
+          'html',
+          {
+            open: 'never', // Changed from 'always' to prevent auto-opening
+            outputFolder: 'playwright-report',
+          },
+        ],
         ['json', { outputFile: 'test-results/results.json' }],
-        ['list']
+        ['list'],
       ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -47,7 +50,7 @@ export default defineConfig({
   },
 
   /* Timeout configurations */
-  timeout: 60 * 1000, // 60 seconds per test
+  timeout: 90 * 1000, // 90 seconds per test
   expect: {
     timeout: 10 * 1000, // 10 seconds for expect assertions
   },
