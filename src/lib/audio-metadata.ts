@@ -3,6 +3,11 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { randomUUID } from 'crypto';
 
+interface NodeError extends Error {
+  code?: string;
+  path?: string;
+}
+
 export interface AudioMetadata {
   fileFormat: string;
   sampleRate: number;
@@ -92,7 +97,8 @@ export class AudioMetadataService {
       return metadata;
     } catch (error) {
       // ディレクトリが存在しない場合も「一時ファイルが見つからない」エラーとして扱う
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      const nodeError = error as NodeError;
+      if (nodeError.code === 'ENOENT') {
         throw new Error('Temporary file not found');
       }
       throw error;
@@ -123,13 +129,8 @@ export class AudioMetadataService {
       return permanentPath;
     } catch (error) {
       // ディレクトリが存在しない場合も「一時ファイルが見つからない」エラーとして扱う
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT' &&
-        'path' in error &&
-        error.path === this.TEMP_DIR
-      ) {
+      const nodeError = error as NodeError;
+      if (nodeError.code === 'ENOENT' && nodeError.path === this.TEMP_DIR) {
         throw new TempFileNotFoundError(
           'アップロードされたファイルが見つかりません。再度アップロードしてください。',
         );
