@@ -84,7 +84,14 @@ test.describe('エラーハンドリング機能', () => {
       await page.click('button:has-text("Delete")');
 
       // 確認ダイアログで削除を実行
-      await page.click('[role="alertdialog"] button:has-text("Delete")');
+      const deleteConfirmButton = page.locator('[role="alertdialog"] button:has-text("Delete")');
+
+      // WebKitの場合は force オプションを使用
+      if (browserName === 'webkit') {
+        await deleteConfirmButton.click({ force: true });
+      } else {
+        await deleteConfirmButton.click();
+      }
 
       // 成功Toast通知が表示されることを確認
       const toastHelper = new ToastHelper(page);

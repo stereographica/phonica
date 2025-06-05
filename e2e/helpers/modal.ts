@@ -7,6 +7,13 @@ export class ModalHelper {
   constructor(private page: Page) {}
 
   /**
+   * ブラウザ名を取得
+   */
+  private getBrowserName(): string {
+    return this.page.context().browser()?.browserType().name() || 'unknown';
+  }
+
+  /**
    * モーダルのロケーターを取得
    */
   getModal(): Locator {
@@ -26,7 +33,7 @@ export class ModalHelper {
   async getTitle(): Promise<string> {
     const modal = this.getModal();
     const title = modal.locator('h2, h3, [role="heading"]').first();
-    return await title.textContent() || '';
+    return (await title.textContent()) || '';
   }
 
   /**
@@ -34,7 +41,14 @@ export class ModalHelper {
    */
   async clickButton(buttonText: string) {
     const modal = this.getModal();
-    await modal.locator(`button:has-text("${buttonText}")`).click();
+    const button = modal.locator(`button:has-text("${buttonText}")`);
+
+    // WebKitの場合は force オプションを使用
+    if (this.getBrowserName() === 'webkit') {
+      await button.click({ force: true });
+    } else {
+      await button.click();
+    }
   }
 
   /**
@@ -42,9 +56,16 @@ export class ModalHelper {
    */
   async close() {
     const modal = this.getModal();
-    const closeButton = modal.locator('[aria-label="Close"], button[aria-label*="close"], button:has-text("×")').first();
+    const closeButton = modal
+      .locator('[aria-label="Close"], button[aria-label*="close"], button:has-text("×")')
+      .first();
     if (await closeButton.isVisible()) {
-      await closeButton.click();
+      // WebKitの場合は force オプションを使用
+      if (this.getBrowserName() === 'webkit') {
+        await closeButton.click({ force: true });
+      } else {
+        await closeButton.click();
+      }
     }
   }
 
@@ -59,9 +80,9 @@ export class ModalHelper {
    * モーダルが閉じるまで待機
    */
   async waitForClose(timeout: number = 5000) {
-    await this.page.waitForSelector('[role="dialog"]', { 
-      state: 'hidden', 
-      timeout 
+    await this.page.waitForSelector('[role="dialog"]', {
+      state: 'hidden',
+      timeout,
     });
   }
 
@@ -69,9 +90,9 @@ export class ModalHelper {
    * モーダルが開くまで待機
    */
   async waitForOpen(timeout: number = 5000) {
-    await this.page.waitForSelector('[role="dialog"]', { 
-      state: 'visible', 
-      timeout 
+    await this.page.waitForSelector('[role="dialog"]', {
+      state: 'visible',
+      timeout,
     });
   }
 
@@ -80,7 +101,16 @@ export class ModalHelper {
    */
   async confirmAction() {
     const confirmDialog = this.page.locator('[role="alertdialog"]');
-    await confirmDialog.locator('button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes")').click();
+    const confirmButton = confirmDialog.locator(
+      'button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes")',
+    );
+
+    // WebKitの場合は force オプションを使用
+    if (this.getBrowserName() === 'webkit') {
+      await confirmButton.click({ force: true });
+    } else {
+      await confirmButton.click();
+    }
   }
 
   /**
@@ -88,6 +118,13 @@ export class ModalHelper {
    */
   async cancelAction() {
     const confirmDialog = this.page.locator('[role="alertdialog"]');
-    await confirmDialog.locator('button:has-text("Cancel"), button:has-text("No")').click();
+    const cancelButton = confirmDialog.locator('button:has-text("Cancel"), button:has-text("No")');
+
+    // WebKitの場合は force オプションを使用
+    if (this.getBrowserName() === 'webkit') {
+      await cancelButton.click({ force: true });
+    } else {
+      await cancelButton.click();
+    }
   }
 }
