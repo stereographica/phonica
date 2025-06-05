@@ -74,44 +74,68 @@ export class AudioMetadataService {
    * 音声ファイルを解析（非同期）
    */
   async analyzeAudio(tempFileId: string): Promise<AudioMetadata> {
-    const tempFiles = await fs.readdir(this.TEMP_DIR);
-    const tempFile = tempFiles.find((f) => f.startsWith(tempFileId));
+    try {
+      const tempFiles = await fs.readdir(this.TEMP_DIR);
+      const tempFile = tempFiles.find((f) => f.startsWith(tempFileId));
 
-    if (!tempFile) {
-      throw new Error('Temporary file not found');
+      if (!tempFile) {
+        throw new Error('Temporary file not found');
+      }
+
+      const filePath = path.join(this.TEMP_DIR, tempFile);
+      const metadata = await this.extractMetadata(filePath);
+
+      if (!metadata) {
+        throw new Error('Failed to extract metadata');
+      }
+
+      return metadata;
+    } catch (error) {
+      // ディレクトリが存在しない場合も「一時ファイルが見つからない」エラーとして扱う
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new Error('Temporary file not found');
+      }
+      throw error;
     }
-
-    const filePath = path.join(this.TEMP_DIR, tempFile);
-    const metadata = await this.extractMetadata(filePath);
-
-    if (!metadata) {
-      throw new Error('Failed to extract metadata');
-    }
-
-    return metadata;
   }
 
   /**
    * 一時ファイルを永続化
    */
   async persistTempFile(tempFileId: string, permanentFileName: string): Promise<string> {
-    const tempFiles = await fs.readdir(this.TEMP_DIR);
-    const tempFile = tempFiles.find((f) => f.startsWith(tempFileId));
+    try {
+      const tempFiles = await fs.readdir(this.TEMP_DIR);
+      const tempFile = tempFiles.find((f) => f.startsWith(tempFileId));
 
-    if (!tempFile) {
-      throw new TempFileNotFoundError(
-        'アップロードされたファイルが見つかりません。再度アップロードしてください。',
-      );
+      if (!tempFile) {
+        throw new TempFileNotFoundError(
+          'アップロードされたファイルが見つかりません。再度アップロードしてください。',
+        );
+      }
+
+      const tempPath = path.join(this.TEMP_DIR, tempFile);
+      const permanentPath = path.join(this.UPLOAD_DIR, permanentFileName);
+
+      // アップロードディレクトリが存在することを確認
+      await fs.mkdir(this.UPLOAD_DIR, { recursive: true });
+
+      await fs.rename(tempPath, permanentPath);
+      return permanentPath;
+    } catch (error) {
+      // ディレクトリが存在しない場合も「一時ファイルが見つからない」エラーとして扱う
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT' &&
+        'path' in error &&
+        error.path === this.TEMP_DIR
+      ) {
+        throw new TempFileNotFoundError(
+          'アップロードされたファイルが見つかりません。再度アップロードしてください。',
+        );
+      }
+      throw error;
     }
-
-    const tempPath = path.join(this.TEMP_DIR, tempFile);
-    const permanentPath = path.join(this.UPLOAD_DIR, permanentFileName);
-
-    // アップロードディレクトリが存在することを確認
-    await fs.mkdir(this.UPLOAD_DIR, { recursive: true });
-
-    await fs.rename(tempPath, permanentPath);
-    return permanentPath;
   }
 
   /**
