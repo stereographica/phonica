@@ -23,8 +23,10 @@ test.describe('エラーハンドリング機能', () => {
       await fileInput.setInputFiles(testAudioPath);
 
       // メタデータ抽出が完了するまで待つ
+      // WebKitは処理が遅いため、より長いタイムアウトを設定
+      const uploadTimeout = browserName === 'webkit' ? 30000 : 15000;
       await expect(page.locator('text=✓ File uploaded and analyzed successfully')).toBeVisible({
-        timeout: 15000,
+        timeout: uploadTimeout,
       });
 
       // フォームフィールドを入力
@@ -154,8 +156,10 @@ test.describe('エラーハンドリング機能', () => {
       await fileInput.setInputFiles(testAudioPath);
 
       // メタデータ抽出が完了するまで待つ
+      // WebKitは処理が遅いため、より長いタイムアウトを設定
+      const uploadTimeout = browserName === 'webkit' ? 30000 : 15000;
       await expect(page.locator('text=✓ File uploaded and analyzed successfully')).toBeVisible({
-        timeout: 15000,
+        timeout: uploadTimeout,
       });
 
       // フォームフィールドを入力
@@ -299,8 +303,10 @@ test.describe('エラーハンドリング機能', () => {
       await page.locator('input[type="file"]').setInputFiles(testAudioPath);
 
       // メタデータ抽出が完了するまで待つ
+      // WebKitは処理が遅いため、より長いタイムアウトを設定
+      const uploadTimeout = browserName === 'webkit' ? 30000 : 15000;
       await expect(page.locator('text=✓ File uploaded and analyzed successfully')).toBeVisible({
-        timeout: 15000,
+        timeout: uploadTimeout,
       });
 
       // 保存ボタンが有効になるまで待つ
