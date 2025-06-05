@@ -2,7 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 // コマンドライン引数からデータベースURLを取得
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/phonica_test';
+const databaseUrl =
+  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/phonica_test';
 
 console.log(`🌱 Seeding test data to database: ${databaseUrl}`);
 
@@ -16,13 +17,13 @@ const prisma = new PrismaClient({
 
 async function cleanDatabase() {
   console.log('🧹 Cleaning existing data...');
-  
+
   // メインテーブルを削除（多対多の関係は自動的に削除される）
   await prisma.material.deleteMany();
   await prisma.project.deleteMany();
   await prisma.tag.deleteMany();
   await prisma.equipment.deleteMany();
-  
+
   console.log('✅ Database cleaned');
 }
 
@@ -91,7 +92,7 @@ async function seedTestData() {
 
   console.log(`✅ Created ${tags.length} tags`);
 
-  // 機材の作成
+  // 機材の作成（テスト負荷軽減のため最小限に）
   const equipment = await Promise.all([
     prisma.equipment.create({
       data: {
@@ -118,51 +119,6 @@ async function seedTestData() {
         type: 'Microphone',
         manufacturer: 'Rode',
         memo: 'ショットガンマイク 🎤',
-      },
-    }),
-    prisma.equipment.create({
-      data: {
-        id: randomUUID(),
-        name: 'Sennheiser MKH 416',
-        type: 'Microphone',
-        manufacturer: 'Sennheiser',
-        memo: 'Industry standard shotgun mic',
-      },
-    }),
-    prisma.equipment.create({
-      data: {
-        id: randomUUID(),
-        name: 'タスカム DR-40X',
-        type: 'Recorder',
-        manufacturer: 'TASCAM',
-        memo: '4トラック録音対応のハンディレコーダー',
-      },
-    }),
-    prisma.equipment.create({
-      data: {
-        id: randomUUID(),
-        name: 'Audio-Technica AT4040',
-        type: 'Microphone',
-        manufacturer: 'Audio-Technica',
-        memo: 'Cardioid condenser microphone 🎙️',
-      },
-    }),
-    prisma.equipment.create({
-      data: {
-        id: randomUUID(),
-        name: 'Zoom F3',
-        type: 'Recorder',
-        manufacturer: 'Zoom',
-        memo: '32-bit float recording! Never clip again 📊',
-      },
-    }),
-    prisma.equipment.create({
-      data: {
-        id: randomUUID(),
-        name: 'ローランド R-07',
-        type: 'Recorder',
-        manufacturer: 'Roland',
-        memo: 'コンパクトで高音質、Bluetooth対応',
       },
     }),
   ]);
@@ -257,7 +213,7 @@ async function seedTestData() {
       memo: '🕰️ ラッシュアワーの新宿駅構内。👥 平日夕方のラッシュアワー',
       rating: 3,
       tags: [tags[1], tags[2]], // 都市音, 環境音
-      equipments: [equipment[0], equipment[3]], // Zoom H6, Sennheiser MKH 416
+      equipments: [equipment[0], equipment[2]], // Zoom H6, Rode NTG3
       projects: [projects[1]], // 都市サウンドスケープ
     },
     {
@@ -325,7 +281,7 @@ async function seedTestData() {
       memo: 'Dense rainforest soundscape with exotic birds and insects. 🌴 Recorded during the golden hour. Amazing biodiversity!',
       rating: 5,
       tags: [tags[0], tags[7], tags[4]], // 自然音, Wildlife Sounds, Field Recording
-      equipments: [equipment[1], equipment[3]], // Sony PCM-D100, Sennheiser MKH 416
+      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
       projects: [projects[2]], // Nature Documentary
     },
     {
@@ -359,7 +315,7 @@ async function seedTestData() {
       memo: 'Harsh arctic winds recorded during polar winter. Temperature: -30°C 🥶',
       rating: 4,
       tags: tags.length > 4 ? [tags[0], tags[4]] : [tags[0]], // 自然音, Field Recording
-      equipments: equipment.length > 6 ? [equipment[6]] : [equipment[1]], // Zoom F3 or Sony PCM-D100
+      equipments: [equipment[1]], // Sony PCM-D100
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
@@ -393,7 +349,7 @@ async function seedTestData() {
       memo: 'Eerily quiet desert with occasional coyote calls 🐺. Milky way visible overhead.',
       rating: 5,
       tags: tags.length > 7 ? [tags[0], tags[7], tags[4]] : [tags[0]], // 自然音, Wildlife Sounds, Field Recording
-      equipments: [equipment[1], equipment[3]], // Sony PCM-D100, Sennheiser MKH 416
+      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
@@ -410,7 +366,7 @@ async function seedTestData() {
       memo: 'Morning prayers and temple bells. 朝のお経と鐘の音。Peaceful atmosphere.',
       rating: 5,
       tags: tags.length > 6 ? [tags[2], tags[6]] : tags.length > 2 ? [tags[2]] : [tags[0]], // 環境音, ASMR
-      equipments: equipment.length > 7 ? [equipment[7]] : [equipment[0]], // ローランド R-07 or Zoom H6
+      equipments: [equipment[0]], // Zoom H6
       projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
@@ -421,13 +377,13 @@ async function seedTestData() {
       sampleRate: 48000,
       bitDepth: 24,
       recordedAt: new Date('2024-09-10T11:00:00Z'),
-      latitude: 19.0760,
+      latitude: 19.076,
       longitude: 72.8777,
       locationName: 'Crawford Market, Mumbai',
       memo: 'Bustling market with vendors calling out prices. Incredible energy! 🇮🇳',
       rating: 4,
       tags: tags.length > 4 ? [tags[1], tags[4]] : tags.length > 1 ? [tags[1]] : [tags[0]], // 都市音, Field Recording
-      equipments: [equipment[0], equipment[3]], // Zoom H6, Sennheiser MKH 416
+      equipments: [equipment[0], equipment[2]], // Zoom H6, Rode NTG3
       projects: [projects[1]], // 都市サウンドスケープ
     },
     {
@@ -443,7 +399,12 @@ async function seedTestData() {
       locationName: 'Houston, Texas',
       memo: 'Intense summer thunderstorm with close lightning strikes. ⚡️ DO NOT try this at home!',
       rating: 5,
-      tags: tags.length > 4 ? [tags[0], tags[3], tags[4]] : tags.length > 3 ? [tags[0], tags[3]] : [tags[0]], // 自然音, 水音, Field Recording
+      tags:
+        tags.length > 4
+          ? [tags[0], tags[3], tags[4]]
+          : tags.length > 3
+            ? [tags[0], tags[3]]
+            : [tags[0]], // 自然音, 水音, Field Recording
       equipments: [equipment[1]], // Sony PCM-D100
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
@@ -461,7 +422,7 @@ async function seedTestData() {
       memo: 'Crispy autumn leaves underfoot. カサカサと響く落ち葉の音。Perfect ASMR!',
       rating: 4,
       tags: tags.length > 6 ? [tags[0], tags[6]] : [tags[0]], // 自然音, ASMR
-      equipments: equipment.length > 4 ? [equipment[4], equipment[2]] : [equipment[0], equipment[2]], // タスカム DR-40X, Rode NTG3
+      equipments: [equipment[0], equipment[2]], // Zoom H6, Rode NTG3
       projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
@@ -472,7 +433,7 @@ async function seedTestData() {
       sampleRate: 48000,
       bitDepth: 24,
       recordedAt: new Date('2024-11-05T17:45:00Z'),
-      latitude: 40.7580,
+      latitude: 40.758,
       longitude: -73.9855,
       locationName: 'Times Square Station, NYC',
       memo: 'Rush hour madness at Times Square. "Stand clear of the closing doors!" 🚇',
@@ -494,7 +455,12 @@ async function seedTestData() {
       locationName: 'Maui, Hawaii',
       memo: 'Humpback whales singing during mating season. Recorded with hydrophone.',
       rating: 5,
-      tags: tags.length > 7 ? [tags[3], tags[7], tags[4], tags[5]] : tags.length > 3 ? [tags[3]] : [tags[0]], // 水音, Wildlife Sounds, Field Recording, Binaural
+      tags:
+        tags.length > 7
+          ? [tags[3], tags[7], tags[4], tags[5]]
+          : tags.length > 3
+            ? [tags[3]]
+            : [tags[0]], // 水音, Wildlife Sounds, Field Recording, Binaural
       equipments: [equipment[1]], // Sony PCM-D100
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
@@ -512,7 +478,7 @@ async function seedTestData() {
       memo: 'Traditional Japanese summer festival. 太鼓の音とヤキソバの匂い！Fireworks at the end!',
       rating: 5,
       tags: tags.length > 2 ? [tags[1], tags[2]] : tags.length > 1 ? [tags[1]] : [tags[0]], // 都市音, 環境音
-      equipments: [equipment[0], equipment[3]], // Zoom H6, Sennheiser MKH 416
+      equipments: [equipment[0], equipment[2]], // Zoom H6, Rode NTG3
       projects: [projects[1]], // 都市サウンドスケープ
     },
     {
@@ -528,7 +494,12 @@ async function seedTestData() {
       locationName: 'Vatnajökull, Iceland',
       memo: 'Inside a glacial ice cave. Dripping water and cracking ice. 🧊 Ethereal!',
       rating: 5,
-      tags: tags.length > 4 ? [tags[0], tags[3], tags[4]] : tags.length > 3 ? [tags[0], tags[3]] : [tags[0]], // 自然音, 水音, Field Recording
+      tags:
+        tags.length > 4
+          ? [tags[0], tags[3], tags[4]]
+          : tags.length > 3
+            ? [tags[0], tags[3]]
+            : [tags[0]], // 自然音, 水音, Field Recording
       equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
@@ -546,7 +517,7 @@ async function seedTestData() {
       memo: 'Bubbling hot springs and bamboo water features. コポコポと湧く温泉の音。Relaxing!',
       rating: 5,
       tags: tags.length > 6 ? [tags[3], tags[6], tags[2]] : tags.length > 3 ? [tags[3]] : [tags[0]], // 水音, ASMR, 環境音
-      equipments: equipment.length > 5 ? [equipment[0], equipment[5]] : [equipment[0]], // Zoom H6, Audio-Technica AT4040
+      equipments: [equipment[0]], // Zoom H6
       projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
@@ -563,30 +534,30 @@ async function seedTestData() {
       memo: 'African savanna awakening. Lions roaring in the distance! 🦁🌍',
       rating: 5,
       tags: tags.length > 7 ? [tags[0], tags[7], tags[4]] : [tags[0]], // 自然音, Wildlife Sounds, Field Recording
-      equipments: [equipment[1], equipment[3]], // Sony PCM-D100, Sennheiser MKH 416
+      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
   ];
 
   for (const materialData of materials) {
     const { tags, equipments, projects, ...data } = materialData;
-    
+
     const material = await prisma.material.create({
       data: {
         id: randomUUID(),
         ...data,
         tags: {
-          connect: tags.map(tag => ({ id: tag.id })),
+          connect: tags.map((tag) => ({ id: tag.id })),
         },
         equipments: {
-          connect: equipments.map(equip => ({ id: equip.id })),
+          connect: equipments.map((equip) => ({ id: equip.id })),
         },
         projects: {
-          connect: projects.map(project => ({ id: project.id })),
+          connect: projects.map((project) => ({ id: project.id })),
         },
       },
     });
-    
+
     console.log(`✅ Created material: ${material.title}`);
   }
 

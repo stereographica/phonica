@@ -31,7 +31,7 @@ global.File = class File {
   constructor(
     private parts: BlobPart[],
     public name: string,
-    private options?: FilePropertyBag
+    private options?: FilePropertyBag,
   ) {
     this.size = parts.reduce((acc, part) => {
       if (typeof part === 'string') return acc + part.length;
@@ -62,7 +62,7 @@ global.File = class File {
   async arrayBuffer(): Promise<ArrayBuffer> {
     return new ArrayBuffer(0);
   }
-} as any;
+} as unknown as typeof File;
 
 // Global FormData mock
 // このモックは、NextRequestのformData()メソッドが返すPromise<FormData>を解決するために使われる
@@ -85,7 +85,7 @@ export const mockHas = jest.fn((key: string): boolean => {
 
 global.FormData = jest.fn(() => ({
   append: mockAppend,
-  get: mockGet, 
+  get: mockGet,
   getAll: mockGetAll,
   has: mockHas,
   // 他のFormDataメソッドも必要に応じてモックに追加
@@ -100,6 +100,7 @@ export const mockFsPromises = {
   rename: jest.fn(),
   writeFile: jest.fn(),
   mkdir: jest.fn(),
+  stat: jest.fn(),
 };
 
 jest.mock('fs/promises', () => mockFsPromises);
@@ -119,7 +120,7 @@ beforeEach(() => {
   mockGetAll.mockClear();
   mockHas.mockClear();
   mockFormDataStore.clear(); // ストアもクリアする
-  
+
   // fs/promises mocks もクリア
   mockFsPromises.access.mockClear();
   mockFsPromises.readdir.mockClear();
@@ -127,7 +128,8 @@ beforeEach(() => {
   mockFsPromises.rename.mockClear();
   mockFsPromises.writeFile.mockClear();
   mockFsPromises.mkdir.mockClear();
-  
+  mockFsPromises.stat.mockClear();
+
   // UUID mock もクリア
   mockUuidV4.mockClear();
   mockUuidV4.mockReturnValue('test-uuid');
@@ -136,10 +138,10 @@ beforeEach(() => {
 // Mock NextResponse.json
 jest.mock('next/server', () => {
   const originalModule = jest.requireActual('next/server');
-  
+
   // Next.js 15.3.3 互換のモック
   class MockNextResponse extends Response {
-    static json(body: any, init?: ResponseInit) {
+    static json(body: unknown, init?: ResponseInit) {
       const response = new Response(JSON.stringify(body), {
         ...init,
         headers: {
@@ -147,7 +149,7 @@ jest.mock('next/server', () => {
           ...(init?.headers || {}),
         },
       });
-      
+
       // Response-like オブジェクトを返す
       return Object.create(response, {
         json: {
@@ -162,9 +164,9 @@ jest.mock('next/server', () => {
       });
     }
   }
-  
+
   return {
     ...originalModule,
     NextResponse: MockNextResponse,
   };
-}); 
+});

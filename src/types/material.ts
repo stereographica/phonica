@@ -23,6 +23,7 @@ export interface Material {
   sampleRate?: number | null;
   bitDepth?: number | null;
   durationSeconds?: number | null;
+  channels?: number | null;
   latitude?: number | null;
   longitude?: number | null;
   locationName?: string | null;
@@ -32,4 +33,4 @@ export interface Material {
   transcription?: string | null;
   createdAt?: string; // APIレスポンスに合わせてstring (ISO 8601)
   updatedAt?: string; // APIレスポンスに合わせてstring (ISO 8601)
-} 
+}
