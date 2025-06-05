@@ -181,10 +181,9 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
           REDIS_URL: redis://localhost:6379
-          NODE_ENV: production
+          NODE_ENV: test
           CI: true
         run: |
-          npm run build
           npm run e2e -- --project=${{ matrix.browser }} --workers=1 --reporter=dot
 
       - name: Upload test report
