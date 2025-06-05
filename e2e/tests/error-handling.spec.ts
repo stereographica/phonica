@@ -293,7 +293,7 @@ test.describe('エラーハンドリング機能', () => {
       await toastHelper.expectErrorToast('機材の削除に失敗しました');
     });
 
-    test('素材作成時の必須フィールドエラー', async ({ page }) => {
+    test('素材作成時の必須フィールドエラー', async ({ page, browserName }) => {
       // 新規素材作成ページへ移動
       await page.goto('/materials/new');
       await page.waitForLoadState('networkidle');
