@@ -123,7 +123,15 @@ test.describe('@master @smoke Tag Master', () => {
         await expect(page.locator('[role="alertdialog"] h2')).toHaveText('Are you sure?');
 
         // 削除ボタンをクリック
-        await page.locator('[role="alertdialog"] button:has-text("Delete")').click();
+        const browserName = page.context().browser()?.browserType().name() || 'unknown';
+        const deleteConfirmButton = page.locator('[role="alertdialog"] button:has-text("Delete")');
+
+        // WebKitの場合は force オプションを使用
+        if (browserName === 'webkit') {
+          await deleteConfirmButton.click({ force: true });
+        } else {
+          await deleteConfirmButton.click();
+        }
 
         // 成功メッセージの確認
         await wait.waitForToast();

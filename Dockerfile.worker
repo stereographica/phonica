@@ -1,0 +1,55 @@
+# Dockerfile for background worker service
+FROM node:20-alpine AS base
+
+# Install ffmpeg and ffprobe for audio metadata extraction
+RUN apk add --no-cache ffmpeg
+
+# Install dependencies
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Build stage
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Compile TypeScript
+RUN npx tsc --project tsconfig.json || true
+
+# Production stage
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+# Create a non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 worker
+
+# Create necessary directories
+RUN mkdir -p /app/public/uploads/materials /app/public/uploads/temp
+RUN mkdir -p /tmp/phonica-uploads
+RUN chown -R worker:nodejs /app/public/uploads /tmp/phonica-uploads
+
+# Copy necessary files
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./
+
+# Install tsx for running TypeScript directly
+RUN npm install -g tsx
+
+USER worker
+
+# Run the worker using tsx
+CMD ["tsx", "src/lib/queue/workers.ts"]

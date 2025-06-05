@@ -14,21 +14,23 @@ datasource db {
 }
 
 model Material {
-  id           String      @id @default(cuid())
-  slug         String      @unique
-  title        String
-  filePath     String
-  fileFormat   String?
-  sampleRate   Int?
-  bitDepth     Int?
-  recordedAt   DateTime
-  latitude     Float?
-  longitude    Float?
-  locationName String?
-  memo         String?     @db.Text
-  rating       Int?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  slug            String      @unique
+  title           String
+  filePath        String
+  fileFormat      String?
+  sampleRate      Int?
+  bitDepth        Int?
+  durationSeconds Float?
+  channels        Int?
+  recordedAt      DateTime
+  latitude        Float?
+  longitude       Float?
+  locationName    String?
+  memo            String?     @db.Text
+  rating          Int?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   projects     Project[]   @relation("MaterialProjects")
   tags         Tag[]       @relation("MaterialTags")
