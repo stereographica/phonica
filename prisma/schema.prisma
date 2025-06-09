@@ -16,7 +16,7 @@ datasource db {
 model Material {
   id              String      @id @default(cuid())
   slug            String      @unique
-  title           String
+  title           String      @unique
   filePath        String
   fileFormat      String?
   sampleRate      Int?
@@ -60,7 +60,7 @@ model Tag {
 
 model Equipment {
   id           String     @id @default(cuid())
-  name         String
+  name         String     @unique
   type         String
   manufacturer String?
   memo         String?    @db.Text

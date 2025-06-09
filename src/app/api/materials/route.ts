@@ -6,17 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
 import { AudioMetadataService } from '@/lib/audio-metadata';
-
-// slugify関数を再定義
-function slugify(text: string): string {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w-]+/g, '') // Remove all non-word chars
-    .replace(/--+/g, '-'); // Replace multiple - with single -
-}
+import { generateUniqueSlug } from '@/lib/slug-generator';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 // 新しいPOSTリクエストのスキーマ（メタデータ抽出対応）
 const CreateMaterialWithMetadataSchema = z.object({
@@ -217,18 +208,18 @@ export async function POST(request: NextRequest) {
       // データベース用のファイルパス
       const filePathForDb = filePath.replace(process.cwd() + '/public', '');
 
-      // タイムスタンプを追加してslugをユニークにする
-      const timestamp = Date.now();
-      const slug = `${slugify(data.title)}-${timestamp}`;
+      // ユニークなslugを生成
+      const slug = await generateUniqueSlug(data.title, 'material');
 
       // タグの処理
       const tagsToConnect = data.tags
         ? await Promise.all(
             data.tags.map(async (tagName) => {
               const trimmedName = tagName.trim();
+              const tagSlug = await generateUniqueSlug(trimmedName, 'tag');
               return {
                 where: { name: trimmedName },
-                create: { name: trimmedName, slug: slugify(trimmedName) },
+                create: { name: trimmedName, slug: tagSlug },
               };
             }),
           )
@@ -337,10 +328,7 @@ export async function POST(request: NextRequest) {
       equipmentsStr = formData.get('equipmentIds') as string | null;
 
       if (!title || !recordedAt || !file) {
-        return NextResponse.json(
-          { error: 'Missing required fields: title, recordedAt, and file' },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: ERROR_MESSAGES.REQUIRED_FIELD_MISSING }, { status: 400 });
       }
 
       const fileExtension = path.extname(file.name);
@@ -354,17 +342,17 @@ export async function POST(request: NextRequest) {
       await fs.writeFile(filePathInFilesystem, fileBuffer);
       const filePathForDb = `/uploads/materials/${uniqueFileName}`;
 
-      // タイムスタンプを追加してslugをユニークにする
-      const timestamp = Date.now();
-      const slug = `${slugify(title)}-${timestamp}`;
+      // ユニークなslugを生成
+      const slug = await generateUniqueSlug(title, 'material');
 
       const tagsToConnect = tagsStr
         ? await Promise.all(
             tagsStr.split(',').map(async (tagName) => {
               const trimmedName = tagName.trim();
+              const tagSlug = await generateUniqueSlug(trimmedName, 'tag');
               return {
                 where: { name: trimmedName },
-                create: { name: trimmedName, slug: slugify(trimmedName) },
+                create: { name: trimmedName, slug: tagSlug },
               };
             }),
           )
@@ -453,15 +441,19 @@ export async function POST(request: NextRequest) {
       error.meta &&
       typeof error.meta === 'object' &&
       'target' in error.meta &&
-      Array.isArray(error.meta.target) &&
-      error.meta.target.includes('slug')
+      Array.isArray(error.meta.target)
     ) {
-      return NextResponse.json(
-        { error: 'Failed to create material: Slug already exists. Please change the title.' },
-        { status: 409 },
-      );
+      if (error.meta.target.includes('title')) {
+        return NextResponse.json({ error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS }, { status: 409 });
+      } else if (error.meta.target.includes('slug')) {
+        // This shouldn't happen with generateUniqueSlug, but just in case
+        return NextResponse.json(
+          { error: 'Slugの生成に失敗しました。もう一度お試しください。' },
+          { status: 409 },
+        );
+      }
     }
 
-    return NextResponse.json({ error: 'Failed to create material' }, { status: 500 });
+    return NextResponse.json({ error: ERROR_MESSAGES.DATABASE_ERROR }, { status: 500 });
   }
 }

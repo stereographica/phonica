@@ -504,4 +504,84 @@ describe('NewMaterialPage', () => {
     expect(global.alert).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
+
+  test('handles duplicate title error (409)', async () => {
+    // Upload temp API success response
+    fetchMock.mockResponseOnce(
+      JSON.stringify({
+        tempFileId: 'test-temp-id',
+        fileName: 'duplicate.wav',
+        fileSize: 1024000,
+      }),
+      { status: 200 },
+    );
+
+    // Analyze audio API success response
+    fetchMock.mockResponseOnce(
+      JSON.stringify({
+        fileFormat: 'WAV',
+        sampleRate: 48000,
+        bitDepth: 24,
+        durationSeconds: 120,
+        channels: 1,
+      }),
+      { status: 200 },
+    );
+
+    // Material creation API error response (409 - duplicate title)
+    fetchMock.mockResponseOnce(
+      JSON.stringify({ error: 'そのタイトルの素材は既に存在しています' }),
+      { status: 409 },
+    );
+
+    const user = userEvent.setup();
+    render(<NewMaterialPage />);
+
+    // ファイルを選択
+    const fileInput = screen.getByLabelText(/select audio file/i);
+    const testFile = new File(['duplicate content'], 'duplicate.wav', { type: 'audio/wav' });
+
+    Object.defineProperty(fileInput, 'files', {
+      value: [testFile],
+      writable: false,
+    });
+
+    fireEvent.change(fileInput);
+
+    // メタデータ抽出を待つ
+    await waitFor(
+      () => {
+        expect(screen.getByText('✓ File uploaded and analyzed successfully')).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
+
+    // フォームに入力
+    await user.type(screen.getByLabelText(/title/i), 'Existing Material');
+    const recordedAtInput = screen.getByLabelText(/recorded at/i);
+    await user.clear(recordedAtInput);
+    await user.type(recordedAtInput, '2024-01-01T10:00');
+
+    // フォームを送信
+    await submitForm();
+
+    // APIが呼ばれるまで待つ
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(3); // upload, analyze, create
+    });
+
+    // notifyErrorが正しいエラーメッセージで呼ばれることを確認
+    await waitFor(() => {
+      expect(mockNotifyError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'そのタイトルの素材は既に存在しています',
+          status: 409,
+        }),
+        { operation: 'create', entity: 'material' },
+      );
+    });
+
+    // ページ遷移が発生しないことを確認
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
 });

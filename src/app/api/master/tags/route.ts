@@ -2,17 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-
-// slugify関数（materialsのAPIから流用）
-function slugify(text: string): string {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w-]+/g, '') // Remove all non-word chars
-    .replace(/--+/g, '-'); // Replace multiple - with single -
-}
+import { generateUniqueSlug } from '@/lib/slug-generator';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 // クエリパラメータのバリデーションスキーマ
 const GetTagsQuerySchema = z.object({
@@ -38,8 +29,8 @@ export async function GET(request: NextRequest) {
 
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Invalid query parameters", details: validationResult.error.flatten() },
-        { status: 400 }
+        { error: 'Invalid query parameters', details: validationResult.error.flatten() },
+        { status: 400 },
       );
     }
 
@@ -92,11 +83,8 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error fetching tags:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch tags" },
-      { status: 500 }
-    );
+    console.error('Error fetching tags:', error);
+    return NextResponse.json({ error: 'Failed to fetch tags' }, { status: 500 });
   }
 }
 
@@ -104,18 +92,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+
     const validationResult = CreateTagSchema.safeParse(body);
-    
+
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Invalid input", details: validationResult.error.flatten() },
-        { status: 400 }
+        { error: 'Invalid input', details: validationResult.error.flatten() },
+        { status: 400 },
       );
     }
 
     const { name } = validationResult.data;
-    const slug = slugify(name);
+    const slug = await generateUniqueSlug(name, 'tag');
 
     const newTag = await prisma.tag.create({
       data: {
@@ -133,30 +121,32 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newTag, { status: 201 });
   } catch (error) {
-    console.error("Error creating tag:", error);
-    
+    console.error('Error creating tag:', error);
+
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const target = error.meta?.target;
         let conflictField = 'unknown';
-        
+
         if (typeof target === 'string') {
           conflictField = target;
         } else if (Array.isArray(target)) {
           if (target.includes('name')) conflictField = 'name';
           else if (target.includes('slug')) conflictField = 'slug';
         }
-        
-        return NextResponse.json(
-          { error: `Tag with this ${conflictField} already exists` },
-          { status: 409 }
-        );
+
+        if (conflictField === 'name') {
+          return NextResponse.json({ error: ERROR_MESSAGES.TAG_NAME_EXISTS }, { status: 409 });
+        } else {
+          // slug conflict shouldn't happen with generateUniqueSlug
+          return NextResponse.json(
+            { error: 'Slugの生成に失敗しました。もう一度お試しください。' },
+            { status: 409 },
+          );
+        }
       }
     }
-    
-    return NextResponse.json(
-      { error: "Failed to create tag" },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: ERROR_MESSAGES.DATABASE_ERROR }, { status: 500 });
   }
 }

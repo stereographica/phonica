@@ -195,6 +195,12 @@ test.describe('@materials Edit Material', () => {
   test('can update material without changing file', async ({ page }) => {
     await navigateToValidMaterialEditPage(page);
 
+    // 現在のURLから編集中の素材のslugを取得
+    const currentUrl = page.url();
+    const slugMatch = currentUrl.match(/\/materials\/([^/]+)\/edit$/);
+    const editingSlug = slugMatch ? slugMatch[1] : null;
+    console.log(`Editing material with slug: ${editingSlug}`);
+
     // 現在の緯度値を確認し、必要に応じて修正
     const latitudeInput = page.locator('input#latitude');
     const longitudeInput = page.locator('input#longitude');
@@ -234,8 +240,9 @@ test.describe('@materials Edit Material', () => {
       console.log(`Longitude after update: ${verifyLon}`);
     }
 
-    // タイトルを変更
-    const newTitle = `Updated Material ${Date.now()}`;
+    // タイトルを変更（より一意性の高いタイトルにする）
+    const timestamp = Date.now();
+    const newTitle = `E2E-Updated-${timestamp}`;
     await form.fillByLabel('Title', newTitle);
 
     // メモを更新
@@ -266,55 +273,38 @@ test.describe('@materials Edit Material', () => {
     // ナビゲーション完了を待つ
     await page.waitForURL('/materials', { timeout: 30000 });
 
-    // データが更新されるまで少し待つ
-    await page.waitForTimeout(4000);
-
     // ページをリロードして最新のデータを取得
     await page.reload();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
-    // 更新されたタイトルを含む行を探す
-    const updatedTitlePattern = 'Updated Material';
+    // 更新されたタイトルが表示されていることを確認
+    // 方法1: 完全一致で検索
+    const updatedButton = page
+      .locator(`button.text-blue-600`)
+      .filter({ hasText: new RegExp(`^${newTitle}$`) });
 
-    // 方法1: 直接セレクターで検索
-    let foundUpdated = await page
-      .locator(`button.text-blue-600:has-text("${updatedTitlePattern}")`)
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
+    // タイトルが見つからない場合は、テーブル全体をスキャン
+    const isVisible = await updatedButton.isVisible({ timeout: 5000 }).catch(() => false);
 
-    if (!foundUpdated) {
-      // 方法2: 全行をスキャンして部分一致検索
+    if (!isVisible) {
+      // テーブルの内容をログ出力して確認
       const tableRows = page.locator('tbody tr');
       const rowCount = await tableRows.count();
-      console.log(`Scanning ${rowCount} rows for updated title...`);
+      console.log(`Total rows in table: ${rowCount}`);
 
-      for (let i = 0; i < rowCount; i++) {
+      for (let i = 0; i < Math.min(rowCount, 10); i++) {
         const row = tableRows.nth(i);
-        // ボタン要素からタイトルを取得
-        const titleButton = row.locator('button.text-blue-600');
-        const titleText = await titleButton.textContent();
-
-        console.log(`Row ${i} title: ${titleText}`);
-
-        if (titleText && (titleText.includes(updatedTitlePattern) || titleText === newTitle)) {
-          foundUpdated = true;
-          console.log(`Found updated material at row ${i}: ${titleText}`);
-          break;
-        }
+        const titleText = await row.locator('button.text-blue-600').textContent();
+        console.log(`Row ${i}: ${titleText}`);
       }
+
+      // もう一度待って再確認
+      await page.waitForTimeout(3000);
     }
 
-    // それでも見つからない場合は、完全なタイトルで検索
-    if (!foundUpdated) {
-      console.log(`Last attempt: searching for full title: ${newTitle}`);
-      await page.waitForTimeout(2000);
-      const fullTitleButton = page.locator(`button.text-blue-600:has-text("${newTitle}")`).first();
-      foundUpdated = await fullTitleButton.isVisible({ timeout: 5000 }).catch(() => false);
-    }
-
-    expect(foundUpdated).toBeTruthy();
+    // 最終的な確認
+    await expect(updatedButton).toBeVisible({ timeout: 15000 });
   });
 
   test('can update material with new file and auto-extract metadata', async ({

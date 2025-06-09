@@ -1,4 +1,5 @@
 import path from 'path';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 // fs/promisesのデフォルトエクスポートをモック
 const mockFs = {
@@ -830,6 +831,34 @@ describe('API Route: /api/materials/[slug]', () => {
 
       expect(response.status).toBe(404);
       expect(responseBody.error).toBe('Material not found');
+    });
+
+    it('should return 409 for duplicate title on update', async () => {
+      const mockSlug = 'test-material';
+      const updateData = {
+        title: 'Existing Material Title',
+        tags: [],
+        equipmentIds: [],
+      };
+
+      const mockRequest = {
+        json: () => Promise.resolve(updateData),
+      } as unknown as NextRequest;
+
+      // Mock Prisma unique constraint error
+      const prismaError = new PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        { code: 'P2002', clientVersion: '2.24.0', meta: { target: ['title'] } },
+      );
+
+      (prisma.$transaction as jest.Mock).mockRejectedValue(prismaError);
+
+      const context = { params: Promise.resolve({ slug: mockSlug }) };
+      const response = await PUT(mockRequest, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(responseBody.error).toBe('そのタイトルの素材は既に存在しています');
     });
 
     it('should handle failed old file deletion after successful transaction', async () => {

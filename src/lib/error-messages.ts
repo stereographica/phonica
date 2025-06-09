@@ -103,6 +103,14 @@ export const SUCCESS_MESSAGES = {
 
 // エラーオブジェクトからユーザーフレンドリーなメッセージを取得
 export function getErrorMessage(error: unknown, operation?: string, entity?: string): string {
+  // エラーオブジェクトに具体的なエラーメッセージがある場合は優先的に使用
+  if (error && typeof error === 'object' && 'error' in error) {
+    const errorWithMessage = error as { error: unknown };
+    if (typeof errorWithMessage.error === 'string') {
+      return errorWithMessage.error;
+    }
+  }
+
   // HTTPエラーの場合
   if (error && typeof error === 'object' && 'status' in error) {
     const errorWithStatus = error as { status: unknown };
@@ -144,10 +152,12 @@ export function getErrorMessage(error: unknown, operation?: string, entity?: str
 
   // 操作別のデフォルトメッセージ
   if (operation) {
-    const operationMessages = OPERATION_ERROR_MESSAGES[operation.toUpperCase() as keyof typeof OPERATION_ERROR_MESSAGES];
+    const operationMessages =
+      OPERATION_ERROR_MESSAGES[operation.toUpperCase() as keyof typeof OPERATION_ERROR_MESSAGES];
     if (operationMessages) {
       if (entity) {
-        const entityMessage = operationMessages[entity.toUpperCase() as keyof typeof operationMessages];
+        const entityMessage =
+          operationMessages[entity.toUpperCase() as keyof typeof operationMessages];
         if (entityMessage) {
           return entityMessage;
         }
@@ -160,12 +170,32 @@ export function getErrorMessage(error: unknown, operation?: string, entity?: str
   return '予期しないエラーが発生しました。もう一度お試しください。';
 }
 
+// 新しい定数：重複チェックとバリデーション用のエラーメッセージ
+export const ERROR_MESSAGES = {
+  // 重複エラー
+  MATERIAL_TITLE_EXISTS: 'そのタイトルの素材は既に存在しています',
+  EQUIPMENT_NAME_EXISTS: 'その名前の機材は既に存在しています',
+  TAG_NAME_EXISTS: 'その名前のタグは既に存在しています',
+
+  // バリデーションエラー
+  REQUIRED_FIELD_MISSING: '必須項目が入力されていません',
+  INVALID_FORMAT: '形式が正しくありません',
+
+  // システムエラー
+  DATABASE_ERROR: 'データベースエラーが発生しました',
+  UNKNOWN_ERROR: '予期せぬエラーが発生しました',
+} as const;
+
+export type ErrorMessageKey = keyof typeof ERROR_MESSAGES;
+
 // 成功メッセージを取得
 export function getSuccessMessage(operation: string, entity?: string): string {
-  const operationMessages = SUCCESS_MESSAGES[operation.toUpperCase() as keyof typeof SUCCESS_MESSAGES];
+  const operationMessages =
+    SUCCESS_MESSAGES[operation.toUpperCase() as keyof typeof SUCCESS_MESSAGES];
   if (operationMessages) {
     if (entity) {
-      const entityMessage = operationMessages[entity.toUpperCase() as keyof typeof operationMessages];
+      const entityMessage =
+        operationMessages[entity.toUpperCase() as keyof typeof operationMessages];
       if (entityMessage) {
         return entityMessage;
       }
