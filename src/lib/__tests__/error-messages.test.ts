@@ -2,9 +2,28 @@ import {
   getErrorMessage,
   getSuccessMessage,
   FILE_ERROR_MESSAGES,
+  ERROR_MESSAGES,
 } from '../error-messages';
 
 describe('error-messages', () => {
+  describe('ERROR_MESSAGES定数', () => {
+    it('重複チェックエラーメッセージが定義されている', () => {
+      expect(ERROR_MESSAGES).toBeDefined();
+      expect(ERROR_MESSAGES.MATERIAL_TITLE_EXISTS).toBe('そのタイトルの素材は既に存在しています');
+      expect(ERROR_MESSAGES.EQUIPMENT_NAME_EXISTS).toBe('その名前の機材は既に存在しています');
+      expect(ERROR_MESSAGES.TAG_NAME_EXISTS).toBe('その名前のタグは既に存在しています');
+    });
+
+    it('バリデーションエラーメッセージが定義されている', () => {
+      expect(ERROR_MESSAGES.REQUIRED_FIELD_MISSING).toBe('必須項目が入力されていません');
+      expect(ERROR_MESSAGES.INVALID_FORMAT).toBe('形式が正しくありません');
+    });
+
+    it('システムエラーメッセージが定義されている', () => {
+      expect(ERROR_MESSAGES.DATABASE_ERROR).toBe('データベースエラーが発生しました');
+      expect(ERROR_MESSAGES.UNKNOWN_ERROR).toBe('予期せぬエラーが発生しました');
+    });
+  });
   describe('getErrorMessage', () => {
     describe('HTTPエラー', () => {
       it('HTTPステータスコードに対応するメッセージを返す', () => {
@@ -16,7 +35,9 @@ describe('error-messages', () => {
       });
 
       it('未定義のHTTPステータスコードの場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage({ status: 418 })).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage({ status: 418 })).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
     });
 
@@ -29,28 +50,44 @@ describe('error-messages', () => {
       });
 
       it('未定義のPrismaエラーコードの場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage({ code: 'P9999' })).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage({ code: 'P9999' })).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
     });
 
     describe('ファイルエラー', () => {
       it('ファイルサイズエラーを判定できる', () => {
-        expect(getErrorMessage({ message: 'File size too large' })).toBe(FILE_ERROR_MESSAGES.FILE_TOO_LARGE);
-        expect(getErrorMessage({ message: 'The file exceeds the maximum size' })).toBe(FILE_ERROR_MESSAGES.FILE_TOO_LARGE);
+        expect(getErrorMessage({ message: 'File size too large' })).toBe(
+          FILE_ERROR_MESSAGES.FILE_TOO_LARGE,
+        );
+        expect(getErrorMessage({ message: 'The file exceeds the maximum size' })).toBe(
+          FILE_ERROR_MESSAGES.FILE_TOO_LARGE,
+        );
       });
 
       it('ファイルが見つからないエラーを判定できる', () => {
-        expect(getErrorMessage({ message: 'File not found' })).toBe(FILE_ERROR_MESSAGES.FILE_NOT_FOUND);
-        expect(getErrorMessage({ message: 'The file was not found' })).toBe(FILE_ERROR_MESSAGES.FILE_NOT_FOUND);
+        expect(getErrorMessage({ message: 'File not found' })).toBe(
+          FILE_ERROR_MESSAGES.FILE_NOT_FOUND,
+        );
+        expect(getErrorMessage({ message: 'The file was not found' })).toBe(
+          FILE_ERROR_MESSAGES.FILE_NOT_FOUND,
+        );
       });
 
       it('ファイルタイプエラーを判定できる', () => {
-        expect(getErrorMessage({ message: 'Invalid file type' })).toBe(FILE_ERROR_MESSAGES.INVALID_FILE_TYPE);
-        expect(getErrorMessage({ message: 'Unsupported file format' })).toBe(FILE_ERROR_MESSAGES.INVALID_FILE_TYPE);
+        expect(getErrorMessage({ message: 'Invalid file type' })).toBe(
+          FILE_ERROR_MESSAGES.INVALID_FILE_TYPE,
+        );
+        expect(getErrorMessage({ message: 'Unsupported file format' })).toBe(
+          FILE_ERROR_MESSAGES.INVALID_FILE_TYPE,
+        );
       });
 
       it('その他のファイルエラーはデフォルトのファイルエラーメッセージを返す', () => {
-        expect(getErrorMessage({ message: 'File upload error' })).toBe(FILE_ERROR_MESSAGES.UPLOAD_FAILED);
+        expect(getErrorMessage({ message: 'File upload error' })).toBe(
+          FILE_ERROR_MESSAGES.UPLOAD_FAILED,
+        );
       });
     });
 
@@ -70,43 +107,61 @@ describe('error-messages', () => {
       });
 
       it('操作が未定義の場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage({}, 'unknown', 'material')).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage({}, 'unknown', 'material')).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
     });
 
     describe('エラータイプの優先順位', () => {
       it('HTTPエラーがPrismaエラーより優先される', () => {
-        expect(getErrorMessage({ status: 404, code: 'P2002' })).toBe('要求されたリソースが見つかりません。');
+        expect(getErrorMessage({ status: 404, code: 'P2002' })).toBe(
+          '要求されたリソースが見つかりません。',
+        );
       });
 
       it('Prismaエラーが操作別メッセージより優先される', () => {
-        expect(getErrorMessage({ code: 'P2002' }, 'create', 'material')).toBe('このデータは既に登録されています。');
+        expect(getErrorMessage({ code: 'P2002' }, 'create', 'material')).toBe(
+          'このデータは既に登録されています。',
+        );
       });
     });
 
     describe('エッジケース', () => {
       it('nullの場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage(null)).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage(null)).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
 
       it('undefinedの場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage(undefined)).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage(undefined)).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
 
       it('文字列の場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage('エラー')).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage('エラー')).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
 
       it('数値の場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage(500)).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage(500)).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
 
       it('不正な型のstatusの場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage({ status: '400' })).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage({ status: '400' })).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
 
       it('不正な型のcodeの場合はデフォルトメッセージを返す', () => {
-        expect(getErrorMessage({ code: 2002 })).toBe('予期しないエラーが発生しました。もう一度お試しください。');
+        expect(getErrorMessage({ code: 2002 })).toBe(
+          '予期しないエラーが発生しました。もう一度お試しください。',
+        );
       });
     });
   });

@@ -6,8 +6,14 @@ import { prismaMock } from '../../../../../../jest.setup'; // Prismaモックを
 import { NextRequest } from 'next/server';
 import { Equipment, Prisma } from '@prisma/client';
 
-function createMockRequest(method: string, body?: Record<string, unknown>, searchParams?: URLSearchParams): NextRequest {
-  const url = new URL(`http://localhost/api/master/equipment${searchParams ? `?${searchParams.toString()}` : ''}`);
+function createMockRequest(
+  method: string,
+  body?: Record<string, unknown>,
+  searchParams?: URLSearchParams,
+): NextRequest {
+  const url = new URL(
+    `http://localhost/api/master/equipment${searchParams ? `?${searchParams.toString()}` : ''}`,
+  );
   const request = new Request(url.toString(), {
     method,
     headers: {
@@ -23,14 +29,22 @@ describe('/api/master/equipment', () => {
     it('should return a list of equipments', async () => {
       const mockEquipments: Equipment[] = [
         {
-          id: 'eq1', name: 'Test Recorder', type: 'Recorder', 
-          manufacturer: 'TestBrand', memo: 'Test memo 1', 
-          createdAt: new Date(), updatedAt: new Date(),
+          id: 'eq1',
+          name: 'Test Recorder',
+          type: 'Recorder',
+          manufacturer: 'TestBrand',
+          memo: 'Test memo 1',
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         {
-          id: 'eq2', name: 'Test Mic', type: 'Microphone', 
-          manufacturer: 'AnotherBrand', memo: 'Test memo 2', 
-          createdAt: new Date(), updatedAt: new Date(),
+          id: 'eq2',
+          name: 'Test Mic',
+          type: 'Microphone',
+          manufacturer: 'AnotherBrand',
+          memo: 'Test memo 2',
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ];
       prismaMock.equipment.findMany.mockResolvedValue(mockEquipments);
@@ -90,23 +104,24 @@ describe('/api/master/equipment', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(400);
-      expect(responseBody.error).toBe('Missing required fields: name, type');
+      expect(responseBody.error).toBe('必須項目が入力されていません');
     });
-    
+
     it('should return 400 if required fields (type) are missing', async () => {
       const request = createMockRequest('POST', { name: 'Incomplete Equipment' }); // type を欠落させる
       const response = await POST(request);
       const responseBody = await response.json();
 
       expect(response.status).toBe(400);
-      expect(responseBody.error).toBe('Missing required fields: name, type');
+      expect(responseBody.error).toBe('必須項目が入力されていません');
     });
 
     it('should return 409 if name already exists', async () => {
-      const knownError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        { code: 'P2002', clientVersion: 'mock.version', meta: { target: ['name'] } }
-      );
+      const knownError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'mock.version',
+        meta: { target: ['name'] },
+      });
       prismaMock.equipment.create.mockRejectedValue(knownError);
 
       const request = createMockRequest('POST', validEquipmentData);
@@ -114,7 +129,7 @@ describe('/api/master/equipment', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(409);
-      expect(responseBody.error).toBe('Failed to create equipment: Name already exists.');
+      expect(responseBody.error).toBe('その名前の機材は既に存在しています');
     });
 
     it('should return 500 for other database errors on create', async () => {
@@ -124,7 +139,7 @@ describe('/api/master/equipment', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(500);
-      expect(responseBody.error).toBe('Failed to create equipment');
+      expect(responseBody.error).toBe('データベースエラーが発生しました');
     });
   });
-}); 
+});

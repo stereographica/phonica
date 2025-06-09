@@ -5,6 +5,11 @@ import { GET, POST } from '@/app/api/master/tags/route';
 import { prismaMock } from '../../../../../../jest.setup';
 import { NextRequest } from 'next/server';
 import { Tag, Prisma } from '@prisma/client';
+import { generateUniqueSlug } from '@/lib/slug-generator';
+
+// slug-generatorをモック
+jest.mock('@/lib/slug-generator');
+const mockGenerateUniqueSlug = generateUniqueSlug as jest.MockedFunction<typeof generateUniqueSlug>;
 
 // タグ数込みの型定義
 type TagWithCount = Tag & {
@@ -14,11 +19,13 @@ type TagWithCount = Tag & {
 };
 
 function createMockRequest(
-  method: string, 
-  body?: Record<string, unknown>, 
-  searchParams?: URLSearchParams
+  method: string,
+  body?: Record<string, unknown>,
+  searchParams?: URLSearchParams,
 ): NextRequest {
-  const url = new URL(`http://localhost/api/master/tags${searchParams ? `?${searchParams.toString()}` : ''}`);
+  const url = new URL(
+    `http://localhost/api/master/tags${searchParams ? `?${searchParams.toString()}` : ''}`,
+  );
   const request = new Request(url.toString(), {
     method,
     headers: {
@@ -30,6 +37,20 @@ function createMockRequest(
 }
 
 describe('/api/master/tags', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    // generateUniqueSlugのモック実装
+    mockGenerateUniqueSlug.mockImplementation(async (name: string) => {
+      return Promise.resolve(
+        name
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, '-')
+          .replace(/[^\w-]/g, ''),
+      );
+    });
+  });
+
   describe('GET', () => {
     const mockTags: TagWithCount[] = [
       {
@@ -49,10 +70,6 @@ describe('/api/master/tags', () => {
         _count: { materials: 3 },
       },
     ];
-
-    beforeEach(() => {
-      jest.resetAllMocks();
-    });
 
     it('should return a list of tags with default pagination', async () => {
       prismaMock.tag.findMany.mockResolvedValue(mockTags);
@@ -74,7 +91,7 @@ describe('/api/master/tags', () => {
         hasNext: false,
         hasPrev: false,
       });
-      
+
       expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
         where: {},
         include: {
@@ -113,7 +130,7 @@ describe('/api/master/tags', () => {
         hasNext: false,
         hasPrev: true,
       });
-      
+
       expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
         where: {},
         include: {
@@ -159,9 +176,9 @@ describe('/api/master/tags', () => {
     });
 
     it('should return 400 for invalid query parameters', async () => {
-      const searchParams = new URLSearchParams({ 
+      const searchParams = new URLSearchParams({
         page: '-1',
-        sortBy: 'invalid_field'
+        sortBy: 'invalid_field',
       });
       const request = createMockRequest('GET', undefined, searchParams);
       const response = await GET(request);
@@ -198,10 +215,6 @@ describe('/api/master/tags', () => {
       _count: { materials: 0 },
     };
 
-    beforeEach(() => {
-      jest.resetAllMocks();
-    });
-
     it('should create a new tag and return 201', async () => {
       prismaMock.tag.create.mockResolvedValue(createdTagResponse);
 
@@ -213,7 +226,7 @@ describe('/api/master/tags', () => {
       expect(responseBody.name).toBe(validTagData.name);
       expect(responseBody.slug).toBe('new-nature-tag');
       expect(responseBody._count.materials).toBe(0);
-      
+
       expect(prismaMock.tag.create).toHaveBeenCalledWith({
         data: {
           name: 'New Nature Tag',
@@ -289,10 +302,11 @@ describe('/api/master/tags', () => {
     });
 
     it('should return 409 if name already exists', async () => {
-      const knownError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        { code: 'P2002', clientVersion: 'mock.version', meta: { target: ['name'] } }
-      );
+      const knownError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'mock.version',
+        meta: { target: ['name'] },
+      });
       prismaMock.tag.create.mockRejectedValue(knownError);
 
       const request = createMockRequest('POST', validTagData);
@@ -300,14 +314,15 @@ describe('/api/master/tags', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(409);
-      expect(responseBody.error).toBe('Tag with this name already exists');
+      expect(responseBody.error).toBe('その名前のタグは既に存在しています');
     });
 
     it('should return 409 if slug already exists', async () => {
-      const knownError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        { code: 'P2002', clientVersion: 'mock.version', meta: { target: ['slug'] } }
-      );
+      const knownError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'mock.version',
+        meta: { target: ['slug'] },
+      });
       prismaMock.tag.create.mockRejectedValue(knownError);
 
       const request = createMockRequest('POST', validTagData);
@@ -315,7 +330,7 @@ describe('/api/master/tags', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(409);
-      expect(responseBody.error).toBe('Tag with this slug already exists');
+      expect(responseBody.error).toBe('Slugの生成に失敗しました。もう一度お試しください。');
     });
 
     it('should return 500 for other database errors on create', async () => {
@@ -326,7 +341,7 @@ describe('/api/master/tags', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(500);
-      expect(responseBody.error).toBe('Failed to create tag');
+      expect(responseBody.error).toBe('データベースエラーが発生しました');
     });
   });
 });

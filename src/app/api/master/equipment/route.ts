@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client'; // PrismaClientKnownRequestError をインポート
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 // GET /api/master/equipment - 機材一覧取得
 export async function GET() {
@@ -10,11 +11,8 @@ export async function GET() {
     });
     return NextResponse.json(equipments);
   } catch (error) {
-    console.error("Error fetching equipments:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch equipments" },
-      { status: 500 }
-    );
+    console.error('Error fetching equipments:', error);
+    return NextResponse.json({ error: 'Failed to fetch equipments' }, { status: 500 });
   }
 }
 
@@ -25,11 +23,9 @@ export async function POST(request: Request) {
     // スキーマに合わせてフィールド名を修正
     const { name, type, manufacturer, memo } = body;
 
-    if (!name || !type) { // type も必須と仮定（スキーマ上は必須）
-      return NextResponse.json(
-        { error: 'Missing required fields: name, type' },
-        { status: 400 }
-      );
+    if (!name || !type) {
+      // type も必須と仮定（スキーマ上は必須）
+      return NextResponse.json({ error: ERROR_MESSAGES.REQUIRED_FIELD_MISSING }, { status: 400 });
     }
 
     const newEquipment = await prisma.equipment.create({
@@ -42,7 +38,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(newEquipment, { status: 201 });
   } catch (error) {
-    console.error("Error creating equipment:", error);
+    console.error('Error creating equipment:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       // P2002はユニーク制約違反
       // error.meta.target can be a string or string[]
@@ -56,14 +52,11 @@ export async function POST(request: Request) {
 
       if (error.code === 'P2002' && isNameConflict) {
         return NextResponse.json(
-          { error: 'Failed to create equipment: Name already exists.' },
-          { status: 409 } // Conflict
+          { error: ERROR_MESSAGES.EQUIPMENT_NAME_EXISTS },
+          { status: 409 }, // Conflict
         );
       }
     }
-    return NextResponse.json(
-      { error: "Failed to create equipment" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: ERROR_MESSAGES.DATABASE_ERROR }, { status: 500 });
   }
-} 
+}
