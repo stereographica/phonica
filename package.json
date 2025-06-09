@@ -50,7 +50,7 @@
     "@radix-ui/react-toast": "^1.2.14",
     "@tanstack/react-query": "^5.79.0",
     "@tanstack/react-table": "^8.21.3",
-    "bullmq": "^5.53.1",
+    "bullmq": "^5.53.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gridstack": "^12.2.1",
