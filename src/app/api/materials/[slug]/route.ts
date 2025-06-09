@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client'; // 実行時にも必要なのでtypeを削除
+import type { Prisma } from '@prisma/client'; // 型定義のみインポート
 import { v4 as uuidv4 } from 'uuid'; // 追加
 import path from 'path'; // 追加
 import {
@@ -393,10 +393,16 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     // Prismaのユニーク制約違反エラーの処理
+    // instanceof の代わりにエラーの構造を直接チェック（CI環境での互換性向上）
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
       error.code === 'P2002' &&
-      error.meta?.target
+      'meta' in error &&
+      error.meta &&
+      typeof error.meta === 'object' &&
+      'target' in error.meta
     ) {
       const target = error.meta.target as string[];
       if (target.includes('title')) {
