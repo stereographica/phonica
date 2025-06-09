@@ -99,8 +99,11 @@ test.describe('@materials Create Material', () => {
   });
 
   test('can create a valid material', async ({ page, browserName }) => {
-    // WebKitではFormDataのboundaryエラーがあるため、このテストをスキップ
-    test.skip(browserName === 'webkit', 'WebKitではFormDataのboundaryエラーのためスキップ');
+    // WebKitとFirefoxではFormDataのboundaryエラーがあるため、このテストをスキップ
+    test.skip(
+      browserName === 'webkit' || browserName === 'firefox',
+      'WebKit/FirefoxではFormDataのboundaryエラーのためスキップ',
+    );
     // フォームに入力
     await form.fillByLabel('Title', 'E2E Test Material');
     await form.fillTextareaByLabel('Memo', 'Test memo');

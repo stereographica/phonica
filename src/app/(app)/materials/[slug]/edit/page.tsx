@@ -268,12 +268,10 @@ export default function EditMaterialPage() {
         };
       }
 
+      // 成功時のみページ遷移と成功通知を行う
       setIsSubmitting(false);
+      notifySuccess('update', 'material');
       router.push('/materials');
-      // ナビゲーション後に通知を表示
-      setTimeout(() => {
-        notifySuccess('update', 'material');
-      }, 100);
     } catch (err) {
       console.error('Failed to update material:', err);
       notifyError(err, { operation: 'update', entity: 'material' });
