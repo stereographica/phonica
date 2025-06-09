@@ -66,3 +66,53 @@ Remember: Every CI failure wastes time, breaks flow, and delays delivery. Test l
    - If a test is genuinely outdated, update it properly rather than skipping
    - **PROHIBITED**: Skipping test cases because they don't pass
    - **Exception**: If fixing the implementation is better than fixing the test, notify the user of this judgment
+
+### 🚦 Pre-commit Hook Timeout Handling
+
+1. **Expected execution time**:
+
+   - **Normal execution**: 5-10 minutes for full test suite
+   - **Maximum timeout**: Set to 15 minutes to account for worst-case scenarios
+   - **ALWAYS use maximum timeout** when executing pre-commit hooks
+   - **DO NOT assume quick completion** even for "small" changes
+
+2. **When pre-commit hook times out**:
+
+   - **IMMEDIATELY report to the user** with the timeout duration
+   - **WAIT for explicit user instructions**
+   - **DO NOT make autonomous decisions** to use `--no-verify`
+
+3. **Common timeout scenarios**:
+
+   - Large test suites taking longer than expected
+   - E2E tests running slowly (especially cross-browser tests)
+   - System resource constraints
+   - First run after dependency updates
+
+4. **Proper timeout response**:
+   ```
+   "Pre-commit hook has timed out after X minutes.
+   The tests are still running. Would you like me to:
+   1. Continue waiting for completion
+   2. Use --no-verify flag (not recommended for code changes)
+   3. Cancel and investigate the timeout cause"
+   ```
+
+### ⚠️ Critical Mindset Principles
+
+1. **No change is too small**:
+
+   - Even "simple" changes like instanceof checks can affect test execution
+   - Changing error handling can impact test environments differently
+   - Import statement modifications can break module resolution
+
+2. **Urgency is not an excuse**:
+
+   - CI failures create pressure, but rushing increases risk
+   - Following process prevents cascading failures
+   - One proper fix is better than multiple rushed attempts
+
+3. **When in doubt, ask**:
+   - Uncertainty about impact = run the pre-commit hook
+   - Ambiguous situations = request user clarification
+   - Better to be cautious than create additional problems
