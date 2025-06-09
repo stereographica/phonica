@@ -261,7 +261,11 @@ export default function EditMaterialPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        // エラーオブジェクトにstatusを含める（新規作成ページと同じ構造にする）
+        throw {
+          status: response.status,
+          error: errorData.error || `HTTP error! status: ${response.status}`,
+        };
       }
 
       setIsSubmitting(false);

@@ -114,6 +114,12 @@ describe('error-messages', () => {
     });
 
     describe('エラータイプの優先順位', () => {
+      it('具体的なエラーメッセージが最優先される', () => {
+        expect(
+          getErrorMessage({ error: 'そのタイトルの素材は既に存在しています', status: 409 }),
+        ).toBe('そのタイトルの素材は既に存在しています');
+      });
+
       it('HTTPエラーがPrismaエラーより優先される', () => {
         expect(getErrorMessage({ status: 404, code: 'P2002' })).toBe(
           '要求されたリソースが見つかりません。',

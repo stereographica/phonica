@@ -103,6 +103,14 @@ export const SUCCESS_MESSAGES = {
 
 // エラーオブジェクトからユーザーフレンドリーなメッセージを取得
 export function getErrorMessage(error: unknown, operation?: string, entity?: string): string {
+  // エラーオブジェクトに具体的なエラーメッセージがある場合は優先的に使用
+  if (error && typeof error === 'object' && 'error' in error) {
+    const errorWithMessage = error as { error: unknown };
+    if (typeof errorWithMessage.error === 'string') {
+      return errorWithMessage.error;
+    }
+  }
+
   // HTTPエラーの場合
   if (error && typeof error === 'object' && 'status' in error) {
     const errorWithStatus = error as { status: unknown };

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client'; // Prisma Namespaceをインポート
+import { Prisma } from '@prisma/client'; // 実行時にも必要なのでtypeを削除
 import { v4 as uuidv4 } from 'uuid'; // 追加
 import path from 'path'; // 追加
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/lib/file-system';
 import fs from 'fs/promises'; // fs を再度インポート
 import { AudioMetadataService } from '@/lib/audio-metadata'; // 追加
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 // import type { Prisma } from '@prisma/client'; // Prisma Namespaceはここでは不要かも
 
 const routeParamsSchema = z.object({
@@ -390,6 +391,19 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     if (error instanceof Error && error.message === 'Material not found for update') {
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });
     }
+
+    // Prismaのユニーク制約違反エラーの処理
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002' &&
+      error.meta?.target
+    ) {
+      const target = error.meta.target as string[];
+      if (target.includes('title')) {
+        return NextResponse.json({ error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS }, { status: 409 });
+      }
+    }
+
     return NextResponse.json(
       {
         error: 'Internal Server Error',

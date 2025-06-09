@@ -172,7 +172,13 @@ export default function NewMaterialPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        // エラーオブジェクトにstatusを含める
+        const errorWithStatus = {
+          ...errorData,
+          status: response.status,
+          message: errorData.error || `HTTP error! status: ${response.status}`,
+        };
+        throw errorWithStatus;
       }
 
       // JSONレスポンスは不要
