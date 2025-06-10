@@ -75,7 +75,10 @@ test.describe('@materials Duplicate Title Error Handling', () => {
     await expect(page).toHaveURL('/materials/new');
   });
 
-  test('should display specific error message for duplicate title on edit', async ({ page }) => {
+  test('should display specific error message for duplicate title on edit', async ({
+    page,
+    browserName,
+  }) => {
     // 素材一覧ページへ
     await navigation.goToMaterialsPage();
     await page.waitForLoadState('networkidle');
@@ -126,10 +129,22 @@ test.describe('@materials Duplicate Title Error Handling', () => {
 
     // タイトルを別の素材（targetMaterial）と同じに変更
     const titleInput = page.locator('input#title');
+    await titleInput.clear();
     await titleInput.fill(targetMaterial!);
+
+    // 入力が正しく反映されたことを確認
+    await expect(titleInput).toHaveValue(targetMaterial!);
 
     // フォーム送信
     await form.submitForm();
+
+    // フォーム送信後の処理を待つ
+    await page.waitForTimeout(1000);
+
+    // Firefoxでは追加の待機が必要
+    if (browserName === 'firefox') {
+      await page.waitForTimeout(500);
+    }
 
     // エラートーストが表示されることを確認
     await toast.expectErrorToast('そのタイトルの素材は既に存在しています');

@@ -5,6 +5,7 @@ import {
   ModalHelper,
   TableHelper,
   CrossBrowserHelper,
+  WaitHelper,
 } from '../../helpers';
 import path from 'path';
 
@@ -14,7 +15,7 @@ test.describe('@workflow Project Management Workflow', () => {
   let form: FormHelper;
   let modal: ModalHelper;
   let table: TableHelper;
-  // let wait: WaitHelper; // Removed unused variable
+  let wait: WaitHelper;
   let crossBrowser: CrossBrowserHelper;
 
   test.beforeEach(async ({ page }) => {
@@ -22,7 +23,7 @@ test.describe('@workflow Project Management Workflow', () => {
     form = new FormHelper(page);
     modal = new ModalHelper(page);
     table = new TableHelper(page);
-    // wait = new WaitHelper(page); // Removed unused variable
+    wait = new WaitHelper(page);
     crossBrowser = new CrossBrowserHelper(page);
   });
 
@@ -145,7 +146,7 @@ test.describe('@workflow Project Management Workflow', () => {
 
     // 6. 検索フィルターのクリアとプロジェクト管理完了確認
     await searchInput.clear();
-    await page.waitForTimeout(500);
+    await wait.waitForBrowserStability();
 
     // 全素材が再表示されることを確認
     const finalRowCount = await table.getRowCount();
@@ -238,7 +239,7 @@ test.describe('@workflow Project Management Workflow', () => {
     // WebKitでは素材一覧の読み込みに時間がかかることがある（WebKitはすでにスキップ済み）
     // browserNameはすでにパラメータとして受け取っている
     if (browserName === 'webkit') {
-      await page.waitForTimeout(3000);
+      await wait.waitForNetworkStable({ timeout: 3000 });
       await page.reload();
       await page.waitForLoadState('networkidle');
     }
@@ -256,7 +257,7 @@ test.describe('@workflow Project Management Workflow', () => {
     // 4. 作成した素材で新機材が使用されていることを確認
     // WebKitではボタンクリック前に追加の待機が必要
     if (browserName === 'webkit') {
-      await page.waitForTimeout(1000);
+      await wait.waitForBrowserStability();
     }
 
     const materialButton = page.locator(`button:has-text("${uniqueIntegrationTitle}")`);
@@ -274,7 +275,7 @@ test.describe('@workflow Project Management Workflow', () => {
         retries--;
         if (retries === 0) throw error;
         console.log(`Modal open failed, retrying... (${3 - retries}/3)`);
-        await page.waitForTimeout(1000);
+        await wait.waitForBrowserStability();
       }
     }
 

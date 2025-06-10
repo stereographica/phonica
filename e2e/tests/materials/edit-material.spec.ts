@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures/test-fixtures';
 import { NavigationHelper } from '../../helpers/navigation';
 import { FormHelper } from '../../helpers/form';
+import { WaitHelper } from '../../helpers/wait';
 import { Page } from '@playwright/test';
 import path from 'path';
 
@@ -9,17 +10,19 @@ test.describe.configure({ mode: 'serial' });
 test.describe('@materials Edit Material', () => {
   let navigation: NavigationHelper;
   let form: FormHelper;
+  let wait: WaitHelper;
 
   test.beforeEach(async ({ page }) => {
     navigation = new NavigationHelper(page);
     form = new FormHelper(page);
+    wait = new WaitHelper(page);
 
     // 素材一覧ページに移動
     await navigation.goToMaterialsPage();
 
     // データがロードされるまで待機
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
   });
 
   // ヘルパー関数：有効な素材の編集ページに移動
@@ -80,7 +83,7 @@ test.describe('@materials Edit Material', () => {
 
     // すべてのブラウザで安定した方法を使用
     // まずボタンが見えるまで待つ
-    await page.waitForTimeout(1000);
+    await wait.waitForBrowserStability();
 
     if (browserName === 'webkit') {
       // WebKitの場合、より具体的なセレクターを使用
@@ -90,7 +93,8 @@ test.describe('@materials Edit Material', () => {
       // force: true を使用してクリックを試みる
     } else if (browserName === 'firefox') {
       // Firefoxでは追加の待機が必要
-      await page.waitForTimeout(2000);
+      await wait.waitForBrowserStability();
+      await wait.waitForNetworkStable({ timeout: 2000 });
 
       // Firefoxの場合、より安定したセレクター戦略を使用
       editElement = modal.locator('button').filter({ hasText: 'Edit' }).first();
@@ -219,7 +223,7 @@ test.describe('@materials Edit Material', () => {
       );
       await latitudeInput.click({ clickCount: 3 }); // Select all
       await latitudeInput.type('35.6762');
-      await page.waitForTimeout(500);
+      await wait.waitForInputValue('input#latitude', '35.6762', { timeout: 1000 });
 
       // 再度確認
       const verifyLat = await latitudeInput.inputValue();
@@ -233,7 +237,7 @@ test.describe('@materials Edit Material', () => {
       );
       await longitudeInput.click({ clickCount: 3 }); // Select all
       await longitudeInput.type('139.6503');
-      await page.waitForTimeout(500);
+      await wait.waitForInputValue('input#longitude', '139.6503', { timeout: 1000 });
 
       // 再度確認
       const verifyLon = await longitudeInput.inputValue();
@@ -276,32 +280,22 @@ test.describe('@materials Edit Material', () => {
     // ページをリロードして最新のデータを取得
     await page.reload();
     await page.waitForLoadState('networkidle');
+    await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
+
+    // material-testsプロジェクトでは特に遅延があるため、追加の待機
     await page.waitForTimeout(2000);
 
+    // フィルターを使って確実に見つける
+    const titleFilter = page.locator('input#titleFilter');
+    await titleFilter.fill(newTitle);
+    await page.click('button:has-text("Apply Filters")');
+    await wait.waitForNetworkStable();
+    await wait.waitForDataLoad({ selector: 'tbody tr', minRows: 1 });
+
     // 更新されたタイトルが表示されていることを確認
-    // 方法1: 完全一致で検索
     const updatedButton = page
       .locator(`button.text-blue-600`)
       .filter({ hasText: new RegExp(`^${newTitle}$`) });
-
-    // タイトルが見つからない場合は、テーブル全体をスキャン
-    const isVisible = await updatedButton.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (!isVisible) {
-      // テーブルの内容をログ出力して確認
-      const tableRows = page.locator('tbody tr');
-      const rowCount = await tableRows.count();
-      console.log(`Total rows in table: ${rowCount}`);
-
-      for (let i = 0; i < Math.min(rowCount, 10); i++) {
-        const row = tableRows.nth(i);
-        const titleText = await row.locator('button.text-blue-600').textContent();
-        console.log(`Row ${i}: ${titleText}`);
-      }
-
-      // もう一度待って再確認
-      await page.waitForTimeout(3000);
-    }
 
     // 最終的な確認
     await expect(updatedButton).toBeVisible({ timeout: 15000 });
@@ -330,7 +324,7 @@ test.describe('@materials Edit Material', () => {
       );
       await latitudeInput.clear();
       await latitudeInput.fill('35.6762');
-      await page.waitForTimeout(500); // 値が確実に反映されるまで待機
+      await wait.waitForInputValue('input#latitude', '35.6762', { timeout: 1000 });
     }
 
     // 経度も同様に確認（-180 to 180）
@@ -340,7 +334,7 @@ test.describe('@materials Edit Material', () => {
       );
       await longitudeInput.clear();
       await longitudeInput.fill('139.6503');
-      await page.waitForTimeout(500);
+      await wait.waitForInputValue('input#longitude', '139.6503', { timeout: 1000 });
     }
 
     // 再度確認して、まだ無効な場合は強制的に修正
@@ -352,7 +346,7 @@ test.describe('@materials Edit Material', () => {
       );
       await latitudeInput.click({ clickCount: 3 }); // Select all text
       await latitudeInput.type('35.6762');
-      await page.waitForTimeout(500);
+      await wait.waitForInputValue('input#latitude', '35.6762', { timeout: 1000 });
     }
 
     // 新しいタイトル
@@ -397,7 +391,7 @@ test.describe('@materials Edit Material', () => {
 
     // ナビゲーションのタイミングを改善
     // Next.js のナビゲーションは非同期なので、まず画面遷移の開始を待つ
-    await page.waitForTimeout(1000);
+    await wait.waitForBrowserStability();
 
     // ナビゲーション完了を待つ（URLが変わるか、タイムアウトするまで）
     try {
@@ -473,7 +467,7 @@ test.describe('@materials Edit Material', () => {
       );
       await latitudeInput.clear();
       await latitudeInput.fill('35.6762');
-      await page.waitForTimeout(500); // 値が確実に反映されるまで待機
+      await wait.waitForInputValue('input#latitude', '35.6762', { timeout: 1000 });
     }
 
     // 無効なファイル（非音声ファイル）をアップロード
@@ -511,7 +505,7 @@ test.describe('@materials Edit Material', () => {
       );
       await latitudeInput.clear();
       await latitudeInput.fill('35.6762');
-      await page.waitForTimeout(500); // 値が確実に反映されるまで待機
+      await wait.waitForInputValue('input#latitude', '35.6762', { timeout: 1000 });
     }
 
     // タグを追加 (ラベルテキストを正確に指定)
@@ -553,12 +547,13 @@ test.describe('@materials Edit Material', () => {
     }
 
     // データが更新されるまで少し待つ
-    await page.waitForTimeout(4000);
+    await wait.waitForNetworkStable({ timeout: 4000 });
+    await wait.waitForDataLoad({ minRows: 1 });
 
     // ページをリロードして最新のデータを取得
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
   });
 
   test('can update location information', async ({ page }) => {
@@ -575,7 +570,7 @@ test.describe('@materials Edit Material', () => {
     if (!currentLatitude || isNaN(latValue) || latValue > 90 || latValue < -90) {
       console.log(`Invalid or empty latitude detected: ${currentLatitude}, clearing field`);
       await latitudeInput.clear();
-      await page.waitForTimeout(500); // 値が確実にクリアされるまで待機
+      await wait.waitForBrowserStability(); // 値が確実にクリアされるまで弅機
     }
 
     // 位置情報を更新（有効な範囲内の値を使用）
@@ -608,12 +603,13 @@ test.describe('@materials Edit Material', () => {
     await page.waitForURL('/materials', { timeout: 30000 });
 
     // データが更新されるまで少し待つ
-    await page.waitForTimeout(4000);
+    await wait.waitForNetworkStable({ timeout: 4000 });
+    await wait.waitForDataLoad({ minRows: 1 });
 
     // ページをリロードして最新のデータを取得
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
   });
 
   test('cancel button returns to materials list without saving', async ({ page }) => {

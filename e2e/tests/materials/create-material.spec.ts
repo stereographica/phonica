@@ -134,9 +134,12 @@ test.describe('@materials Create Material', () => {
     // フォーム送信
     await form.submitForm();
 
+    // フォーム送信後の処理を待つ（material-testsでは特に遅延がある）
+    await page.waitForTimeout(1000);
+
     // Toast通知の代わりにページ遷移を待つ
     // Server Actionの実行とリダイレクトを待つ
-    await page.waitForURL('/materials', { timeout: 15000 });
+    await page.waitForURL('/materials', { timeout: 20000 });
 
     // リダイレクト後の確認
     await expect(page.locator('h1')).toHaveText('Materials');

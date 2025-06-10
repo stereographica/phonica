@@ -24,6 +24,8 @@
     "e2e:db:seed": "tsx scripts/e2e-db-setup.ts seed",
     "e2e:db:drop": "tsx scripts/e2e-db-setup.ts drop",
     "e2e:db:setup": "tsx scripts/e2e-db-setup.ts setup",
+    "e2e:db:setup:optimized": "tsx scripts/e2e-db-optimized.ts setup",
+    "e2e:optimized": "tsx scripts/run-e2e-with-db-optimized.ts",
     "seed:test": "tsx scripts/seed-test-data.ts",
     "e2e:smoke": "npm run e2e -- --grep @smoke --project=chromium",
     "e2e:master": "npm run e2e -- --grep @master --project=chromium",
@@ -34,6 +36,8 @@
     "e2e:webkit": "npm run e2e -- --project=webkit",
     "e2e:cross-browser": "npm run e2e -- --project=chromium --project=firefox",
     "e2e:repeat": "tsx scripts/test-e2e-repeatedly.ts",
+    "e2e:benchmark": "tsx scripts/e2e-performance-benchmark.ts",
+    "e2e:compare": "tsx scripts/e2e-performance-comparison.ts",
     "prepare": "husky"
   },
   "dependencies": {

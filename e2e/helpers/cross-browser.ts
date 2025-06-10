@@ -1,10 +1,15 @@
 import { Page, expect } from '@playwright/test';
+import { WaitHelper } from './wait';
 
 /**
  * クロスブラウザ対応のためのヘルパー関数
  */
 export class CrossBrowserHelper {
-  constructor(private page: Page) {}
+  private waitHelper: WaitHelper;
+
+  constructor(private page: Page) {
+    this.waitHelper = new WaitHelper(page);
+  }
 
   /**
    * ブラウザの種類を取得
@@ -17,60 +22,57 @@ export class CrossBrowserHelper {
    * Firefox/WebKit用の特別な待機処理
    */
   async waitForStability() {
-    const browserName = this.getBrowserName();
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      // Firefox/WebKitでは追加の待機が必要な場合がある
-      await this.page.waitForTimeout(500);
-    }
+    // 固定待機時間の代わりにブラウザ安定性待機を使用
+    await this.waitHelper.waitForBrowserStability();
   }
 
   /**
    * ダイアログハンドリング（Firefox/WebKit対応）
    */
   async setupDialogHandler(expectedMessage?: string): Promise<void> {
-    const browserName = this.getBrowserName();
-    
     // ダイアログハンドラーを設定
-    this.page.once('dialog', async dialog => {
+    this.page.once('dialog', async (dialog) => {
       if (expectedMessage) {
         console.log(`Dialog message: ${dialog.message()}`);
         if (!dialog.message().includes(expectedMessage)) {
-          console.warn(`Expected dialog message to contain "${expectedMessage}", but got "${dialog.message()}"`);
+          console.warn(
+            `Expected dialog message to contain "${expectedMessage}", but got "${dialog.message()}"`,
+          );
         }
       }
-      // Firefox/WebKitではダイアログ処理を少し遅らせる
-      if (browserName === 'firefox' || browserName === 'webkit') {
-        await this.page.waitForTimeout(100);
-      }
+      // Firefox/WebKitではダイアログ処理の安定性を待つ
+      await this.waitHelper.waitForBrowserStability();
       await dialog.accept();
     });
 
-    // Firefox/WebKitの場合は、ハンドラー設定後に少し待機
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      await this.page.waitForTimeout(200);
-    }
+    // Firefox/WebKitの場合は、ハンドラー設定後の安定性を待つ
+    await this.waitHelper.waitForBrowserStability();
   }
 
   /**
    * フォーム送信とダイアログ処理（クロスブラウザ対応）
    * 注意: Server Actionを使用している場合、ダイアログは表示されない
    */
-  async submitFormWithDialog(submitSelector: string, expectedMessage?: string, navigateToUrl?: string) {
+  async submitFormWithDialog(
+    submitSelector: string,
+    expectedMessage?: string,
+    navigateToUrl?: string,
+  ) {
     const browserName = this.getBrowserName();
-    
+
     // ボタンが有効であることを確認
     const submitButton = this.page.locator(submitSelector);
     await submitButton.waitFor({ state: 'visible' });
     await expect(submitButton).toBeEnabled();
-    
+
     // ダイアログハンドラーを設定（expectedMessageがある場合のみ）
     // Server Actionの場合はダイアログが表示されないため、必要ない
     if (expectedMessage) {
       await this.setupDialogHandler(expectedMessage);
     }
-    
+
     // Firefox/WebKitではナビゲーションの遅延を考慮
-    let navigationPromise: Promise<any> | null = null;
+    let navigationPromise: Promise<void> | null = null;
     if (navigateToUrl && (browserName === 'firefox' || browserName === 'webkit')) {
       // ナビゲーションを事前にセットアップ
       navigationPromise = this.page.waitForURL(navigateToUrl, { timeout: 15000 });
@@ -78,7 +80,7 @@ export class CrossBrowserHelper {
 
     // フォームを送信
     await submitButton.click();
-    
+
     // ダイアログとナビゲーションを両方待つ
     if (navigateToUrl) {
       if (navigationPromise) {
@@ -89,11 +91,9 @@ export class CrossBrowserHelper {
         await this.page.waitForURL(navigateToUrl, { timeout: 15000 });
       }
     }
-    
+
     // ナビゲーション後の安定化待機
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      await this.page.waitForTimeout(500);
-    }
+    await this.waitHelper.waitForBrowserStability();
   }
 
   /**
@@ -102,15 +102,24 @@ export class CrossBrowserHelper {
   async fillInputSafely(selector: string, value: string) {
     const browserName = this.getBrowserName();
     const input = this.page.locator(selector).first();
-    
+
     // Firefox/WebKitでは入力前にフォーカスとクリアが必要な場合がある
     if (browserName === 'firefox' || browserName === 'webkit') {
       await input.click();
       await input.clear();
-      await this.page.waitForTimeout(100);
+      // 固定待機時間の代わりに入力フィールドの準備完了を待つ
+      await this.waitHelper.waitForInteractive(selector);
     }
-    
+
     await input.fill(value);
+
+    // 入力値が反映されるまで待機（タイムアウトしても続行）
+    try {
+      await this.waitHelper.waitForInputValue(selector, value);
+    } catch {
+      // Firefox/WebKitでは入力値の反映が遅れることがあるため、エラーは無視
+      console.log(`Input value verification timeout for ${selector}, continuing...`);
+    }
   }
 
   /**
@@ -120,39 +129,39 @@ export class CrossBrowserHelper {
     const browserName = this.getBrowserName();
     const defaultTimeout = browserName === 'firefox' || browserName === 'webkit' ? 20000 : 10000;
     const timeout = options?.timeout || defaultTimeout;
-    
+
     // WebKit/Firefoxでは要素の表示が遅れることがあるため、再試行ロジックを追加
     if (browserName === 'webkit' || browserName === 'firefox') {
       let retries = 3;
       let lastError;
-      
+
       while (retries > 0) {
         try {
-          await this.page.waitForSelector(selector, { 
-            state: 'visible', 
-            timeout: timeout / 3 // 各試行のタイムアウトを分割
+          await this.page.waitForSelector(selector, {
+            state: 'visible',
+            timeout: timeout / 3, // 各試行のタイムアウトを分割
           });
           return; // 成功したら終了
         } catch (error) {
           lastError = error;
           retries--;
-          
+
           if (retries > 0) {
-            // リトライ前に少し待機
-            await this.page.waitForTimeout(1000);
+            // リトライ前にブラウザの安定性を確保
+            await this.waitHelper.waitForBrowserStability();
             // ページをリロードして最新のデータを取得
             await this.page.reload();
-            await this.page.waitForLoadState('networkidle');
+            await this.waitHelper.waitForNetworkStable();
           }
         }
       }
-      
+
       throw lastError;
     } else {
       // 他のブラウザは通常の処理
-      await this.page.waitForSelector(selector, { 
-        state: 'visible', 
-        timeout 
+      await this.page.waitForSelector(selector, {
+        state: 'visible',
+        timeout,
       });
     }
   }
