@@ -40,6 +40,9 @@
     "e2e:compare": "tsx scripts/e2e-performance-comparison.ts",
     "prepare": "husky"
   },
+  "overrides": {
+    "brace-expansion": "^4.0.1"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.1.0",
     "@prisma/client": "^6.9.0",

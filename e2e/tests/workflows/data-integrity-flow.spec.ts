@@ -620,11 +620,37 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // browserNameはすでにパラメータとして受け取っている
     if (browserName === 'firefox') {
       await wait.waitForBrowserStability();
-      // ボタンを再取得してスクロール
-      const freshButton = page.locator(`button:has-text("${uniqueMaterialTitle}")`).first();
-      await freshButton.scrollIntoViewIfNeeded();
-      await wait.waitForBrowserStability();
-      await freshButton.click();
+      // 要素が安定するまで再試行
+      let clicked = false;
+      for (let i = 0; i < 3; i++) {
+        try {
+          // ボタンを再取得
+          const freshButton = page.locator(`button:has-text("${uniqueMaterialTitle}")`).first();
+          // 要素が存在することを確認
+          await expect(freshButton).toBeVisible({ timeout: 5000 });
+          // スクロールを試みる（エラーが出ても続行）
+          try {
+            await freshButton.scrollIntoViewIfNeeded();
+          } catch (scrollError) {
+            console.log('Scroll failed, continuing without scroll:', scrollError);
+          }
+          await wait.waitForBrowserStability();
+          await freshButton.click();
+          clicked = true;
+          break;
+        } catch (error) {
+          console.log(
+            `Attempt ${i + 1} failed:`,
+            error instanceof Error ? error.message : String(error),
+          );
+          if (i < 2) {
+            await page.waitForTimeout(1000);
+          }
+        }
+      }
+      if (!clicked) {
+        throw new Error(`Failed to click material button after 3 attempts`);
+      }
     } else {
       await materialButton.click();
     }
