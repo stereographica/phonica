@@ -5,7 +5,16 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EditMaterialPage from '../page';
-// import '../../../../../../global.mock'; // fetch, alert, FormData などのグローバルモック (REMOVED)
+
+// Server Actions のモック
+const mockGetMaterial = jest.fn();
+const mockUploadAndAnalyzeAudio = jest.fn();
+const mockUpdateMaterialWithMetadata = jest.fn();
+jest.mock('@/lib/actions/materials', () => ({
+  getMaterial: (...args: unknown[]) => mockGetMaterial(...args),
+  uploadAndAnalyzeAudio: (...args: unknown[]) => mockUploadAndAnalyzeAudio(...args),
+  updateMaterialWithMetadata: (...args: unknown[]) => mockUpdateMaterialWithMetadata(...args),
+}));
 
 // useNotificationのモック
 const mockNotifyError = jest.fn();
@@ -85,13 +94,20 @@ let user: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   user = userEvent.setup();
-  fetchMock.resetMocks();
+  mockGetMaterial.mockClear();
+  mockUploadAndAnalyzeAudio.mockClear();
+  mockUpdateMaterialWithMetadata.mockClear();
   mockRouterPush.mockClear();
   mockRouterBack.mockClear();
   mockUseParams.mockReturnValue({ slug: 'test-slug' });
   mockNotifyError.mockClear();
   mockNotifySuccess.mockClear();
-  fetchMock.mockResponseOnce(JSON.stringify(mockMaterialData));
+
+  // デフォルトのServer Action成功レスポンス
+  mockGetMaterial.mockResolvedValue({
+    success: true,
+    data: mockMaterialData,
+  });
 });
 
 describe('EditMaterialPage', () => {
@@ -183,11 +199,11 @@ describe('EditMaterialPage', () => {
       expect(screen.getByText('Equipment: eq-1, eq-2')).toBeInTheDocument();
     });
 
-    // PUT用のレスポンスを設定
-    fetchMock.mockResponseOnce(
-      JSON.stringify({ material: { ...mockMaterialData, title: 'Updated Title via Test' } }),
-      { status: 200 },
-    );
+    // Server Action成功レスポンスを設定
+    mockUpdateMaterialWithMetadata.mockResolvedValueOnce({
+      success: true,
+      data: { ...mockMaterialData, title: 'Updated Title via Test' },
+    });
 
     // フォームをsubmitイベントで送信
     const form = screen.getByTestId('edit-material-form');
@@ -197,30 +213,16 @@ describe('EditMaterialPage', () => {
 
     // フォーム送信後の処理を待つ
     await waitFor(() => {
-      // 更新APIが呼ばれたことを確認
-      const updateCall = fetchMock.mock.calls.find((call) => {
-        return (
-          typeof call[0] === 'string' &&
-          call[0].includes('/api/materials/') &&
-          call[1]?.method === 'PUT'
-        );
-      });
-
-      if (!updateCall) {
-        // デバッグ用: 全てのfetchコールを出力
-        console.log('All fetch calls:', fetchMock.mock.calls);
-        throw new Error('PUT call not found');
-      }
-
-      expect(updateCall).toBeDefined();
-
-      // JSONボディの内容を確認
-      const body = JSON.parse(updateCall[1]?.body as string);
-      expect(body.title).toBe('Updated Title via Test');
-      expect(body.recordedAt).toBe(new Date(newRecordedAt).toISOString());
-      // equipmentIdsは初期状態では['1', '2']だが、ボタンクリックで['eq-1', 'eq-2']に変更される
-      expect(body.equipmentIds).toBeDefined();
-      expect(Array.isArray(body.equipmentIds)).toBe(true);
+      // Server Actionが呼ばれたことを確認（複数回呼ばれる可能性を考慮）
+      expect(mockUpdateMaterialWithMetadata).toHaveBeenCalled();
+      expect(mockUpdateMaterialWithMetadata).toHaveBeenLastCalledWith(
+        'test-slug',
+        expect.objectContaining({
+          title: 'Updated Title via Test',
+          recordedAt: new Date(newRecordedAt).toISOString(),
+          equipmentIds: ['eq-1', 'eq-2'],
+        }),
+      );
     });
     await waitFor(() => {
       expect(mockNotifySuccess).toHaveBeenCalledWith('update', 'material');
@@ -238,18 +240,19 @@ describe('EditMaterialPage', () => {
       expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument(),
     );
 
-    // 一時ファイルアップロードとメタデータ解析のモック
-    fetchMock.mockResponseOnce(JSON.stringify({ tempFileId: 'temp-123' }), { status: 200 }); // upload-temp
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    // Server Action成功レスポンスをモック
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: true,
+      tempFileId: 'temp-123',
+      fileName: 'new-audio.mp3',
+      metadata: {
         fileFormat: 'MP3',
         sampleRate: 44100,
         bitDepth: 16,
         durationSeconds: 120,
         channels: 2,
-      }),
-      { status: 200 },
-    ); // analyze-audio
+      },
+    });
 
     const file = new File(['dummy content'], 'new-audio.mp3', { type: 'audio/mpeg' });
     const fileInput = screen.getByLabelText(/select new audio file/i);
@@ -263,25 +266,32 @@ describe('EditMaterialPage', () => {
       expect(screen.getByText('✓ File uploaded and analyzed successfully')).toBeInTheDocument();
     });
 
-    // 更新APIのモック
-    fetchMock.mockResponseOnce(
-      JSON.stringify({ material: { ...mockMaterialData, filePath: 'new-audio.mp3' } }),
-      { status: 200 },
-    );
+    // 更新のServer Actionモック
+    mockUpdateMaterialWithMetadata.mockResolvedValueOnce({
+      success: true,
+      data: { ...mockMaterialData, filePath: 'new-audio.mp3' },
+    });
 
     const form = screen.getByTestId('edit-material-form');
     fireEvent.submit(form);
 
     await waitFor(() => {
-      // 更新APIが呼ばれたことを確認
-      const updateCall = fetchMock.mock.calls.find((call) => call[1]?.method === 'PUT');
-      expect(updateCall).toBeDefined();
-
-      // JSONボディの内容を確認
-      const body = JSON.parse(updateCall![1]?.body as string);
-      expect(body.tempFileId).toBe('temp-123');
-      expect(body.fileName).toBe('new-audio.mp3');
-      expect(body.replaceFile).toBe(true);
+      // Server Actionが呼ばれたことを確認（複数回呼ばれる可能性を考慮）
+      expect(mockUpdateMaterialWithMetadata).toHaveBeenCalled();
+      expect(mockUpdateMaterialWithMetadata).toHaveBeenLastCalledWith(
+        'test-slug',
+        expect.objectContaining({
+          tempFileId: 'temp-123',
+          fileName: 'new-audio.mp3',
+          metadata: {
+            fileFormat: 'MP3',
+            sampleRate: 44100,
+            bitDepth: 16,
+            durationSeconds: 120,
+            channels: 2,
+          },
+        }),
+      );
     });
 
     await waitFor(() => {
@@ -293,8 +303,7 @@ describe('EditMaterialPage', () => {
   });
 
   it('handles fetch error when loading initial data', async () => {
-    fetchMock.resetMocks();
-    fetchMock.mockRejectOnce(new Error('Network Error'));
+    mockGetMaterial.mockRejectedValueOnce(new Error('Network Error'));
     await act(async () => {
       render(<EditMaterialPage />);
     });
@@ -329,8 +338,8 @@ describe('EditMaterialPage', () => {
       expect(errorMessage).toHaveTextContent(/Title is required/i);
     });
 
-    // APIが呼ばれないことを確認
-    expect(global.fetch).toHaveBeenCalledTimes(1); // Initial fetch only
+    // Server Actionが呼ばれないことを確認
+    expect(mockUpdateMaterialWithMetadata).not.toHaveBeenCalled();
     expect(mockNotifySuccess).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
@@ -360,8 +369,8 @@ describe('EditMaterialPage', () => {
       expect(errorMessage).toHaveTextContent(/Recorded At is required/i);
     });
 
-    // APIが呼ばれないことを確認
-    expect(global.fetch).toHaveBeenCalledTimes(1); // Initial fetch only
+    // Server Actionが呼ばれないことを確認
+    expect(mockUpdateMaterialWithMetadata).not.toHaveBeenCalled();
     expect(mockNotifySuccess).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
@@ -402,20 +411,25 @@ describe('EditMaterialPage', () => {
       fireEvent.change(recordedAtInput, { target: { value: inputValue } });
     });
     expect(recordedAtInput.value).toBe(inputValue);
-    fetchMock.mockResponseOnce(JSON.stringify({ material: mockMaterialData }), { status: 200 });
+
+    mockUpdateMaterialWithMetadata.mockResolvedValueOnce({
+      success: true,
+      data: mockMaterialData,
+    });
+
     const form = screen.getByTestId('edit-material-form');
     fireEvent.submit(form);
-    await waitFor(() => {
-      // 更新APIが呼ばれたことを確認
-      const updateCall = fetchMock.mock.calls.find((call) => call[1]?.method === 'PUT');
-      expect(updateCall).toBeDefined();
 
-      // JSONボディの内容を確認
-      const body = JSON.parse(updateCall![1]?.body as string);
-      const expectedSubmittedDate = new Date(inputValue).toISOString();
-      expect(body.recordedAt).toBe(expectedSubmittedDate);
+    await waitFor(() => {
+      // Server Actionが呼ばれたことを確認（複数回呼ばれる可能性を考慮）
+      expect(mockUpdateMaterialWithMetadata).toHaveBeenCalled();
+      expect(mockUpdateMaterialWithMetadata).toHaveBeenLastCalledWith(
+        'test-slug',
+        expect.objectContaining({
+          recordedAt: new Date(inputValue).toISOString(),
+        }),
+      );
     });
-    // const requestBody = (fetchMock.mock.calls[1][1]?.body as FormData); // 未使用のためコメントアウト
   });
 
   it('navigates back when back button is clicked', async () => {
@@ -449,13 +463,13 @@ describe('EditMaterialPage', () => {
   });
 
   it('handles invalid date format when setting recordedAt', async () => {
-    fetchMock.resetMocks();
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    mockGetMaterial.mockResolvedValueOnce({
+      success: true,
+      data: {
         ...mockMaterialData,
         recordedDate: 'invalid-date',
-      }),
-    );
+      },
+    });
 
     await act(async () => {
       render(<EditMaterialPage />);
@@ -470,13 +484,13 @@ describe('EditMaterialPage', () => {
   });
 
   it('handles null recordedDate when setting initial values', async () => {
-    fetchMock.resetMocks();
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    mockGetMaterial.mockResolvedValueOnce({
+      success: true,
+      data: {
         ...mockMaterialData,
         recordedDate: null,
-      }),
-    );
+      },
+    });
 
     await act(async () => {
       render(<EditMaterialPage />);

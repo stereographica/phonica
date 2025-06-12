@@ -1,9 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NewMaterialPage from '../page';
-import fetchMock from 'jest-fetch-mock'; // jest-fetch-mock をインポート
-
-fetchMock.enableMocks(); // jest-fetch-mock を有効化
 
 // next/navigation のモック
 const mockRouterPush = jest.fn();
@@ -13,8 +10,13 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-// fetch API のモック は jest-fetch-mock が行うので削除
-// global.fetch = jest.fn();
+// Server Actions のモック
+const mockUploadAndAnalyzeAudio = jest.fn();
+const mockCreateMaterialWithMetadata = jest.fn();
+jest.mock('@/lib/actions/materials', () => ({
+  uploadAndAnalyzeAudio: (...args: unknown[]) => mockUploadAndAnalyzeAudio(...args),
+  createMaterialWithMetadata: (...args: unknown[]) => mockCreateMaterialWithMetadata(...args),
+}));
 
 // window.alert のモック
 global.alert = jest.fn();
@@ -50,7 +52,8 @@ jest.mock('@/components/materials/EquipmentMultiSelect', () => ({
 describe('NewMaterialPage', () => {
   beforeEach(() => {
     // 各テストの前にモックをリセット
-    fetchMock.resetMocks(); // jest-fetch-mock のリセットメソッドを使用
+    mockUploadAndAnalyzeAudio.mockClear();
+    mockCreateMaterialWithMetadata.mockClear();
     mockRouterPush.mockClear(); // router.push のモックもクリア
     (global.alert as jest.Mock).mockClear(); // alert のモックもクリア
     mockNotifyError.mockClear();
@@ -99,27 +102,19 @@ describe('NewMaterialPage', () => {
   });
 
   test('uploads file and extracts metadata', async () => {
-    // Upload temp API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
-        tempFileId: 'test-temp-id',
-        fileName: 'test.mp3',
-        fileSize: 1024000,
-      }),
-      { status: 200 },
-    );
-
-    // Analyze audio API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    // Server Action success response
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: true,
+      tempFileId: 'test-temp-id',
+      fileName: 'test.mp3',
+      metadata: {
         fileFormat: 'MP3',
         sampleRate: 44100,
         bitDepth: null,
         durationSeconds: 180.5,
         channels: 2,
-      }),
-      { status: 200 },
-    );
+      },
+    });
 
     render(<NewMaterialPage />);
 
@@ -162,30 +157,24 @@ describe('NewMaterialPage', () => {
   });
 
   test('submits the form successfully with metadata', async () => {
-    // Upload temp API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
-        tempFileId: 'test-temp-id',
-        fileName: 'test.wav',
-        fileSize: 1024000,
-      }),
-      { status: 200 },
-    );
-
-    // Analyze audio API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    // Server Action success responses
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: true,
+      tempFileId: 'test-temp-id',
+      fileName: 'test.wav',
+      metadata: {
         fileFormat: 'WAV',
         sampleRate: 48000,
         bitDepth: 24,
         durationSeconds: 120,
         channels: 1,
-      }),
-      { status: 200 },
-    );
+      },
+    });
 
-    // Material creation API success response
-    fetchMock.mockResponseOnce(JSON.stringify({ id: 'new-id', slug: 'new-slug' }), { status: 201 });
+    mockCreateMaterialWithMetadata.mockResolvedValueOnce({
+      success: true,
+      data: { id: 'new-id', slug: 'new-slug' },
+    });
 
     const user = userEvent.setup();
     render(<NewMaterialPage />);
@@ -230,32 +219,27 @@ describe('NewMaterialPage', () => {
     // フォームを送信
     await submitForm();
 
-    // APIが呼ばれるまで待つ
+    // Server Actionが呼ばれるまで待つ
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(3); // upload, analyze, create
+      expect(mockCreateMaterialWithMetadata).toHaveBeenCalledTimes(1);
     });
 
-    // 正しいパラメータでAPIが呼ばれたか確認
-    const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
-    expect(lastCall[0]).toBe('/api/materials');
-    expect(lastCall[1]?.method).toBe('POST');
-    expect((lastCall[1]?.headers as Record<string, string>)?.['Content-Type']).toBe(
-      'application/json',
+    // 正しいパラメータでServer Actionが呼ばれたか確認
+    expect(mockCreateMaterialWithMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Test Material',
+        tempFileId: 'test-temp-id',
+        fileName: 'test.wav',
+        tags: ['tag1', 'tag2'],
+        metadata: {
+          fileFormat: 'WAV',
+          sampleRate: 48000,
+          bitDepth: 24,
+          durationSeconds: 120,
+          channels: 1,
+        },
+      }),
     );
-
-    // bodyの内容を検証
-    const bodyData = JSON.parse(lastCall[1]?.body as string);
-    expect(bodyData.title).toBe('Test Material');
-    expect(bodyData.tempFileId).toBe('test-temp-id');
-    expect(bodyData.fileName).toBe('test.wav');
-    expect(bodyData.tags).toEqual(['tag1', 'tag2']);
-    expect(bodyData.metadata).toEqual({
-      fileFormat: 'WAV',
-      sampleRate: 48000,
-      bitDepth: 24,
-      durationSeconds: 120,
-      channels: 1,
-    });
 
     // 成功時の処理を確認
     await waitFor(() => {
@@ -265,19 +249,10 @@ describe('NewMaterialPage', () => {
   });
 
   test('handles API error on metadata extraction', async () => {
-    // Upload temp API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
-        tempFileId: 'test-temp-id',
-        fileName: 'test.wav',
-        fileSize: 1024000,
-      }),
-      { status: 200 },
-    );
-
-    // Analyze audio API error response
-    fetchMock.mockResponseOnce(JSON.stringify({ error: 'Failed to extract metadata' }), {
-      status: 500,
+    // Server Action error response
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: false,
+      error: 'Failed to extract metadata',
     });
 
     const user = userEvent.setup();
@@ -307,27 +282,18 @@ describe('NewMaterialPage', () => {
     const recordedAtInput = screen.getByLabelText(/recorded at/i) as HTMLInputElement;
 
     // Note: ファイルアップロードとメタデータ抽出をモック
-    // Upload temp API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
-        tempFileId: 'test-temp-id',
-        fileName: 'date.wav',
-        fileSize: 1024000,
-      }),
-      { status: 200 },
-    );
-
-    // Analyze audio API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: true,
+      tempFileId: 'test-temp-id',
+      fileName: 'date.wav',
+      metadata: {
         fileFormat: 'WAV',
         sampleRate: 48000,
         bitDepth: 24,
         durationSeconds: 120,
         channels: 2,
-      }),
-      { status: 200 },
-    );
+      },
+    });
 
     // ファイルを選択
     const fileInput = screen.getByLabelText(/select audio file/i);
@@ -367,38 +333,30 @@ describe('NewMaterialPage', () => {
       expect(alert).toHaveTextContent(/Invalid date format for Recorded At/i);
     });
 
-    // APIは呼ばれない（upload/analyze以外）
-    expect(fetchMock).toHaveBeenCalledTimes(2); // upload and analyze only
+    // Server Actionは呼ばれない（upload/analyze以外）
+    expect(mockCreateMaterialWithMetadata).not.toHaveBeenCalled();
     expect(global.alert).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
   test('submits all form fields', async () => {
-    // Upload temp API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
-        tempFileId: 'test-temp-id',
-        fileName: 'full_form.mp3',
-        fileSize: 2048000,
-      }),
-      { status: 200 },
-    );
-
-    // Analyze audio API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    // Server Action success responses
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: true,
+      tempFileId: 'test-temp-id',
+      fileName: 'full_form.mp3',
+      metadata: {
         fileFormat: 'MP3',
         sampleRate: 48000,
         bitDepth: null,
         durationSeconds: 240,
         channels: 2,
-      }),
-      { status: 200 },
-    );
+      },
+    });
 
-    // API成功時のレスポンスをモック
-    fetchMock.mockResponseOnce(JSON.stringify({ id: 'full-id', slug: 'full-slug' }), {
-      status: 201,
+    mockCreateMaterialWithMetadata.mockResolvedValueOnce({
+      success: true,
+      data: { id: 'full-id', slug: 'full-slug' },
     });
 
     const user = userEvent.setup();
@@ -446,38 +404,33 @@ describe('NewMaterialPage', () => {
     // フォーム送信
     await submitForm();
 
-    // APIが呼ばれるまで待つ
+    // Server Actionが呼ばれるまで待つ
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(3); // upload, analyze, create
+      expect(mockCreateMaterialWithMetadata).toHaveBeenCalledTimes(1);
     });
 
-    // 正しいパラメータでAPIが呼ばれたか確認
-    const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
-    expect(lastCall[0]).toBe('/api/materials');
-    expect(lastCall[1]?.method).toBe('POST');
-    expect((lastCall[1]?.headers as Record<string, string>)?.['Content-Type']).toBe(
-      'application/json',
+    // 正しいパラメータでServer Actionが呼ばれたか確認
+    expect(mockCreateMaterialWithMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Full Form Test',
+        tempFileId: 'test-temp-id',
+        fileName: 'full_form.mp3',
+        memo: 'This is a full test memo.',
+        tags: ['ambient', 'field recording', 'test'],
+        equipmentIds: ['equipment-1', 'equipment-2'],
+        latitude: 35.123,
+        longitude: 139.456,
+        locationName: 'Test Location',
+        rating: 5,
+        metadata: {
+          fileFormat: 'MP3',
+          sampleRate: 48000,
+          bitDepth: null,
+          durationSeconds: 240,
+          channels: 2,
+        },
+      }),
     );
-
-    // bodyの内容を検証
-    const bodyData = JSON.parse(lastCall[1]?.body as string);
-    expect(bodyData.title).toBe('Full Form Test');
-    expect(bodyData.tempFileId).toBe('test-temp-id');
-    expect(bodyData.fileName).toBe('full_form.mp3');
-    expect(bodyData.memo).toBe('This is a full test memo.');
-    expect(bodyData.tags).toEqual(['ambient', 'field recording', 'test']);
-    expect(bodyData.equipmentIds).toEqual(['equipment-1', 'equipment-2']);
-    expect(bodyData.latitude).toBe(35.123);
-    expect(bodyData.longitude).toBe(139.456);
-    expect(bodyData.locationName).toBe('Test Location');
-    expect(bodyData.rating).toBe(5);
-    expect(bodyData.metadata).toEqual({
-      fileFormat: 'MP3',
-      sampleRate: 48000,
-      bitDepth: null,
-      durationSeconds: 240,
-      channels: 2,
-    });
 
     // 成功時の処理を確認
     await waitFor(() => {
@@ -506,33 +459,25 @@ describe('NewMaterialPage', () => {
   });
 
   test('handles duplicate title error (409)', async () => {
-    // Upload temp API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
-        tempFileId: 'test-temp-id',
-        fileName: 'duplicate.wav',
-        fileSize: 1024000,
-      }),
-      { status: 200 },
-    );
-
-    // Analyze audio API success response
-    fetchMock.mockResponseOnce(
-      JSON.stringify({
+    // Server Action success response for upload
+    mockUploadAndAnalyzeAudio.mockResolvedValueOnce({
+      success: true,
+      tempFileId: 'test-temp-id',
+      fileName: 'duplicate.wav',
+      metadata: {
         fileFormat: 'WAV',
         sampleRate: 48000,
         bitDepth: 24,
         durationSeconds: 120,
         channels: 1,
-      }),
-      { status: 200 },
-    );
+      },
+    });
 
-    // Material creation API error response (409 - duplicate title)
-    fetchMock.mockResponseOnce(
-      JSON.stringify({ error: 'そのタイトルの素材は既に存在しています' }),
-      { status: 409 },
-    );
+    // Server Action error response for create (duplicate title)
+    mockCreateMaterialWithMetadata.mockResolvedValueOnce({
+      success: false,
+      error: 'そのタイトルの素材は既に存在しています',
+    });
 
     const user = userEvent.setup();
     render(<NewMaterialPage />);
@@ -565,9 +510,9 @@ describe('NewMaterialPage', () => {
     // フォームを送信
     await submitForm();
 
-    // APIが呼ばれるまで待つ
+    // Server Actionが呼ばれるまで待つ
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(3); // upload, analyze, create
+      expect(mockCreateMaterialWithMetadata).toHaveBeenCalledTimes(1);
     });
 
     // notifyErrorが正しいエラーメッセージで呼ばれることを確認
