@@ -189,7 +189,7 @@ jobs:
           NODE_ENV: test
           CI: true
         run: |
-          npm run e2e -- --project=${{ matrix.browser }} --workers=1 --reporter=dot
+          npm run e2e:ci -- --project=${{ matrix.browser }} --workers=1 --reporter=dot
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
