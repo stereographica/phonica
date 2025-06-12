@@ -29,7 +29,7 @@ npx prisma generate      # Generate Prisma Client
 ### 🚀 Basic Execution
 
 ```bash
-npm run e2e              # Run all E2E tests in parallel (recommended)
+npm run e2e              # Run all E2E tests with optimized database setup (recommended)
 npm run e2e:with-report  # Run tests and open HTML report
 ```
 
@@ -62,7 +62,7 @@ npm run e2e -- --grep "Equipment.*validation"
 
 ### ⚠️ Notes
 
-- `npm run e2e` uses parallel execution for faster test runs
+- `npm run e2e` uses optimized database setup for 10x faster test execution
 - CI environment automatically limits workers to 1 for stability
 - Use feature-specific tests only when testing specific functionality
 
