@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react'; // Added Loader2 for progress
 import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
 import { useNotification } from '@/hooks/use-notification';
+import { uploadAndAnalyzeAudio, createMaterialWithMetadata } from '@/lib/actions/materials';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 // Audio metadata type
 interface AudioMetadata {
@@ -55,41 +57,20 @@ export default function NewMaterialPage() {
 
       // Start async upload and metadata extraction
       try {
-        // Step 1: Upload temporary file
+        // Server Actionを使用してファイルアップロードとメタデータ抽出
         setUploadProgress('uploading');
         const formData = new FormData();
         formData.append('file', file);
 
-        const uploadResponse = await fetch('/api/materials/upload-temp', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.error || 'Failed to upload file');
-        }
-
-        const uploadData = await uploadResponse.json();
-        setTempFileId(uploadData.tempFileId);
-
-        // Step 2: Analyze audio metadata
         setUploadProgress('analyzing');
-        const analyzeResponse = await fetch('/api/materials/analyze-audio', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ tempFileId: uploadData.tempFileId }),
-        });
+        const result = await uploadAndAnalyzeAudio(formData);
 
-        if (!analyzeResponse.ok) {
-          const errorData = await analyzeResponse.json();
-          throw new Error(errorData.error || 'Failed to analyze audio');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to process file');
         }
 
-        const metadataData = await analyzeResponse.json();
-        setMetadata(metadataData);
+        setTempFileId(result.tempFileId!);
+        setMetadata(result.metadata!);
         setUploadProgress('ready');
       } catch (err) {
         console.error('File processing error:', err);
@@ -139,11 +120,11 @@ export default function NewMaterialPage() {
 
     setIsSubmitting(true);
 
-    // Prepare JSON data for new API
+    // Prepare data for Server Action
     const requestData = {
       title: title.trim(),
-      tempFileId,
-      fileName,
+      tempFileId: tempFileId!,
+      fileName: fileName,
       recordedAt: recordedAtISO,
       memo: memo || null,
       tags: tagsInput
@@ -157,32 +138,25 @@ export default function NewMaterialPage() {
       longitude: longitude ? Number(longitude) : null,
       locationName: locationName || null,
       rating: rating ? Number(rating) : null,
-      metadata, // Include extracted metadata
+      metadata: metadata!, // Include extracted metadata
     };
 
     try {
-      // Use new JSON API
-      const response = await fetch('/api/materials', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
+      // Use Server Action
+      const result = await createMaterialWithMetadata(requestData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        // エラーオブジェクトにstatusを含める
-        const errorWithStatus = {
-          ...errorData,
-          status: response.status,
-          message: errorData.error || `HTTP error! status: ${response.status}`,
-        };
-        throw errorWithStatus;
+      if (!result.success) {
+        // エラーハンドリング
+        if (result.error === ERROR_MESSAGES.MATERIAL_TITLE_EXISTS) {
+          const errorWithStatus = {
+            error: result.error,
+            status: 409,
+            message: result.error,
+          };
+          throw errorWithStatus;
+        }
+        throw new Error(result.error || 'Failed to create material');
       }
-
-      // JSONレスポンスは不要
-      await response.json();
 
       // 成功通知を表示
       notifySuccess('create', 'material');

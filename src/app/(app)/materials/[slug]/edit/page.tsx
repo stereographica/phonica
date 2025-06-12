@@ -11,6 +11,12 @@ import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react';
 import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
 import { useNotification } from '@/hooks/use-notification';
 import { AudioMetadata } from '@/lib/audio-metadata';
+import {
+  getMaterial,
+  uploadAndAnalyzeAudio,
+  updateMaterialWithMetadata,
+} from '@/lib/actions/materials';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 // APIから返される素材データの型 (GET /api/materials/[slug] のレスポンスに合わせる)
 interface MaterialData {
@@ -86,12 +92,11 @@ export default function EditMaterialPage() {
     setInitialLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/materials/${currentSlug}`);
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Failed to fetch material data');
+      const result = await getMaterial(currentSlug);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch material data');
       }
-      const data: MaterialData = await response.json();
+      const data = result.data as MaterialData;
       setMaterial(data);
       setTitle(data.title || '');
       setRecordedAt(formatDateForInput(data.recordedDate));
@@ -148,37 +153,19 @@ export default function EditMaterialPage() {
       setError(null);
 
       try {
-        // 一時ファイルをアップロード
+        // Server Actionを使用してファイルアップロードとメタデータ抽出
         const uploadFormData = new FormData();
         uploadFormData.append('file', file);
 
-        const uploadResponse = await fetch('/api/materials/upload-temp', {
-          method: 'POST',
-          body: uploadFormData,
-        });
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.error || 'Failed to upload file');
-        }
-
-        const uploadData = await uploadResponse.json();
-        setTempFileId(uploadData.tempFileId);
         setUploadProgress('analyzing');
+        const result = await uploadAndAnalyzeAudio(uploadFormData);
 
-        // メタデータを解析
-        const analyzeResponse = await fetch('/api/materials/analyze-audio', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tempFileId: uploadData.tempFileId }),
-        });
-
-        if (!analyzeResponse.ok) {
-          throw new Error('Failed to analyze audio metadata');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to process file');
         }
 
-        const metadataResult = await analyzeResponse.json();
-        setMetadata(metadataResult);
+        setTempFileId(result.tempFileId!);
+        setMetadata(result.metadata!);
         setUploadProgress('ready');
       } catch (err) {
         console.error('File processing error:', err);
@@ -226,8 +213,8 @@ export default function EditMaterialPage() {
     }
 
     try {
-      // JSONベースのリクエストを準備
-      const requestData: Record<string, unknown> = {
+      // Server Action用のデータを準備
+      const requestData = {
         title: title.trim(),
         recordedAt: recordedAtISO,
         memo: memo || null,
@@ -242,30 +229,29 @@ export default function EditMaterialPage() {
         longitude: longitude ? parseFloat(String(longitude)) : null,
         locationName: locationName || null,
         rating: rating ? parseInt(String(rating)) : null,
+        // 新しいファイルがアップロードされた場合
+        ...(selectedFile && tempFileId && metadata
+          ? {
+              tempFileId,
+              fileName,
+              metadata,
+            }
+          : {}),
       };
 
-      // 新しいファイルがアップロードされた場合
-      if (selectedFile && tempFileId) {
-        requestData.tempFileId = tempFileId;
-        requestData.fileName = fileName;
-        requestData.replaceFile = true; // 既存ファイルを置き換える
-      }
+      const result = await updateMaterialWithMetadata(slugFromParams, requestData);
 
-      const response = await fetch(`/api/materials/${slugFromParams}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        // エラーオブジェクトにstatusを含める（新規作成ページと同じ構造にする）
-        throw {
-          status: response.status,
-          error: errorData.error || `HTTP error! status: ${response.status}`,
-        };
+      if (!result.success) {
+        // エラーハンドリング
+        if (result.error === ERROR_MESSAGES.MATERIAL_TITLE_EXISTS) {
+          const errorWithStatus = {
+            error: result.error,
+            status: 409,
+            message: result.error,
+          };
+          throw errorWithStatus;
+        }
+        throw new Error(result.error || 'Failed to update material');
       }
 
       // 成功時のみページ遷移と成功通知を行う

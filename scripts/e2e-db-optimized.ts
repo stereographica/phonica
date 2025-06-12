@@ -90,6 +90,19 @@ export async function createTemplateDatabase() {
   });
 
   try {
+    // 既存のテンプレートデータベースがある場合、まずテンプレートフラグを解除
+    try {
+      await prisma.$executeRawUnsafe(`
+        UPDATE pg_database 
+        SET datistemplate = false 
+        WHERE datname = '${E2E_TEMPLATE_DB_NAME}'
+      `);
+      console.log(`✅ Unfroze existing template database: ${E2E_TEMPLATE_DB_NAME}`);
+    } catch {
+      // データベースが存在しない場合は無視
+      console.log('ℹ️ No existing template database to unfreeze');
+    }
+
     // 既存のテンプレートデータベースを削除
     await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${E2E_TEMPLATE_DB_NAME}`);
     console.log(`✅ Dropped existing template database: ${E2E_TEMPLATE_DB_NAME}`);
