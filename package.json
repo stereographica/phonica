@@ -41,7 +41,7 @@
     "prepare": "husky"
   },
   "overrides": {
-    "brace-expansion": "^4.0.1"
+    "brace-expansion": "^2.0.1"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.0",
