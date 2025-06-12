@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ToastHelper } from '../helpers';
+import { ToastHelper, WaitHelper } from '../helpers';
 import * as path from 'path';
 
 test.describe('エラーハンドリング機能', () => {
@@ -54,7 +54,8 @@ test.describe('エラーハンドリング機能', () => {
 
       // WebKit/Firefoxでは追加の待機が必要
       if (browserName === 'webkit' || browserName === 'firefox') {
-        await page.waitForTimeout(1000);
+        const wait = new WaitHelper(page);
+        await wait.waitForBrowserStability();
       }
 
       // Firefoxの場合は要素を再取得して確実にクリック
@@ -189,7 +190,8 @@ test.describe('エラーハンドリング機能', () => {
 
       // WebKit/Firefoxでは追加の待機が必要
       if (browserName === 'webkit' || browserName === 'firefox') {
-        await page.waitForTimeout(1000);
+        const wait = new WaitHelper(page);
+        await wait.waitForBrowserStability();
       }
 
       // Firefoxの場合は要素を再取得して確実にクリック

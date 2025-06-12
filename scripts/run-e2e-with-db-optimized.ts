@@ -1,19 +1,25 @@
-import { spawn } from 'child_process';
-import { setupE2EEnvironment, cleanupE2EEnvironment, E2E_DATABASE_URL } from './e2e-db-setup';
+import { spawn, ChildProcess } from 'child_process';
+import {
+  setupOptimizedE2EEnvironment,
+  cleanupE2EDatabase,
+  E2E_DATABASE_URL,
+} from './e2e-db-optimized';
 
 /**
- * E2Eテストを実行（データベースのセットアップ・クリーンアップ付き）
+ * E2Eテストを実行（最適化されたデータベースセットアップ付き）
  */
 async function runE2ETests() {
-  let testProcess: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  let serverProcess: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  let testProcess: ChildProcess | undefined;
+  let serverProcess: ChildProcess | undefined;
 
   try {
-    console.log('🚀 Starting E2E test suite with database setup...\n');
+    console.log('🚀 Starting E2E test suite with optimized database setup...\n');
 
-    // 1. E2E環境のセットアップ
-    await setupE2EEnvironment();
-    console.log('\n');
+    // 1. 最適化されたE2E環境のセットアップ
+    const setupStart = Date.now();
+    await setupOptimizedE2EEnvironment();
+    const setupDuration = Date.now() - setupStart;
+    console.log(`⚡ Database setup completed in ${(setupDuration / 1000).toFixed(2)}s\n`);
 
     // 2. 開発サーバーを起動（E2E用データベースを使用）
     console.log('🌐 Starting development server with E2E database...');
@@ -31,7 +37,7 @@ async function runE2ETests() {
     await new Promise((resolve) => {
       let serverReady = false;
 
-      serverProcess.stdout?.on('data', (data: Buffer) => {
+      serverProcess!.stdout?.on('data', (data: Buffer) => {
         const output = data.toString();
         console.log(`[Server] ${output.trim()}`);
 
@@ -44,11 +50,11 @@ async function runE2ETests() {
         // Next.jsの起動完了を検知
         if (output.includes('Ready in') || output.includes('✓ Ready')) {
           serverReady = true;
-          setTimeout(resolve, 1000); // 待機時間を短縮
+          setTimeout(resolve, 500); // 待機時間を短縮
         }
       });
 
-      serverProcess.stderr?.on('data', (data: Buffer) => {
+      serverProcess!.stderr?.on('data', (data: Buffer) => {
         const error = data.toString().trim();
         console.error(`[Server Error] ${error}`);
 
@@ -61,13 +67,13 @@ async function runE2ETests() {
         }
       });
 
-      // タイムアウト設定
+      // タイムアウト設定（短縮）
       setTimeout(() => {
         if (!serverReady) {
           console.log('⚠️  Server startup timeout, proceeding with tests...');
           resolve(undefined);
         }
-      }, 30000);
+      }, 20000); // 30秒から20秒に短縮
     });
 
     console.log('\n📋 Running E2E tests...\n');
@@ -85,7 +91,7 @@ async function runE2ETests() {
 
     // テストの完了を待つ
     const testExitCode = await new Promise<number>((resolve) => {
-      testProcess.on('close', (code: number) => {
+      testProcess!.on('close', (code: number) => {
         resolve(code || 0);
       });
     });
@@ -109,8 +115,8 @@ async function runE2ETests() {
 
       // プロセスの終了を待つ
       await new Promise((resolve) => {
-        serverProcess.on('close', resolve);
-        setTimeout(resolve, 5000); // タイムアウト
+        serverProcess!.on('close', resolve);
+        setTimeout(resolve, 3000); // タイムアウトを短縮
       });
     }
 
@@ -120,7 +126,7 @@ async function runE2ETests() {
     }
 
     // データベースをクリーンアップ
-    await cleanupE2EEnvironment();
+    await cleanupE2EDatabase();
 
     console.log('✅ Cleanup completed');
   }

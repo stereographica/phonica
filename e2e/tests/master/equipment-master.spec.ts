@@ -1,17 +1,19 @@
 import { test, expect } from '../../fixtures/test-fixtures';
-import { NavigationHelper, FormHelper, ModalHelper, TableHelper } from '../../helpers';
+import { NavigationHelper, FormHelper, ModalHelper, TableHelper, WaitHelper } from '../../helpers';
 
 test.describe('@master @critical Equipment Master', () => {
   let navigation: NavigationHelper;
   let form: FormHelper;
   let modal: ModalHelper;
   let table: TableHelper;
+  let wait: WaitHelper;
 
   test.beforeEach(async ({ page }) => {
     navigation = new NavigationHelper(page);
     form = new FormHelper(page);
     modal = new ModalHelper(page);
     table = new TableHelper(page);
+    wait = new WaitHelper(page);
     await navigation.goToEquipmentMasterPage();
   });
 
@@ -57,7 +59,9 @@ test.describe('@master @critical Equipment Master', () => {
     await modal.waitForClose();
 
     // 新しい機材がテーブルに表示されることを確認（first()で最初の要素を選択）
-    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('Can edit equipment (via dropdown menu)', async ({ page }) => {
@@ -65,26 +69,26 @@ test.describe('@master @critical Equipment Master', () => {
     // まず新しい機材を作成
     await page.click('button:has-text("Add Equipment")');
     await modal.waitForOpen();
-    
+
     // ユニークな機材名を生成（タイムスタンプを含めて一意性を保証）
     const timestamp = Date.now();
     const uniqueEquipmentName = `E2E Test Edit Equipment ${timestamp}`;
     const editedEquipmentName = `Edited Equipment ${timestamp}`;
-    
+
     // フォームに入力
     await form.fillByLabel('Name', uniqueEquipmentName);
     await form.fillByLabel('Type', 'Recorder');
     await form.fillByLabel('Manufacturer', 'TestBrand');
     await form.fillTextareaByLabel('Memo', 'Equipment to be edited');
-    
+
     // 保存
     await modal.clickButton('Add Equipment');
     await modal.waitForClose();
-    
+
     // 新しい機材が表示されるまで待機
     const newEquipmentCell = page.locator(`td:has-text("${uniqueEquipmentName}")`).first();
     await expect(newEquipmentCell).toBeVisible({ timeout: 10000 });
-    
+
     // その行のアクションメニューを開く
     const equipmentRow = page.locator('tbody tr').filter({ hasText: uniqueEquipmentName });
     const actionButton = equipmentRow.locator('button:has(.sr-only:text("Open menu"))');
@@ -107,11 +111,14 @@ test.describe('@master @critical Equipment Master', () => {
     await modal.clickButton('Save');
 
     // 編集APIの完了を待つ（catchでタイムアウトを防ぐ）
-    const editResponse = await page.waitForResponse(response => 
-      response.url().includes('/api/master/equipment/') && 
-      response.request().method() === 'PUT'
-    ).catch(() => null);
-    
+    const editResponse = await page
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/api/master/equipment/') &&
+          response.request().method() === 'PUT',
+      )
+      .catch(() => null);
+
     if (!editResponse || editResponse.status() !== 200) {
       console.error('Edit API failed or timed out');
       if (editResponse) {
@@ -125,7 +132,10 @@ test.describe('@master @critical Equipment Master', () => {
       await modal.waitForClose();
     } catch (e) {
       // エラーメッセージが表示されている場合、モーダルを手動で閉じる
-      const errorMessage = await page.locator('[role="dialog"] [role="alert"]').textContent().catch(() => '');
+      const errorMessage = await page
+        .locator('[role="dialog"] [role="alert"]')
+        .textContent()
+        .catch(() => '');
       if (errorMessage) {
         console.error('Equipment edit failed with error:', errorMessage);
         // Cancelボタンまたは閉じるボタンをクリック
@@ -142,12 +152,15 @@ test.describe('@master @critical Equipment Master', () => {
     }
 
     // データの再取得を待つ（タイムアウトを短くして、失敗してもテストを続行）
-    const getResponse = await page.waitForResponse(response => 
-      response.url().includes('/api/master/equipment') && 
-      response.request().method() === 'GET' &&
-      response.status() === 200,
-      { timeout: 3000 }
-    ).catch(() => null);
+    const getResponse = await page
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/api/master/equipment') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 3000 },
+      )
+      .catch(() => null);
 
     // レスポンスが取得できない場合は手動でページを更新
     if (!getResponse) {
@@ -157,10 +170,13 @@ test.describe('@master @critical Equipment Master', () => {
     }
 
     // 少し待機してDOMの更新を確実にする
-    await page.waitForTimeout(500);
-    
+    await wait.waitForBrowserStability();
+
     // 編集が反映されない場合はページをリロード
-    const editedVisible = await page.locator(`td:has-text("${editedEquipmentName}")`).first().isVisible();
+    const editedVisible = await page
+      .locator(`td:has-text("${editedEquipmentName}")`)
+      .first()
+      .isVisible();
     if (!editedVisible) {
       console.log('Equipment not visible after edit, reloading page...');
       await page.reload();
@@ -169,8 +185,10 @@ test.describe('@master @critical Equipment Master', () => {
     }
 
     // 変更が反映されることを確認（first()で最初の要素を選択）
-    await expect(page.locator(`td:has-text("${editedEquipmentName}")`).first()).toBeVisible({ timeout: 10000 });
-    
+    await expect(page.locator(`td:has-text("${editedEquipmentName}")`).first()).toBeVisible({
+      timeout: 10000,
+    });
+
     // 元の名前が表示されていないことを確認
     await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).not.toBeVisible();
   });
@@ -178,20 +196,22 @@ test.describe('@master @critical Equipment Master', () => {
   test('Can delete equipment (via dropdown menu)', async ({ page, browserName }) => {
     // テスト用の機材を作成（削除テスト用）
     const uniqueEquipmentName = `Delete Test Equipment ${browserName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // 新しい機材を作成
     await page.click('button:has-text("Add Equipment")');
     await modal.waitForOpen();
-    
+
     await page.fill('[role="dialog"] input[name="name"]', uniqueEquipmentName);
     await page.fill('[role="dialog"] input[name="type"]', 'Test Type');
     await page.fill('[role="dialog"] input[name="manufacturer"]', 'Test Manufacturer');
     await modal.clickButton('Add Equipment');
     await modal.waitForClose();
-    
+
     // 作成した機材が表示されるまで待機
-    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).toBeVisible({ timeout: 10000 });
-    
+    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).toBeVisible({
+      timeout: 10000,
+    });
+
     // 作成した機材の行を取得
     const targetRow = page.locator(`tbody tr:has(td:has-text("${uniqueEquipmentName}"))`);
 
@@ -201,29 +221,33 @@ test.describe('@master @critical Equipment Master', () => {
 
     // 削除オプションをクリック
     // confirmダイアログのハンドラーを設定
-    page.on('dialog', async dialog => {
+    page.on('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Are you sure you want to delete this equipment?');
       await dialog.accept();
     });
-    
+
     await page.click('[role="menuitem"]:has-text("Delete")');
 
     // 削除APIの完了を待つ
-    const deleteResponse = await page.waitForResponse(response => 
-      response.url().includes('/api/master/equipment/') && 
-      response.request().method() === 'DELETE'
+    const deleteResponse = await page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/master/equipment/') &&
+        response.request().method() === 'DELETE',
     );
 
     // 削除が成功したことを確認
     expect(deleteResponse.status()).toBe(200);
 
     // データの再取得を待つ（削除後の自動更新）
-    const refreshResponse = await page.waitForResponse(response => 
-      response.url().includes('/api/master/equipment') && 
-      response.request().method() === 'GET' &&
-      response.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => null);
+    const refreshResponse = await page
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/api/master/equipment') &&
+          response.request().method() === 'GET' &&
+          response.status() === 200,
+        { timeout: 5000 },
+      )
+      .catch(() => null);
 
     // 自動更新されない場合は手動でリロード
     if (!refreshResponse) {
@@ -233,7 +257,9 @@ test.describe('@master @critical Equipment Master', () => {
     }
 
     // 削除された機材が表示されなくなることを確認
-    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).not.toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('Shows error when required fields are empty', async ({ page }) => {
@@ -241,45 +267,49 @@ test.describe('@master @critical Equipment Master', () => {
     await page.click('button:has-text("Add Equipment")');
 
     await modal.waitForOpen();
-    
+
     // 保存ボタンを確認（初期状態では無効化されている）
     const saveButton = page.locator('[role="dialog"] button[type="submit"]');
-    
+
     // react-hook-formのmodeがonChangeの場合、フィールドにフォーカスして離れるとエラーが表示される
     // modeがonSubmitの場合は、submitボタンクリック時のみエラーが表示される
-    
+
     // Nameフィールドにフォーカスして離れる
     const nameInput = page.locator('[role="dialog"] input[name="name"]');
     await nameInput.focus();
     await nameInput.blur();
-    
+
     // Typeフィールドにフォーカスして離れる
     const typeInput = page.locator('[role="dialog"] input[name="type"]');
     await typeInput.focus();
     await typeInput.blur();
-    
+
     // 少し待機（react-hook-formのバリデーション処理のため）
-    await page.waitForTimeout(1000);
-    
+    await wait.waitForBrowserStability();
+
     // FormMessageコンポーネントはgrid内でcol-span-4とtext-rightクラスを持つ
-    const nameErrorLocator = page.locator('[role="dialog"] .col-span-4.text-right').filter({ hasText: 'Name is required.' });
-    const typeErrorLocator = page.locator('[role="dialog"] .col-span-4.text-right').filter({ hasText: 'Type is required.' });
-    
+    const nameErrorLocator = page
+      .locator('[role="dialog"] .col-span-4.text-right')
+      .filter({ hasText: 'Name is required.' });
+    const typeErrorLocator = page
+      .locator('[role="dialog"] .col-span-4.text-right')
+      .filter({ hasText: 'Type is required.' });
+
     // エラーメッセージが表示されているか確認
     // ただし、modeがonSubmitの場合は表示されない可能性がある
     const nameErrorVisible = await nameErrorLocator.isVisible().catch(() => false);
     const typeErrorVisible = await typeErrorLocator.isVisible().catch(() => false);
-    
+
     if (!nameErrorVisible || !typeErrorVisible) {
       // onSubmitモードの場合、送信を試みる
       // ボタンが無効化されているかチェック
       const isDisabled = await saveButton.isDisabled();
-      
+
       if (!isDisabled) {
         // ボタンが有効な場合はクリックしてエラーを表示
         await saveButton.click();
-        await page.waitForTimeout(500);
-        
+        await wait.waitForBrowserStability();
+
         // エラーメッセージを再度確認
         await expect(nameErrorLocator).toBeVisible({ timeout: 5000 });
         await expect(typeErrorLocator).toBeVisible({ timeout: 5000 });
@@ -293,7 +323,7 @@ test.describe('@master @critical Equipment Master', () => {
       await expect(nameErrorLocator).toBeVisible();
       await expect(typeErrorLocator).toBeVisible();
     }
-    
+
     // モーダルが開いたままであることを確認
     await expect(page.locator('[role="dialog"]')).toBeVisible();
   });

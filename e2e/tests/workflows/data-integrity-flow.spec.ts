@@ -5,6 +5,7 @@ import {
   ModalHelper,
   TableHelper,
   CrossBrowserHelper,
+  WaitHelper,
 } from '../../helpers';
 import * as path from 'path';
 
@@ -15,6 +16,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
   let modal: ModalHelper;
   let table: TableHelper;
   let crossBrowser: CrossBrowserHelper;
+  let wait: WaitHelper;
 
   test.beforeEach(async ({ page }) => {
     navigation = new NavigationHelper(page);
@@ -22,6 +24,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
     modal = new ModalHelper(page);
     table = new TableHelper(page);
     crossBrowser = new CrossBrowserHelper(page);
+    wait = new WaitHelper(page);
   });
 
   test('素材とマスタデータの整合性チェック', async ({ page, browserName }) => {
@@ -138,19 +141,20 @@ test.describe('@workflow Data Integrity Workflow', () => {
     if (browserName === 'webkit') {
       console.log(`${browserName}: Waiting for data synchronization with extended timeout...`);
       // WebKitでは特に長い待機時間が必要
-      await page.waitForTimeout(15000); // WebKitでは15秒待機
+      await wait.waitForNetworkStable({ timeout: 15000 });
+      await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
 
       // 複数回リロードして確実にデータを取得
       for (let i = 0; i < 3; i++) {
         await page.reload({ waitUntil: 'networkidle' });
-        await page.waitForTimeout(3000);
+        await wait.waitForNetworkStable({ timeout: 3000 });
       }
     } else {
       // Chromiumでは通常の処理
-      await page.waitForTimeout(2000);
+      await wait.waitForNetworkStable({ timeout: 2000 });
       await page.reload();
       await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(1000);
+      await wait.waitForDataLoad({ minRows: 1, timeout: 2000 });
     }
 
     // Chromiumでのみ以下の処理を実行（FirefoxとWebKitはすでにスキップ済み）
@@ -166,7 +170,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
       await page.click('button:has-text("Apply Filters")');
       await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(1000);
+      await wait.waitForDataLoad({ minRows: 1, timeout: 2000 });
 
       // 素材の表示を確認
       await expect(page.locator(`button:has-text("${uniqueMaterialTitle}")`)).toBeVisible({
@@ -237,7 +241,8 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     // ページが完全に読み込まれるまで待機
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000); // 追加の待機
+    await wait.waitForNetworkStable({ timeout: 2000 });
+    await wait.waitForDataLoad({ minRows: 1 });
 
     // Chromiumでのみ以下の処理を実行（FirefoxとWebKitはすでにスキップ済み）
     if (browserName === 'chromium') {
@@ -245,7 +250,8 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
       // ページをリロードして最新データを取得
       await page.reload({ waitUntil: 'networkidle' });
-      await page.waitForTimeout(3000); // 長めの待機
+      await wait.waitForNetworkStable({ timeout: 3000 });
+      await wait.waitForDataLoad({ minRows: 1 });
 
       // タイトルフィルターの存在を確認してから入力
       const titleFilter2 = page.locator('input#titleFilter');
@@ -261,7 +267,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
       if (await clearFilter.isVisible({ timeout: 2000 }).catch(() => false)) {
         await clearFilter.clear();
         await page.click('button:has-text("Apply Filters")');
-        await page.waitForTimeout(3000);
+        await wait.waitForNetworkStable({ timeout: 3000 });
       }
 
       for (let attempt = 0; attempt < maxSearchAttempts; attempt++) {
@@ -271,9 +277,9 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
         // 2回目以降はページをリロード
         if (attempt > 0) {
-          await page.waitForTimeout(5000); // 長めの待機
+          await wait.waitForNetworkStable({ timeout: 5000 });
           await page.reload({ waitUntil: 'networkidle' });
-          await page.waitForTimeout(3000);
+          await wait.waitForNetworkStable({ timeout: 3000 });
         }
 
         // 複数の方法で素材を探す
@@ -352,7 +358,8 @@ test.describe('@workflow Data Integrity Workflow', () => {
         // 最後の手段: ページを完全にリロード
         console.log(`${browserName}: Final attempt - navigating to materials page directly`);
         await page.goto('/materials', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(5000);
+        await wait.waitForNetworkStable({ timeout: 5000 });
+        await wait.waitForDataLoad({ minRows: 1 });
 
         const finalCheck = await page
           .locator(`button:has-text("${uniqueMaterialTitle}")`)
@@ -490,7 +497,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // 3. 素材詳細でタグが正しく表示されることを確認
     // Firefoxでは追加の待機が必要
     if (browserName === 'firefox') {
-      await page.waitForTimeout(1000);
+      await wait.waitForBrowserStability();
     }
 
     // ボタンを確実に取得してクリック
@@ -510,7 +517,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     // Firefoxでは長めのタイムアウトを設定
     if (browserName === 'firefox') {
-      await page.waitForTimeout(500);
+      await wait.waitForBrowserStability();
     }
 
     await crossBrowser.waitForModalOpen();
@@ -586,7 +593,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // WebKitでは追加の待機が必要（WebKitはすでにスキップ済み）
     // browserNameはすでにパラメータとして受け取っている
     if (browserName === 'firefox') {
-      await page.waitForTimeout(3000);
+      await wait.waitForNetworkStable({ timeout: 3000 });
       // ページをリロードして最新のデータを取得
       await page.reload();
       await page.waitForLoadState('networkidle');
@@ -612,13 +619,41 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // Firefoxでは追加の待機とスクロールが必要な場合がある
     // browserNameはすでにパラメータとして受け取っている
     if (browserName === 'firefox') {
-      await page.waitForTimeout(1000);
-      // スクロールしてボタンを確実に表示
-      await materialButton.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
+      await wait.waitForBrowserStability();
+      // 要素が安定するまで再試行
+      let clicked = false;
+      for (let i = 0; i < 3; i++) {
+        try {
+          // ボタンを再取得
+          const freshButton = page.locator(`button:has-text("${uniqueMaterialTitle}")`).first();
+          // 要素が存在することを確認
+          await expect(freshButton).toBeVisible({ timeout: 5000 });
+          // スクロールを試みる（エラーが出ても続行）
+          try {
+            await freshButton.scrollIntoViewIfNeeded();
+          } catch (scrollError) {
+            console.log('Scroll failed, continuing without scroll:', scrollError);
+          }
+          await wait.waitForBrowserStability();
+          await freshButton.click();
+          clicked = true;
+          break;
+        } catch (error) {
+          console.log(
+            `Attempt ${i + 1} failed:`,
+            error instanceof Error ? error.message : String(error),
+          );
+          if (i < 2) {
+            await page.waitForTimeout(1000);
+          }
+        }
+      }
+      if (!clicked) {
+        throw new Error(`Failed to click material button after 3 attempts`);
+      }
+    } else {
+      await materialButton.click();
     }
-
-    await materialButton.click();
 
     // モーダルが開くのを待つ（Firefoxでは特に時間がかかる場合がある）
     await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: 15000 });
@@ -695,7 +730,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     // Firefoxではモーダルが完全に閉じるまで追加の待機が必要
     if (browserName === 'firefox') {
-      await page.waitForTimeout(1000);
+      await wait.waitForBrowserStability();
     }
 
     // モーダルが確実に閉じていることを確認
@@ -717,9 +752,9 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     // ブラウザごとに待機時間を調整
     if (browserName === 'firefox') {
-      await page.waitForTimeout(500);
+      await wait.waitForBrowserStability();
     } else if (browserName === 'webkit') {
-      await page.waitForTimeout(1000);
+      await wait.waitForBrowserStability();
     }
 
     await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
@@ -740,7 +775,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
       }
 
       // 削除確認ダイアログが表示される可能性があるので待機
-      await page.waitForTimeout(1000);
+      await wait.waitForBrowserStability();
 
       // URLが変わるか、モーダルが閉じるのを待つ
       try {
@@ -757,11 +792,11 @@ test.describe('@workflow Data Integrity Workflow', () => {
           console.log('ℹ️ Delete operation did not complete - modal still open');
           await page.keyboard.press('Escape');
           // より確実にモーダルが閉じるまで待機
-          await page.waitForTimeout(500);
+          await wait.waitForBrowserStability();
           // それでもモーダルが開いている場合は、もう一度Escapeを押す
           if (await page.locator('[role="dialog"]').isVisible()) {
             await page.keyboard.press('Escape');
-            await page.waitForTimeout(500);
+            await wait.waitForBrowserStability();
           }
           // モーダルがまだ閉じない場合はテストを続行
           console.log('ℹ️ Modal may still be open, continuing test');

@@ -21,8 +21,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : 3, // 並列度を3に減らして安定性を向上
+  /* Optimized worker configuration */
+  workers: process.env.CI ? 1 : 4, // CI環境では安定性優先で1、ローカルでは4並列で高速化
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
     ? [['list'], ['json', { outputFile: 'test-results/results.json' }]]
@@ -55,21 +55,64 @@ export default defineConfig({
     timeout: 10 * 1000, // 10 seconds for expect assertions
   },
 
-  /* Configure projects for major browsers */
+  /* Configure projects for major browsers with optimized settings */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Chrome固有の最適化
+        launchOptions: {
+          args: ['--disable-dev-shm-usage', '--no-sandbox'],
+        },
+      },
     },
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        // Firefox固有の最適化
+        launchOptions: {
+          firefoxUserPrefs: {
+            'dom.ipc.processCount': 8,
+            'network.http.max-persistent-connections-per-server': 10,
+          },
+        },
+      },
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: {
+        ...devices['Desktop Safari'],
+        // WebKit固有の設定
+      },
+    },
+
+    // テストグループごとのプロジェクト（並列実行の最適化）
+    {
+      name: 'smoke-tests',
+      testMatch: '**/*smoke*.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    {
+      name: 'material-tests',
+      testMatch: '**/materials/*.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    {
+      name: 'master-tests',
+      testMatch: '**/master/*.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    {
+      name: 'workflow-tests',
+      testMatch: '**/workflows/*.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
     },
 
     /* Test against mobile viewports. */
