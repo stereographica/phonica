@@ -49,7 +49,7 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // 新規プロジェクトボタンをクリック
     await page.getByTestId('new-project-button').click();
-    await await modal.waitForOpen();
+    await modal.waitForOpen();
 
     // フォームに入力
     const timestamp = Date.now();
@@ -88,7 +88,7 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // まず新規プロジェクトを作成
     await page.getByTestId('new-project-button').click();
-    await await modal.waitForOpen();
+    await modal.waitForOpen();
 
     const timestamp = Date.now();
     const originalName = `Original Project ${timestamp}`;
@@ -109,7 +109,7 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // 編集をクリック
     await page.getByRole('menuitem', { name: /Edit Project/i }).click();
-    await await modal.waitForOpen();
+    await modal.waitForOpen();
 
     // プロジェクト情報を更新
     const updatedName = `Updated Project ${timestamp}`;
@@ -137,7 +137,7 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // 新規プロジェクトを作成
     await page.getByTestId('new-project-button').click();
-    await await modal.waitForOpen();
+    await modal.waitForOpen();
 
     const timestamp = Date.now();
     const projectName = `Material Test Project ${timestamp}`;
@@ -162,7 +162,7 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // 削除用のプロジェクトを作成
     await page.getByTestId('new-project-button').click();
-    await await modal.waitForOpen();
+    await modal.waitForOpen();
 
     const timestamp = Date.now();
     const projectName = `Delete Test Project ${timestamp}`;
@@ -211,7 +211,7 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     for (const project of projects) {
       await page.getByTestId('new-project-button').click();
-      await await modal.waitForOpen();
+      await modal.waitForOpen();
 
       await page.locator('input[placeholder*="Nature Sound Collection"]').fill(project.name);
       await page
@@ -220,8 +220,13 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
       await modal.clickButton('Create Project');
       await modal.waitForClose();
 
-      // 作成後の待機
-      await page.waitForTimeout(500);
+      // 作成されたプロジェクトがDOMに反映されるまで待機
+      await page.waitForSelector(
+        `[data-testid*="${project.name.toLowerCase().replace(/\s+/g, '-')}"]`,
+        {
+          timeout: 5000,
+        },
+      );
     }
 
     // フィルタを適用
