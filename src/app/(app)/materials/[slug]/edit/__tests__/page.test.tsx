@@ -60,6 +60,37 @@ jest.mock('@/components/materials/EquipmentMultiSelect', () => ({
   },
 }));
 
+// StarRatingのモック
+jest.mock('@/components/ui/star-rating', () => ({
+  StarRating: ({
+    value,
+    onChange,
+    id,
+  }: {
+    value: number;
+    onChange: (value: number) => void;
+    id?: string;
+  }) => {
+    return (
+      <div data-testid="star-rating" id={id} role="radiogroup" aria-label="Rating">
+        {[1, 2, 3, 4, 5].map((rating) => (
+          <button
+            key={rating}
+            data-testid={`star-${rating}`}
+            onClick={() => onChange(rating)}
+            aria-label={`${rating} star${rating !== 1 ? 's' : ''}`}
+            type="button"
+            role="radio"
+            aria-checked={rating <= value}
+          >
+            {rating <= value ? '★' : '☆'}
+          </button>
+        ))}
+      </div>
+    );
+  },
+}));
+
 // FileとFormDataはjest.setup.tsでモックされている
 
 const mockMaterialData = {
@@ -146,9 +177,11 @@ describe('EditMaterialPage', () => {
     expect(screen.getByTestId('equipment-multi-select')).toBeInTheDocument();
     expect(screen.getByText('Equipment: 1, 2')).toBeInTheDocument();
     expect(screen.getByLabelText(/memo/i)).toHaveValue(mockMaterialData.memo);
-    expect((screen.getByLabelText(/rating/i) as HTMLInputElement).value).toBe(
-      mockMaterialData.rating.toString(),
-    );
+    // 星評価の表示確認 (4つ星が選択されている)
+    expect(screen.getByTestId('star-rating')).toBeInTheDocument();
+    // 4つ星まで塗りつぶされている
+    expect(screen.getByTestId('star-4')).toHaveTextContent('★');
+    expect(screen.getByTestId('star-5')).toHaveTextContent('☆');
     expect(screen.getByText(`Current file: ${mockMaterialData.filePath}`)).toBeInTheDocument();
   });
 
@@ -199,6 +232,10 @@ describe('EditMaterialPage', () => {
       expect(screen.getByText('Equipment: eq-1, eq-2')).toBeInTheDocument();
     });
 
+    // 評価を変更 (3つ星をクリック)
+    const thirdStar = screen.getByTestId('star-3');
+    await user.click(thirdStar);
+
     // Server Action成功レスポンスを設定
     mockUpdateMaterialWithMetadata.mockResolvedValueOnce({
       success: true,
@@ -221,6 +258,7 @@ describe('EditMaterialPage', () => {
           title: 'Updated Title via Test',
           recordedAt: new Date(newRecordedAt).toISOString(),
           equipmentIds: ['eq-1', 'eq-2'],
+          rating: 3,
         }),
       );
     });
@@ -502,5 +540,158 @@ describe('EditMaterialPage', () => {
     const recordedAtInput = screen.getByLabelText(/recorded at/i) as HTMLInputElement;
     // Null date should result in empty value
     expect(recordedAtInput.value).toBe('');
+  });
+
+  describe('StarRating Integration', () => {
+    it('displays StarRating component with existing rating value', async () => {
+      // 既存の素材に4つ星評価が設定されている場合
+      mockGetMaterial.mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...mockMaterialData,
+          rating: 4,
+        },
+      });
+
+      await act(async () => {
+        render(<EditMaterialPage />);
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument(),
+      );
+
+      // StarRatingコンポーネントが表示されることを確認
+      const starRating = screen.getByRole('radiogroup', { name: /rating/i });
+      expect(starRating).toBeInTheDocument();
+
+      // 星のボタンが5つ表示されることを確認
+      const starButtons = screen.getAllByRole('radio');
+      expect(starButtons).toHaveLength(5);
+
+      // 既存の評価（4つ星）が正しく表示されることを確認
+      expect(screen.getByLabelText('1 star')).toHaveTextContent('★');
+      expect(screen.getByLabelText('2 stars')).toHaveTextContent('★');
+      expect(screen.getByLabelText('3 stars')).toHaveTextContent('★');
+      expect(screen.getByLabelText('4 stars')).toHaveTextContent('★');
+      expect(screen.getByLabelText('5 stars')).toHaveTextContent('☆');
+    });
+
+    it('displays StarRating component with no rating (null)', async () => {
+      // 既存の素材に評価が設定されていない場合
+      mockGetMaterial.mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...mockMaterialData,
+          rating: null,
+        },
+      });
+
+      await act(async () => {
+        render(<EditMaterialPage />);
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument(),
+      );
+
+      // StarRatingコンポーネントが表示されることを確認
+      const starRating = screen.getByRole('radiogroup', { name: /rating/i });
+      expect(starRating).toBeInTheDocument();
+
+      // 初期状態では全ての星が空であることを確認
+      const starButtons = screen.getAllByRole('radio');
+      starButtons.forEach((star) => {
+        expect(star).toHaveTextContent('☆');
+      });
+    });
+
+    it('allows rating modification via star clicks', async () => {
+      mockGetMaterial.mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...mockMaterialData,
+          rating: 3, // 初期値は3つ星
+        },
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EditMaterialPage />);
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument(),
+      );
+
+      // 初期状態（3つ星）を確認
+      expect(screen.getByLabelText('1 star')).toHaveTextContent('★');
+      expect(screen.getByLabelText('2 stars')).toHaveTextContent('★');
+      expect(screen.getByLabelText('3 stars')).toHaveTextContent('★');
+      expect(screen.getByLabelText('4 stars')).toHaveTextContent('☆');
+      expect(screen.getByLabelText('5 stars')).toHaveTextContent('☆');
+
+      // 5つ星に変更
+      const fifthStar = screen.getByLabelText('5 stars');
+      await user.click(fifthStar);
+
+      // 評価が5に更新されることを確認
+      await waitFor(() => {
+        expect(screen.getByLabelText('1 star')).toHaveTextContent('★');
+        expect(screen.getByLabelText('2 stars')).toHaveTextContent('★');
+        expect(screen.getByLabelText('3 stars')).toHaveTextContent('★');
+        expect(screen.getByLabelText('4 stars')).toHaveTextContent('★');
+        expect(screen.getByLabelText('5 stars')).toHaveTextContent('★');
+      });
+    });
+
+    it('includes modified rating value in form submission', async () => {
+      mockGetMaterial.mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...mockMaterialData,
+          rating: 2, // 初期値は2つ星
+        },
+      });
+
+      mockUpdateMaterialWithMetadata.mockResolvedValueOnce({
+        success: true,
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EditMaterialPage />);
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument(),
+      );
+
+      // 4つ星に変更
+      const fourthStar = screen.getByLabelText('4 stars');
+      await user.click(fourthStar);
+
+      // 評価が4に更新されることを確認
+      await waitFor(() => {
+        expect(screen.getByLabelText('4 stars')).toHaveTextContent('★');
+        expect(screen.getByLabelText('5 stars')).toHaveTextContent('☆');
+      });
+
+      // フォームを送信
+      const updateButton = screen.getByRole('button', { name: /update material/i });
+      await user.click(updateButton);
+
+      // Server Actionが正しい引数で呼ばれることを確認
+      await waitFor(() => {
+        expect(mockUpdateMaterialWithMetadata).toHaveBeenCalledWith(
+          'test-slug',
+          expect.objectContaining({
+            rating: 4, // 修正された評価値が含まれる
+          }),
+        );
+      });
+    });
   });
 });

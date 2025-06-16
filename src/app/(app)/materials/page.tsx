@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PlusCircle, Search, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MaterialDetailModal } from '@/components/materials/MaterialDetailModal';
+import { StarRating } from '@/components/ui/star-rating';
 import { Material } from '@/types/material';
 
 interface ApiResponse {
@@ -37,7 +38,7 @@ function MaterialsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  
+
   // State
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,15 +52,15 @@ function MaterialsPageContent() {
     totalPages: 1,
     totalItems: 0,
   });
-  
+
   // Filter state
   const [tempTitleFilter, setTempTitleFilter] = useState(searchParams.get('title') || '');
   const [tempTagFilter, setTempTagFilter] = useState(searchParams.get('tag') || '');
-  
+
   // Get current sort params (for future use)
   // const currentSortBy = searchParams.get('sortBy') || 'recordedAt';
   // const currentSortOrder = searchParams.get('sortOrder') || 'desc';
-  
+
   // Update temp filters when URL changes
   useEffect(() => {
     setTempTitleFilter(searchParams.get('title') || '');
@@ -67,33 +68,33 @@ function MaterialsPageContent() {
     // Reset navigation state when URL changes
     setIsNavigating(false);
   }, [searchParams]);
-  
+
   // Fetch materials
   const fetchMaterials = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       // Build query params from URL
       const params = new URLSearchParams();
-      
+
       // Add all search params to the API call
       searchParams.forEach((value, key) => {
         params.set(key, value);
       });
-      
+
       // Set defaults if not present
       if (!params.has('page')) params.set('page', '1');
       if (!params.has('limit')) params.set('limit', '10');
       if (!params.has('sortBy')) params.set('sortBy', 'recordedAt');
       if (!params.has('sortOrder')) params.set('sortOrder', 'desc');
-      
+
       const response = await fetch(`/api/materials?${params.toString()}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data: ApiResponse = await response.json();
       setMaterials(data.data);
       setPagination(data.pagination);
@@ -104,75 +105,75 @@ function MaterialsPageContent() {
       setIsLoading(false);
     }
   }, [searchParams]);
-  
+
   // Fetch materials when component mounts or searchParams change
   useEffect(() => {
     fetchMaterials();
   }, [fetchMaterials]);
-  
+
   // Handlers
   const handleMaterialClick = (slug: string) => {
     setSelectedMaterialSlug(slug);
     setIsDetailModalOpen(true);
   };
-  
+
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedMaterialSlug(null);
   };
-  
+
   const handleApplyFilters = () => {
     const params = new URLSearchParams(searchParams);
-    
+
     // Update or remove title filter
     if (tempTitleFilter) {
       params.set('title', tempTitleFilter);
     } else {
       params.delete('title');
     }
-    
+
     // Update or remove tag filter
     if (tempTagFilter) {
       params.set('tag', tempTagFilter);
     } else {
       params.delete('tag');
     }
-    
+
     // Reset to page 1 when filters change
     params.set('page', '1');
-    
+
     // Update URL
     router.replace(`${pathname}?${params.toString()}`);
   };
-  
+
   const handleSortChange = (sortBy: string, sortOrder: string) => {
     const params = new URLSearchParams(searchParams);
     params.set('sortBy', sortBy);
     params.set('sortOrder', sortOrder);
-    
+
     // Update URL
     router.replace(`${pathname}?${params.toString()}`);
   };
-  
+
   const handlePageChange = (newPage: number) => {
     // Prevent navigation if already navigating or on the requested page
     if (isNavigating) {
       return;
     }
-    
+
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     if (currentPage === newPage) {
       return;
     }
-    
+
     setIsNavigating(true);
     const params = new URLSearchParams(searchParams);
     params.set('page', newPage.toString());
-    
+
     // Update URL
     router.replace(`${pathname}?${params.toString()}`);
   };
-  
+
   // Format date for display
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ja-JP', {
@@ -183,7 +184,7 @@ function MaterialsPageContent() {
       minute: '2-digit',
     });
   };
-  
+
   // Render loading state
   if (isLoading) {
     return (
@@ -192,7 +193,7 @@ function MaterialsPageContent() {
       </div>
     );
   }
-  
+
   // Render error state
   if (error) {
     return (
@@ -201,7 +202,7 @@ function MaterialsPageContent() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -213,7 +214,7 @@ function MaterialsPageContent() {
           </Button>
         </Link>
       </div>
-      
+
       {/* Filter Section */}
       <div className="mb-6 p-4 border rounded-lg bg-card text-card-foreground shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -247,12 +248,10 @@ function MaterialsPageContent() {
           </Button>
         </div>
       </div>
-      
+
       {/* Sort Controls */}
       <div className="mb-4 flex justify-between items-center">
-        <div className="text-sm text-muted-foreground">
-          {pagination.totalItems} materials found
-        </div>
+        <div className="text-sm text-muted-foreground">{pagination.totalItems} materials found</div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
@@ -276,11 +275,9 @@ function MaterialsPageContent() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      
+
       {materials.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          No materials found
-        </div>
+        <div className="text-center py-8 text-gray-500">No materials found</div>
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -289,6 +286,7 @@ function MaterialsPageContent() {
                 <TableHead>Title</TableHead>
                 <TableHead>Recorded At</TableHead>
                 <TableHead>Tags</TableHead>
+                <TableHead>Rating</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -307,25 +305,23 @@ function MaterialsPageContent() {
                   <TableCell>
                     <div className="flex gap-1 flex-wrap">
                       {material.tags.map((tag) => (
-                        <span
-                          key={tag.id}
-                          className="px-2 py-1 text-xs bg-gray-100 rounded"
-                        >
+                        <span key={tag.id} className="px-2 py-1 text-xs bg-gray-100 rounded">
                           {tag.name}
                         </span>
                       ))}
                     </div>
                   </TableCell>
                   <TableCell>
-                    {/* Actions will be added later */}
+                    <StarRating value={material.rating || 0} readOnly size="sm" />
                   </TableCell>
+                  <TableCell>{/* Actions will be added later */}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
-      
+
       {/* Pagination Controls */}
       {pagination.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-4">
@@ -338,11 +334,11 @@ function MaterialsPageContent() {
             <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
-          
+
           <div className="text-sm text-muted-foreground">
             Page {pagination.page} of {pagination.totalPages}
           </div>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -354,7 +350,7 @@ function MaterialsPageContent() {
           </Button>
         </div>
       )}
-      
+
       <MaterialDetailModal
         isOpen={isDetailModalOpen}
         materialSlug={selectedMaterialSlug}

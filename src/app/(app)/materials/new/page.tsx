@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 // import { Checkbox } from '@/components/ui/checkbox'; // Not used yet
 import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react'; // Added Loader2 for progress
 import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
+import { StarRating } from '@/components/ui/star-rating';
 import { useNotification } from '@/hooks/use-notification';
 import { uploadAndAnalyzeAudio, createMaterialWithMetadata } from '@/lib/actions/materials';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
@@ -34,7 +35,7 @@ export default function NewMaterialPage() {
   const [latitude, setLatitude] = useState<number | string>('');
   const [longitude, setLongitude] = useState<number | string>('');
   const [locationName, setLocationName] = useState('');
-  const [rating, setRating] = useState<number | string>('');
+  const [rating, setRating] = useState<number>(0);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
 
   // New states for metadata extraction
@@ -137,7 +138,7 @@ export default function NewMaterialPage() {
       latitude: latitude ? Number(latitude) : null,
       longitude: longitude ? Number(longitude) : null,
       locationName: locationName || null,
-      rating: rating ? Number(rating) : null,
+      rating: rating > 0 ? rating : null,
       metadata: metadata!, // Include extracted metadata
     };
 
@@ -372,15 +373,12 @@ export default function NewMaterialPage() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rating">Rating (1-5)</Label>
-            <Input
+            <Label htmlFor="rating">Rating</Label>
+            <StarRating
               id="rating"
-              type="number"
-              min="1"
-              max="5"
               value={rating}
-              onChange={(e) => setRating(e.target.value)}
-              placeholder="e.g., 4"
+              onChange={(value) => setRating(value)}
+              size="lg"
             />
           </div>
         </div>

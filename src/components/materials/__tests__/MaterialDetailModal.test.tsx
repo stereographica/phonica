@@ -26,7 +26,7 @@ jest.mock('next/navigation', () => ({
     replace: jest.fn(),
     refresh: jest.fn(),
   }),
-  usePathname: () => '/', 
+  usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -44,14 +44,22 @@ jest.mock('@/hooks/use-notification', () => ({
 jest.mock('next/dynamic', () => ({
   __esModule: true,
   default: <T extends Record<string, unknown>>(
-    loader: () => Promise<{ default: React.ComponentType<T> }>, 
-    options?: { loading?: () => React.ReactNode }
+    loader: () => Promise<{ default: React.ComponentType<T> }>,
+    options?: { loading?: () => React.ReactNode },
   ) => {
     // loader is a function that returns a Promise to the component.
     const LazyComponent = React.lazy(loader);
-    
+
     const DynamicMockComponent = (props: T) => (
-      <React.Suspense fallback={options?.loading ? options.loading() : <div data-testid="dynamic-fallback">Loading...</div>}>
+      <React.Suspense
+        fallback={
+          options?.loading ? (
+            options.loading()
+          ) : (
+            <div data-testid="dynamic-fallback">Loading...</div>
+          )
+        }
+      >
         <LazyComponent {...props} />
       </React.Suspense>
     );
@@ -71,32 +79,51 @@ const MockMap = () => <div data-testid="mock-map">Mock Map Component</div>;
 MockMap.displayName = 'MockMap';
 jest.mock('@/components/maps/MaterialLocationMap', () => MockMap, { virtual: true });
 
-const MockAudioPlayer = ({ audioUrl }: { audioUrl: string }) => <div data-testid="mock-audio-player">Mock Audio Player Component: {audioUrl}</div>;
+const MockAudioPlayer = ({ audioUrl }: { audioUrl: string }) => (
+  <div data-testid="mock-audio-player">Mock Audio Player Component: {audioUrl}</div>
+);
 MockAudioPlayer.displayName = 'MockAudioPlayer';
 jest.mock('@/components/audio/AudioPlayer', () => MockAudioPlayer, { virtual: true });
 
+// StarRating のモック
+jest.mock(
+  '@/components/ui/star-rating',
+  () => ({
+    StarRating: ({ value }: { value: number; readOnly?: boolean }) => (
+      <div data-testid="star-rating" aria-label={`Rating: ${value} out of 5 stars`}>
+        {Array.from({ length: 5 }, (_, i) => (
+          <span key={i} data-testid={`star-${i + 1}`}>
+            {i < value ? '★' : '☆'}
+          </span>
+        ))}
+      </div>
+    ),
+  }),
+  { virtual: true },
+);
+
 // Ensure mockMaterial is defined
 const mockMaterial = {
-  id: "test-id-1",
-  slug: "test-slug-1",
-  title: "Test Material Title",
-  description: "Test description",
-  recordedDate: "2023-01-15T10:30:00Z",
-  categoryName: "Test Category",
+  id: 'test-id-1',
+  slug: 'test-slug-1',
+  title: 'Test Material Title',
+  description: 'Test description',
+  recordedDate: '2023-01-15T10:30:00Z',
+  categoryName: 'Test Category',
   tags: [{ id: 't1', name: 'Tag1', slug: 'tag1' }],
-  filePath: "/test/audio.wav",
-  fileFormat: "WAV",
+  filePath: '/test/audio.wav',
+  fileFormat: 'WAV',
   sampleRate: 48000,
   bitDepth: 16,
   latitude: 35.123,
   longitude: 139.456,
-  locationName: "Test Location",
+  locationName: 'Test Location',
   rating: 4,
-  notes: "Test notes",
+  notes: 'Test notes',
   equipments: [{ id: 'e1', name: 'Mic XYZ', type: 'Microphone', manufacturer: 'AudioCorp' }],
-  createdAt: "2023-01-15T10:30:00Z",
-  updatedAt: "2023-01-15T10:30:00Z",
-  downloadUrl: "/api/materials/test-slug-1/download"
+  createdAt: '2023-01-15T10:30:00Z',
+  updatedAt: '2023-01-15T10:30:00Z',
+  downloadUrl: '/api/materials/test-slug-1/download',
 };
 
 describe('Minimal MaterialDetailModal Render Test', () => {
@@ -107,32 +134,27 @@ describe('Minimal MaterialDetailModal Render Test', () => {
 
   it('renders the modal with a title when materialSlug is null and isOpen is true', () => {
     const handleClose = jest.fn();
-    render(
-      <MaterialDetailModal
-        materialSlug={null}
-        isOpen={true}
-        onClose={handleClose}
-      />
-    );
+    render(<MaterialDetailModal materialSlug={null} isOpen={true} onClose={handleClose} />);
     // When materialSlug is null, it should display a default title like "Material Details"
     // or "Loading Details..." depending on initial state logic.
     // Let's check for the title that appears when no slug is provided and not fetching.
-    expect(screen.getByText('Material Details')).toBeInTheDocument(); 
+    expect(screen.getByText('Material Details')).toBeInTheDocument();
   });
 });
 
-describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
+describe('MaterialDetailModal', () => {
+  // Unskipped: describe.skip to describe
   beforeEach(() => {
     fetchMock.resetMocks();
     jest.clearAllMocks();
     mockNotifyError.mockClear();
     mockNotifySuccess.mockClear();
     mockPush.mockClear();
-    
+
     // Clean up any existing DOM elements
     document.body.innerHTML = '';
   });
-  
+
   it('calls onClose when close button is clicked', async () => {
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
     const handleClose = jest.fn();
@@ -142,7 +164,9 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     // 動的コンポーネントのロードを待つ
     const audioPlayerMock = await screen.findByTestId('mock-audio-player');
     expect(audioPlayerMock).toBeInTheDocument();
-    expect(audioPlayerMock).toHaveTextContent(`Mock Audio Player Component: ${mockMaterial.downloadUrl}`);
+    expect(audioPlayerMock).toHaveTextContent(
+      `Mock Audio Player Component: ${mockMaterial.downloadUrl}`,
+    );
 
     expect(await screen.findByTestId('mock-map')).toBeInTheDocument();
 
@@ -155,9 +179,9 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
   it('handles fetch error with JSON error response', async () => {
     const errorResponse = { error: 'Material not found' };
     fetchMock.mockResponseOnce(JSON.stringify(errorResponse), { status: 404 });
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('Error')).toBeInTheDocument();
     });
@@ -165,9 +189,9 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
 
   it('handles fetch error without JSON error response', async () => {
     fetchMock.mockResponseOnce('Not Found', { status: 404, statusText: 'Not Found' });
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('Error')).toBeInTheDocument();
     });
@@ -175,9 +199,9 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
 
   it('handles non-Error exceptions in fetch', async () => {
     fetchMock.mockRejectOnce(new Error('Network error'));
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('Error')).toBeInTheDocument();
     });
@@ -189,33 +213,33 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     const handleDeleted = jest.fn();
     mockNotifyError.mockClear();
     mockNotifySuccess.mockClear();
-    
+
     render(
-      <MaterialDetailModal 
-        materialSlug="test-id-1" 
-        isOpen={true} 
+      <MaterialDetailModal
+        materialSlug="test-id-1"
+        isOpen={true}
         onClose={handleClose}
         onMaterialDeleted={handleDeleted}
-      />
+      />,
     );
-    
+
     await waitFor(() => expect(screen.getByText(mockMaterial.title)).toBeInTheDocument());
-    
+
     // Click delete button
     const deleteButton = screen.getByRole('button', { name: /Delete/i });
     fireEvent.click(deleteButton);
-    
+
     // Confirm delete in modal
     await waitFor(() => {
       const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
       expect(confirmButton).toBeInTheDocument();
     });
-    
+
     fetchMock.mockResponseOnce(JSON.stringify({ success: true }));
-    
+
     const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
       expect(mockNotifySuccess).toHaveBeenCalledWith('delete', 'material');
       expect(handleDeleted).toHaveBeenCalled();
@@ -227,26 +251,26 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
     mockNotifyError.mockClear();
     mockNotifySuccess.mockClear();
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
-    
+
     await waitFor(() => expect(screen.getByText(mockMaterial.title)).toBeInTheDocument());
-    
+
     // Click delete button
     const deleteButton = screen.getByRole('button', { name: /Delete/i });
     fireEvent.click(deleteButton);
-    
+
     // Wait for delete modal
     await waitFor(() => {
       const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
       expect(confirmButton).toBeInTheDocument();
     });
-    
+
     fetchMock.mockResponseOnce(JSON.stringify({ error: 'Permission denied' }), { status: 403 });
-    
+
     const confirmButton = screen.getByRole('button', { name: /^Delete$/i });
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
       expect(mockNotifyError).toHaveBeenCalled();
     });
@@ -257,21 +281,21 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
     const handleClose = jest.fn();
     const handleEdited = jest.fn();
     mockPush.mockClear();
-    
+
     render(
-      <MaterialDetailModal 
-        materialSlug="test-id-1" 
-        isOpen={true} 
+      <MaterialDetailModal
+        materialSlug="test-id-1"
+        isOpen={true}
         onClose={handleClose}
         onMaterialEdited={handleEdited}
-      />
+      />,
     );
-    
+
     await waitFor(() => expect(screen.getByText(mockMaterial.title)).toBeInTheDocument());
-    
+
     const editButton = screen.getByRole('button', { name: /Edit/i });
     fireEvent.click(editButton);
-    
+
     // Should navigate to edit page
     expect(mockPush).toHaveBeenCalledWith(`/materials/${mockMaterial.slug}/edit`);
     expect(handleClose).toHaveBeenCalled();
@@ -282,28 +306,35 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
   it('handles edit button without onMaterialEdited callback', async () => {
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
     mockPush.mockClear();
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
-    
+
     await waitFor(() => expect(screen.getByText(mockMaterial.title)).toBeInTheDocument());
-    
+
     const editButton = screen.getByRole('button', { name: /Edit/i });
     fireEvent.click(editButton);
-    
+
     expect(mockPush).toHaveBeenCalledWith(`/materials/${mockMaterial.slug}/edit`);
   });
 
   it('renders loading state when fetching', async () => {
     // Mock a slow response
-    fetchMock.mockImplementationOnce(() => 
-      new Promise(resolve => setTimeout(() => resolve({
-        ok: true,
-        json: () => Promise.resolve(mockMaterial)
-      } as Response), 100))
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                json: () => Promise.resolve(mockMaterial),
+              } as Response),
+            100,
+          ),
+        ),
     );
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={true} onClose={jest.fn()} />);
-    
+
     // Should show loading state initially
     expect(screen.getByText('Loading Details...')).toBeInTheDocument();
     expect(screen.getByText('Fetching details...')).toBeInTheDocument();
@@ -311,16 +342,16 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
 
   it('renders empty state when no materialSlug provided', () => {
     render(<MaterialDetailModal materialSlug={null} isOpen={true} onClose={jest.fn()} />);
-    
+
     expect(screen.getByText('Material Details')).toBeInTheDocument();
     expect(screen.getByText('Please select a material to view its details.')).toBeInTheDocument();
   });
 
   it('handles close modal and reset state', () => {
     const handleClose = jest.fn();
-    
+
     render(<MaterialDetailModal materialSlug="test-id-1" isOpen={false} onClose={handleClose} />);
-    
+
     // Modal should not be visible when isOpen is false
     expect(screen.queryByText('Material Details')).not.toBeInTheDocument();
   });
@@ -328,17 +359,17 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
   it('handles material deletion', async () => {
     const mockOnMaterialDeleted = jest.fn();
     const mockOnClose = jest.fn();
-    
+
     // Mock the initial material fetch
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
 
     render(
-      <MaterialDetailModal 
-        materialSlug="test-slug-1" 
-        isOpen={true} 
+      <MaterialDetailModal
+        materialSlug="test-slug-1"
+        isOpen={true}
         onClose={mockOnClose}
         onMaterialDeleted={mockOnMaterialDeleted}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -371,16 +402,16 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
   it('handles material editing', async () => {
     const mockOnMaterialEdited = jest.fn();
     const mockOnClose = jest.fn();
-    
+
     fetchMock.mockResponseOnce(JSON.stringify(mockMaterial));
 
     render(
-      <MaterialDetailModal 
-        materialSlug="test-slug-1" 
-        isOpen={true} 
+      <MaterialDetailModal
+        materialSlug="test-slug-1"
+        isOpen={true}
         onClose={mockOnClose}
         onMaterialEdited={mockOnMaterialEdited}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -442,4 +473,4 @@ describe('MaterialDetailModal', () => { // Unskipped: describe.skip to describe
   });
 
   // ... (Rest of the original tests for MaterialDetailModal would be here)
-}); 
+});
