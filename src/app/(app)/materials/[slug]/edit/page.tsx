@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, TagsIcon, Loader2 } from 'lucide-react';
 import { EquipmentMultiSelect } from '@/components/materials/EquipmentMultiSelect';
+import { StarRating } from '@/components/ui/star-rating';
 import { useNotification } from '@/hooks/use-notification';
 import { AudioMetadata } from '@/lib/audio-metadata';
 import {
@@ -59,7 +60,7 @@ export default function EditMaterialPage() {
   const [latitude, setLatitude] = useState<number | string>('');
   const [longitude, setLongitude] = useState<number | string>('');
   const [locationName, setLocationName] = useState('');
-  const [rating, setRating] = useState<number | string>('');
+  const [rating, setRating] = useState<number>(0);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
 
   // 自動取得用の状態
@@ -106,7 +107,7 @@ export default function EditMaterialPage() {
       setLatitude(data.latitude?.toString() || '');
       setLongitude(data.longitude?.toString() || '');
       setLocationName(data.locationName || '');
-      setRating(data.rating?.toString() || '');
+      setRating(data.rating || 0);
       setSelectedEquipmentIds(data.equipments?.map((e) => e.id) || []);
 
       // 既存のメタデータを保存
@@ -228,7 +229,7 @@ export default function EditMaterialPage() {
         latitude: latitude ? parseFloat(String(latitude)) : null,
         longitude: longitude ? parseFloat(String(longitude)) : null,
         locationName: locationName || null,
-        rating: rating ? parseInt(String(rating)) : null,
+        rating: rating > 0 ? rating : null,
         // 新しいファイルがアップロードされた場合
         ...(selectedFile && tempFileId && metadata
           ? {
@@ -509,15 +510,12 @@ export default function EditMaterialPage() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rating">Rating (1-5)</Label>
-            <Input
+            <Label htmlFor="rating">Rating</Label>
+            <StarRating
               id="rating"
-              type="number"
-              min="1"
-              max="5"
               value={rating}
-              onChange={(e) => setRating(e.target.value)}
-              placeholder="e.g., 4"
+              onChange={(value) => setRating(value)}
+              size="lg"
             />
           </div>
         </div>

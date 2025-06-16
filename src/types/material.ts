@@ -29,6 +29,7 @@ export interface Material {
   locationName?: string | null;
   equipment?: Equipment[];
   notes?: string | null;
+  rating?: number | null; // お気に入り度（1-5の5段階評価、null=未評価）
   favorited?: boolean | null;
   transcription?: string | null;
   createdAt?: string; // APIレスポンスに合わせてstring (ISO 8601)
