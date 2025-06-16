@@ -15,7 +15,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('date-fns', () => ({
   formatDistanceToNow: jest.fn(() => '5分前'),
 }));
-jest.mock('date-fns/locale', () => ({
+jest.mock('date-fns/locale/ja', () => ({
   ja: {},
 }));
 

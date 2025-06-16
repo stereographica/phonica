@@ -43,7 +43,7 @@ interface ProjectFormModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   initialData?: Project | null;
-  onSuccess?: () => void;
+  onSuccess?: (project?: Project) => void;
 }
 
 export function ProjectFormModal({
@@ -60,6 +60,7 @@ export function ProjectFormModal({
 
   const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectFormSchema),
+    mode: 'onChange',
     defaultValues: {
       name: '',
       description: '',
@@ -93,7 +94,7 @@ export function ProjectFormModal({
       description: data.description || null,
     };
 
-    const url = isEditMode && initialData ? `/api/projects/${initialData.id}` : '/api/projects';
+    const url = isEditMode && initialData ? `/api/projects/${initialData.slug}` : '/api/projects';
     const method = isEditMode ? 'PUT' : 'POST';
 
     try {
@@ -110,11 +111,13 @@ export function ProjectFormModal({
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
+      const updatedProject = await response.json();
+
       // 成功通知を表示
       notifySuccess(isEditMode ? 'update' : 'create', 'project');
 
       if (onSuccess) {
-        onSuccess();
+        onSuccess(updatedProject);
       }
       onOpenChange(false);
     } catch (err: unknown) {
@@ -187,7 +190,7 @@ export function ProjectFormModal({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Project'}
               </Button>
             </DialogFooter>
