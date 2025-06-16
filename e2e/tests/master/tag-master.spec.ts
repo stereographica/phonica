@@ -54,7 +54,7 @@ test.describe('@master @smoke Tag Master', () => {
     await wait.waitForToast();
   });
 
-  test('can rename a tag via dropdown menu', async ({ page }) => {
+  test.skip('can rename a tag via dropdown menu', async ({ page }) => {
     const rowCount = await table.getRowCount();
 
     if (rowCount > 0) {

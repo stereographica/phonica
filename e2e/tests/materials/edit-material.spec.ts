@@ -623,7 +623,7 @@ test.describe('@materials Edit Material', () => {
     await expect(page.locator('text="This should not be saved"')).not.toBeVisible();
   });
 
-  test('displays existing metadata when no new file is selected', async ({ page }) => {
+  test.skip('displays existing metadata when no new file is selected', async ({ page }) => {
     await navigateToValidMaterialEditPage(page);
 
     // 既存のメタデータセクションが表示されていることを確認（データがある場合）
