@@ -7,6 +7,17 @@ import { useNotification } from '@/hooks/use-notification';
 // Mock the notification hook
 jest.mock('@/hooks/use-notification');
 
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    refresh: jest.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/projects/test-project',
+}));
+
 // Mock fetch
 global.fetch = jest.fn();
 
