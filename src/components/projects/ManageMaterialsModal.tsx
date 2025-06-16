@@ -168,12 +168,12 @@ export function ManageMaterialsModal({
   // Fetch tags
   const fetchTags = useCallback(async () => {
     try {
-      const response = await fetch('/api/tags');
+      const response = await fetch('/api/master/tags');
       if (!response.ok) {
         throw new Error('Failed to fetch tags');
       }
       const data = await response.json();
-      setAvailableTags(data.data || []);
+      setAvailableTags(data.tags || []);
     } catch (error) {
       notifyError(error, { operation: 'fetch', entity: 'tags' });
     }
@@ -377,9 +377,60 @@ export function ManageMaterialsModal({
           </div>
 
           {/* Materials table */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto min-h-[500px]">
             {isLoading ? (
-              <div className="text-center py-8">Loading materials...</div>
+              <div className="h-full">
+                <div className="animate-pulse">
+                  {/* Batch operations bar skeleton */}
+                  <div className="flex items-center justify-between px-2 py-2 border-b">
+                    <div className="h-4 bg-gray-200 rounded w-32" />
+                    <div className="flex gap-2">
+                      <div className="h-8 bg-gray-200 rounded w-28" />
+                      <div className="h-8 bg-gray-200 rounded w-28" />
+                    </div>
+                  </div>
+                  {/* Table skeleton */}
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="p-3 w-[50px]">
+                          <div className="h-4 w-4 bg-gray-200 rounded" />
+                        </th>
+                        <th className="p-3 text-left">
+                          <div className="h-4 bg-gray-200 rounded w-16" />
+                        </th>
+                        <th className="p-3 text-left">
+                          <div className="h-4 bg-gray-200 rounded w-16" />
+                        </th>
+                        <th className="p-3 text-left">
+                          <div className="h-4 bg-gray-200 rounded w-16" />
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <tr key={i} className="border-b">
+                          <td className="p-3">
+                            <div className="h-4 w-4 bg-gray-100 rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-4 bg-gray-100 rounded w-48" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-6 bg-gray-100 rounded w-24" />
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-1">
+                              <div className="h-5 bg-gray-100 rounded w-16" />
+                              <div className="h-5 bg-gray-100 rounded w-20" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ) : materials.length === 0 ? (
               <div className="text-center py-8 text-gray-500">No materials found</div>
             ) : (

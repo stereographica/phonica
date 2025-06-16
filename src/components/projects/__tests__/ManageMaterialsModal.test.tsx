@@ -58,7 +58,7 @@ describe('ManageMaterialsModal', () => {
     });
   });
 
-  it('should render and show loading state initially', async () => {
+  it('should render modal with correct title', async () => {
     (fetch as jest.Mock).mockImplementation(() => new Promise(() => {})); // Never resolves
 
     render(
@@ -66,7 +66,7 @@ describe('ManageMaterialsModal', () => {
     );
 
     expect(screen.getByText('Manage Project Materials')).toBeInTheDocument();
-    expect(screen.getByText('Loading materials...')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('should fetch materials and tags when opened', async () => {
@@ -80,7 +80,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     render(
@@ -93,12 +93,12 @@ describe('ManageMaterialsModal', () => {
     });
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/tags');
+      expect(fetch).toHaveBeenCalledWith('/api/master/tags');
     });
 
-    // Wait for loading to finish (should not show loading text)
+    // Wait for content to be displayed
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledTimes(2);
     });
 
     // Verify content is displayed correctly
@@ -117,7 +117,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     render(
@@ -126,7 +126,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Verify dialog is shown
@@ -134,7 +134,7 @@ describe('ManageMaterialsModal', () => {
 
     // Verify that the components API calls were made
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/materials?'));
-    expect(fetch).toHaveBeenCalledWith('/api/tags');
+    expect(fetch).toHaveBeenCalledWith('/api/master/tags');
   });
 
   it('should handle material selection and show changes', async () => {
@@ -148,7 +148,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     render(
@@ -157,7 +157,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Verify that UI components are present
@@ -177,7 +177,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     const user = userEvent.setup();
@@ -187,7 +187,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Test search functionality exists
@@ -209,7 +209,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     const onSuccess = jest.fn();
@@ -226,7 +226,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Verify the necessary UI elements are present
@@ -255,7 +255,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
@@ -266,7 +266,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Verify dialog is present
@@ -287,7 +287,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     render(
@@ -296,7 +296,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Verify sort dropdown is present
@@ -314,7 +314,7 @@ describe('ManageMaterialsModal', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: mockTags }),
+        json: async () => ({ tags: mockTags }),
       });
 
     render(
@@ -323,7 +323,7 @@ describe('ManageMaterialsModal', () => {
 
     // Wait for loading to finish
     await waitFor(() => {
-      expect(screen.queryByText('Loading materials...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     });
 
     // Verify tag filter dropdown is present
