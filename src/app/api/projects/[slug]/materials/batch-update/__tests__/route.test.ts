@@ -1,7 +1,6 @@
 import { POST } from '../route';
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
-import { ProjectWithMaterials } from '@/types/project';
 
 // Mock prisma
 jest.mock('@/lib/prisma', () => ({
@@ -51,8 +50,8 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invalid: 'data' }),
-      }
+        body: JSON.stringify({ add: 'invalid-type', remove: 123 }),
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -69,7 +68,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ add: [], remove: [] }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -88,7 +87,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ add: ['material-1'], remove: [] }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -104,9 +103,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
       name: 'Test Project',
     });
 
-    (prisma.material.findMany as jest.Mock).mockResolvedValue([
-      { id: 'material-1' },
-    ]);
+    (prisma.material.findMany as jest.Mock).mockResolvedValue([{ id: 'material-1' }]);
 
     const request = new NextRequest(
       'http://localhost:3000/api/projects/test-project/materials/batch-update',
@@ -117,7 +114,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
           add: ['material-1', 'material-2'],
           remove: [],
         }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -146,7 +143,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
           add: [],
           remove: ['material-1', 'material-2'],
         }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -185,7 +182,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
           add: ['material-1', 'material-2'],
           remove: [],
         }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -236,7 +233,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
           add: [],
           remove: ['material-1', 'material-2'],
         }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -269,9 +266,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
         materials: [{ id: 'material-2' }],
       });
 
-    (prisma.material.findMany as jest.Mock).mockResolvedValue([
-      { id: 'material-1' },
-    ]);
+    (prisma.material.findMany as jest.Mock).mockResolvedValue([{ id: 'material-1' }]);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
       return fn({
@@ -291,7 +286,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
           add: ['material-1'],
           remove: ['material-2'],
         }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);
@@ -318,13 +313,9 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
       name: 'Test Project',
     });
 
-    (prisma.material.findMany as jest.Mock).mockResolvedValue([
-      { id: 'material-1' },
-    ]);
+    (prisma.material.findMany as jest.Mock).mockResolvedValue([{ id: 'material-1' }]);
 
-    (prisma.$transaction as jest.Mock).mockRejectedValue(
-      new Error('Transaction failed')
-    );
+    (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('Transaction failed'));
 
     const request = new NextRequest(
       'http://localhost:3000/api/projects/test-project/materials/batch-update',
@@ -335,7 +326,7 @@ describe('POST /api/projects/[slug]/materials/batch-update', () => {
           add: ['material-1'],
           remove: [],
         }),
-      }
+      },
     );
 
     const response = await POST(request, mockContext);

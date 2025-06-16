@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -66,6 +66,7 @@ export function ManageMaterialsModal({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
   const [originalSelection, setOriginalSelection] = useState<Set<string>>(new Set());
+  const isInitializedRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('recordedAt');
@@ -141,11 +142,12 @@ export function ManageMaterialsModal({
       setMaterials(data.data);
       setPagination(data.pagination);
 
-      // Set initial selection for materials already in project
-      if (pagination.page === 1 && originalSelection.size === 0) {
+      // Set initial selection for materials already in project (only on first load)
+      if (pagination.page === 1 && !isInitializedRef.current) {
         const inProjectIds = data.data.filter((m) => m.isInProject).map((m) => m.id);
-        setSelectedMaterials(new Set(inProjectIds));
         setOriginalSelection(new Set(inProjectIds));
+        setSelectedMaterials(new Set(inProjectIds));
+        isInitializedRef.current = true;
       }
     } catch (error) {
       notifyError(error, { operation: 'fetch', entity: 'materials' });
@@ -161,7 +163,6 @@ export function ManageMaterialsModal({
     sortOrder,
     selectedTag,
     notifyError,
-    originalSelection.size,
   ]);
 
   // Fetch tags
@@ -182,11 +183,15 @@ export function ManageMaterialsModal({
   useEffect(() => {
     if (isOpen) {
       fetchMaterials();
-      if (availableTags.length === 0) {
-        fetchTags();
-      }
     }
-  }, [isOpen, fetchMaterials, fetchTags, availableTags.length]);
+  }, [isOpen, fetchMaterials]);
+
+  // Fetch tags separately to avoid dependency cycles
+  useEffect(() => {
+    if (isOpen && availableTags.length === 0) {
+      fetchTags();
+    }
+  }, [isOpen, fetchTags, availableTags.length]);
 
   // Handle checkbox change
   const handleSelectMaterial = (materialId: string, checked: boolean) => {
@@ -223,7 +228,7 @@ export function ManageMaterialsModal({
     // Confirm large deletions
     if (toRemove.length > 5) {
       const confirmed = confirm(
-        `You are about to remove ${toRemove.length} materials from this project. Are you sure?`
+        `You are about to remove ${toRemove.length} materials from this project. Are you sure?`,
       );
       if (!confirmed) return;
     }
@@ -286,9 +291,8 @@ export function ManageMaterialsModal({
     { value: 'createdAt-asc', label: 'Created Date (Oldest First)' },
   ];
 
-  const currentSortLabel = sortOptions.find(
-    (opt) => opt.value === `${sortBy}-${sortOrder}`
-  )?.label || 'Sort';
+  const currentSortLabel =
+    sortOptions.find((opt) => opt.value === `${sortBy}-${sortOrder}`)?.label || 'Sort';
 
   // Handle modal close
   const handleModalClose = (open: boolean) => {
@@ -298,6 +302,7 @@ export function ManageMaterialsModal({
       setDebouncedSearchQuery('');
       setSelectedTag('');
       setPagination((prev) => ({ ...prev, page: 1 }));
+      isInitializedRef.current = false;
     }
     onOpenChange(open);
   };
@@ -324,28 +329,21 @@ export function ManageMaterialsModal({
                 className="pl-10"
               />
             </div>
-            
+
             {/* Tag filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="min-w-[150px]">
-                  {selectedTag ? 
-                    availableTags.find(t => t.name === selectedTag)?.name || 'Tag' 
+                  {selectedTag
+                    ? availableTags.find((t) => t.name === selectedTag)?.name || 'Tag'
                     : 'All Tags'}
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setSelectedTag('')}
-                >
-                  All Tags
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedTag('')}>All Tags</DropdownMenuItem>
                 {availableTags.map((tag) => (
-                  <DropdownMenuItem
-                    key={tag.id}
-                    onClick={() => setSelectedTag(tag.name)}
-                  >
+                  <DropdownMenuItem key={tag.id} onClick={() => setSelectedTag(tag.name)}>
                     {tag.name}
                   </DropdownMenuItem>
                 ))}
@@ -413,66 +411,66 @@ export function ManageMaterialsModal({
                   </div>
                 </div>
                 <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">
-                      <Checkbox
-                        checked={
-                          materials.length > 0 &&
-                          materials.every((m) => selectedMaterials.has(m.id))
-                        }
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tags</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {materials.map((material) => (
-                    <TableRow key={material.id} className={getMaterialRowStyle(material)}>
-                      <TableCell>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]">
                         <Checkbox
-                          checked={selectedMaterials.has(material.id)}
-                          onCheckedChange={(checked) =>
-                            handleSelectMaterial(material.id, checked as boolean)
+                          checked={
+                            materials.length > 0 &&
+                            materials.every((m) => selectedMaterials.has(m.id))
                           }
+                          onCheckedChange={handleSelectAll}
                         />
-                      </TableCell>
-                      <TableCell>{material.title}</TableCell>
-                      <TableCell>
-                        {material.isInProject && (
-                          <Badge variant="secondary" className="text-xs">
-                            Already added
-                          </Badge>
-                        )}
-                        {!originalSelection.has(material.id) &&
-                          selectedMaterials.has(material.id) && (
-                            <Badge variant="default" className="text-xs bg-green-600">
-                              To add
-                            </Badge>
-                          )}
-                        {originalSelection.has(material.id) &&
-                          !selectedMaterials.has(material.id) && (
-                            <Badge variant="destructive" className="text-xs">
-                              To remove
-                            </Badge>
-                          )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 flex-wrap">
-                          {material.tags.map((tag) => (
-                            <Badge key={tag.id} variant="outline" className="text-xs">
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
+                      </TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Tags</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {materials.map((material) => (
+                      <TableRow key={material.id} className={getMaterialRowStyle(material)}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedMaterials.has(material.id)}
+                            onCheckedChange={(checked) =>
+                              handleSelectMaterial(material.id, checked as boolean)
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>{material.title}</TableCell>
+                        <TableCell>
+                          {material.isInProject && (
+                            <Badge variant="secondary" className="text-xs">
+                              Already added
+                            </Badge>
+                          )}
+                          {!originalSelection.has(material.id) &&
+                            selectedMaterials.has(material.id) && (
+                              <Badge variant="default" className="text-xs bg-green-600">
+                                To add
+                              </Badge>
+                            )}
+                          {originalSelection.has(material.id) &&
+                            !selectedMaterials.has(material.id) && (
+                              <Badge variant="destructive" className="text-xs">
+                                To remove
+                              </Badge>
+                            )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {material.tags.map((tag) => (
+                              <Badge key={tag.id} variant="outline" className="text-xs">
+                                {tag.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </>
             )}
           </div>
