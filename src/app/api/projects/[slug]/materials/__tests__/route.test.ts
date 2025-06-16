@@ -1,15 +1,12 @@
 /**
  * @jest-environment node
  */
-import { POST } from '@/app/api/projects/[id]/materials/route';
+import { POST, GET } from '@/app/api/projects/[slug]/materials/route';
 import { prismaMock } from '../../../../../../../jest.setup';
 import { NextRequest } from 'next/server';
 
-function createMockRequest(
-  method: string, 
-  body?: Record<string, unknown>
-): NextRequest {
-  const url = new URL(`http://localhost/api/projects/proj-1/materials`);
+function createMockRequest(method: string, body?: Record<string, unknown>): NextRequest {
+  const url = new URL(`http://localhost/api/projects/nature-sounds/materials`);
   let requestBody: BodyInit | null | undefined = undefined;
   const headers = new Headers();
 
@@ -30,7 +27,7 @@ function createMockRequest(
     Object.defineProperty(req, 'json', {
       value: async () => body,
       writable: true,
-      configurable: true
+      configurable: true,
     });
   }
 
@@ -38,16 +35,16 @@ function createMockRequest(
 }
 
 type RouteContext = {
-  params: Promise<{ id: string }>;
-}
+  params: Promise<{ slug: string }>;
+};
 
-function createMockContext(id: string): RouteContext {
+function createMockContext(slug: string): RouteContext {
   return {
-    params: Promise.resolve({ id }),
+    params: Promise.resolve({ slug }),
   };
 }
 
-describe('/api/projects/[id]/materials', () => {
+describe('/api/projects/[slug]/materials', () => {
   describe('POST', () => {
     const mockProject = {
       id: 'proj-1',
@@ -76,7 +73,7 @@ describe('/api/projects/[id]/materials', () => {
       updatedAt: new Date(),
       tags: [],
       equipments: [],
-      projects: []
+      projects: [],
     };
 
     const mockUpdatedProject = {
@@ -99,9 +96,9 @@ describe('/api/projects/[id]/materials', () => {
           memo: 'Beautiful morning bird sounds',
           createdAt: new Date('2023-01-10T08:00:00Z'),
           updatedAt: new Date('2023-01-10T08:00:00Z'),
-        }
+        },
       ],
-      _count: { materials: 1 }
+      _count: { materials: 1 },
     };
 
     it('should add a material to project successfully', async () => {
@@ -112,7 +109,7 @@ describe('/api/projects/[id]/materials', () => {
 
       const requestBody = { materialId: 'mat-1' };
       const request = createMockRequest('POST', requestBody);
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await POST(request, context);
       const responseBody = await response.json();
 
@@ -121,29 +118,29 @@ describe('/api/projects/[id]/materials', () => {
       expect(responseBody.materials).toHaveLength(1);
       expect(responseBody.materials[0].title).toBe('Bird Song');
       expect(prismaMock.project.update).toHaveBeenCalledWith({
-        where: { id: 'proj-1' },
+        where: { slug: 'nature-sounds' },
         data: {
           materials: {
-            connect: { id: 'mat-1' }
-          }
+            connect: { id: 'mat-1' },
+          },
         },
         include: expect.any(Object),
       });
     });
 
-    it('should return 400 for invalid project ID', async () => {
+    it('should return 400 for invalid project slug', async () => {
       const request = createMockRequest('POST', { materialId: 'mat-1' });
       const context = createMockContext('');
       const response = await POST(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(400);
-      expect(responseBody.error).toBe('Invalid project ID');
+      expect(responseBody.error).toBe('Invalid project slug');
     });
 
     it('should return 400 for missing materialId', async () => {
       const request = createMockRequest('POST', {});
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await POST(request, context);
       const responseBody = await response.json();
 
@@ -169,7 +166,7 @@ describe('/api/projects/[id]/materials', () => {
       prismaMock.material.findUnique.mockResolvedValue(null);
 
       const request = createMockRequest('POST', { materialId: 'non-existent' });
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await POST(request, context);
       const responseBody = await response.json();
 
@@ -183,7 +180,7 @@ describe('/api/projects/[id]/materials', () => {
       prismaMock.project.findFirst.mockResolvedValue(mockProject); // 関連付けが既に存在
 
       const request = createMockRequest('POST', { materialId: 'mat-1' });
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await POST(request, context);
       const responseBody = await response.json();
 
@@ -199,12 +196,172 @@ describe('/api/projects/[id]/materials', () => {
       prismaMock.project.update.mockRejectedValue(new Error('DB Error'));
 
       const request = createMockRequest('POST', { materialId: 'mat-1' });
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await POST(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(500);
       expect(responseBody.error).toBe('Internal Server Error');
+    });
+  });
+
+  describe('GET', () => {
+    const mockProject = {
+      id: 'proj-1',
+      slug: 'nature-sounds',
+      name: 'Nature Sounds',
+      description: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockMaterials = [
+      {
+        id: 'mat1',
+        slug: 'bird-song',
+        title: 'Bird Song',
+        filePath: '/uploads/materials/bird-song.wav',
+        fileFormat: 'WAV',
+        sampleRate: 48000,
+        bitDepth: 24,
+        durationSeconds: 180,
+        channels: 2,
+        recordedAt: new Date('2023-01-10T08:00:00Z'),
+        latitude: null,
+        longitude: null,
+        locationName: null,
+        memo: null,
+        rating: 5,
+        createdAt: new Date('2023-01-10T08:00:00Z'),
+        updatedAt: new Date('2023-01-10T08:00:00Z'),
+        tags: [
+          { id: 'tag1', name: 'Nature', slug: 'nature' },
+          { id: 'tag2', name: 'Birds', slug: 'birds' },
+        ],
+      },
+      {
+        id: 'mat2',
+        slug: 'river-flow',
+        title: 'River Flow',
+        filePath: '/uploads/materials/river-flow.wav',
+        fileFormat: 'WAV',
+        sampleRate: 48000,
+        bitDepth: 24,
+        durationSeconds: 240,
+        channels: 2,
+        recordedAt: new Date('2023-01-15T10:00:00Z'),
+        latitude: null,
+        longitude: null,
+        locationName: null,
+        memo: null,
+        rating: 4,
+        createdAt: new Date('2023-01-15T10:00:00Z'),
+        updatedAt: new Date('2023-01-15T10:00:00Z'),
+        tags: [
+          { id: 'tag1', name: 'Nature', slug: 'nature' },
+          { id: 'tag3', name: 'Water', slug: 'water' },
+        ],
+      },
+    ];
+
+    it('should return materials for a project with pagination', async () => {
+      prismaMock.project.findUnique.mockResolvedValue(mockProject);
+      prismaMock.material.findMany.mockResolvedValue(mockMaterials);
+      prismaMock.material.count.mockResolvedValue(2);
+
+      const request = createMockRequest('GET');
+      const context = createMockContext('nature-sounds');
+      const response = await GET(request, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.data).toHaveLength(2);
+      expect(responseBody.data[0].title).toBe('Bird Song');
+      expect(responseBody.data[1].title).toBe('River Flow');
+      expect(responseBody.pagination).toEqual({
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+        totalItems: 2,
+      });
+      expect(prismaMock.project.findUnique).toHaveBeenCalledWith({
+        where: { slug: 'nature-sounds' },
+        select: { id: true },
+      });
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith({
+        where: {
+          projects: {
+            some: {
+              slug: 'nature-sounds',
+            },
+          },
+        },
+        skip: 0,
+        take: 10,
+        include: {
+          tags: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+        orderBy: {
+          recordedAt: 'desc',
+        },
+      });
+    });
+
+    it('should return 404 if project not found', async () => {
+      prismaMock.project.findUnique.mockResolvedValue(null);
+
+      const request = createMockRequest('GET');
+      const context = createMockContext('non-existent');
+      const response = await GET(request, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(responseBody.error).toBe('Project not found');
+    });
+
+    it('should return 400 for invalid project slug', async () => {
+      const request = createMockRequest('GET');
+      const context = createMockContext('');
+      const response = await GET(request, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(responseBody.error).toBe('Invalid project slug');
+    });
+
+    it('should handle pagination parameters', async () => {
+      prismaMock.project.findUnique.mockResolvedValue(mockProject);
+      prismaMock.material.findMany.mockResolvedValue([mockMaterials[1]]);
+      prismaMock.material.count.mockResolvedValue(2);
+
+      const url = new URL(`http://localhost/api/projects/nature-sounds/materials?page=2&limit=1`);
+      const req = new NextRequest(url.toString(), { method: 'GET' });
+
+      const context = createMockContext('nature-sounds');
+      const response = await GET(req, context);
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.data).toHaveLength(1);
+      expect(responseBody.data[0].title).toBe('River Flow');
+      expect(responseBody.pagination).toEqual({
+        page: 2,
+        limit: 1,
+        totalPages: 2,
+        totalItems: 2,
+      });
+      expect(prismaMock.material.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 1,
+          take: 1,
+        }),
+      );
     });
   });
 });

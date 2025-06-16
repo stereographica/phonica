@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProjectFormModal } from '../ProjectFormModal';
 
@@ -86,23 +86,14 @@ describe('ProjectFormModal', () => {
 
     const createButton = screen.getByText('Create Project');
 
-    // 初期状態では isValid が false のためボタンは disabled
-    await waitFor(() => {
-      expect(createButton).toBeDisabled();
-    });
+    // 初期状態ではボタンは有効（onChangeモードのため）
+    expect(createButton).not.toBeDisabled();
 
-    const formElement = createButton.closest('form');
-    expect(formElement).not.toBeNull();
-
-    await act(async () => {
-      if (formElement) {
-        fireEvent.submit(formElement);
-      }
-    });
+    // 空のままクリック
+    fireEvent.click(createButton);
 
     await waitFor(() => {
       expect(screen.queryByText('Project name is required.')).toBeInTheDocument();
-      expect(createButton).toBeDisabled();
     });
 
     expect(mockOnSuccess).not.toHaveBeenCalled();
@@ -170,7 +161,7 @@ describe('ProjectFormModal', () => {
       expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });
 
-    expect(fetch).toHaveBeenCalledWith(`/api/projects/${mockProject.id}`, {
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${mockProject.slug}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

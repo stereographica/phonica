@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PlusCircle, Search, ArrowUpDown, ChevronLeft, ChevronRight, Folder } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { ja } from 'date-fns/locale/ja';
 import { ProjectFormModal } from '@/components/projects/ProjectFormModal';
 
 interface Project {
@@ -96,6 +96,7 @@ function ProjectsPageContent() {
       setProjects(data.data);
       setPagination(data.pagination);
     } catch (err) {
+      console.error('Error fetching projects:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       setProjects([]);
     } finally {
@@ -269,7 +270,7 @@ function ProjectsPageContent() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{project._count.materials} materials</span>
+                  <span>{project._count?.materials || 0} materials</span>
                 </div>
               </CardContent>
             </Card>

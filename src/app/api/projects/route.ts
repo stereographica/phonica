@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
 
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Invalid query parameters", details: validationResult.error.flatten() },
-        { status: 400 }
+        { error: 'Invalid query parameters', details: validationResult.error.flatten() },
+        { status: 400 },
       );
     }
 
@@ -54,9 +54,11 @@ export async function GET(request: NextRequest) {
 
     const orderBy: Prisma.ProjectOrderByWithRelationInput = {};
     const allowedSortKeys: Array<keyof Prisma.ProjectOrderByWithRelationInput> = [
-      'name', 'createdAt', 'updatedAt'
+      'name',
+      'createdAt',
+      'updatedAt',
     ];
-    
+
     if (allowedSortKeys.includes(sortBy as keyof Prisma.ProjectOrderByWithRelationInput)) {
       orderBy[sortBy as keyof Prisma.ProjectOrderByWithRelationInput] = sortOrder;
     } else {
@@ -73,13 +75,13 @@ export async function GET(request: NextRequest) {
             id: true,
             title: true,
             slug: true,
-          }
+          },
         },
         _count: {
           select: {
             materials: true,
-          }
-        }
+          },
+        },
       },
       orderBy,
     });
@@ -92,8 +94,7 @@ export async function GET(request: NextRequest) {
       slug: project.slug,
       name: project.name,
       description: project.description,
-      materialsCount: project._count.materials,
-      materials: project.materials,
+      _count: project._count,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     }));
@@ -108,24 +109,22 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error fetching projects:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch projects" },
-      { status: 500 }
-    );
+    console.error('Error fetching projects:', error);
+    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     const validationResult = CreateProjectSchema.safeParse(body);
 
     if (!validationResult.success) {
+      console.error('Validation error:', validationResult.error.flatten());
       return NextResponse.json(
-        { error: "Invalid request body", details: validationResult.error.flatten() },
-        { status: 400 }
+        { error: 'Invalid request body', details: validationResult.error.flatten() },
+        { status: 400 },
       );
     }
 
@@ -144,13 +143,13 @@ export async function POST(request: NextRequest) {
             id: true,
             title: true,
             slug: true,
-          }
+          },
         },
         _count: {
           select: {
             materials: true,
-          }
-        }
+          },
+        },
       },
     });
 
@@ -159,26 +158,31 @@ export async function POST(request: NextRequest) {
       slug: newProject.slug,
       name: newProject.name,
       description: newProject.description,
-      materialsCount: newProject._count.materials,
-      materials: newProject.materials,
+      _count: newProject._count,
       createdAt: newProject.createdAt,
       updatedAt: newProject.updatedAt,
     };
 
     return NextResponse.json(formattedProject, { status: 201 });
   } catch (error: unknown) {
-    console.error("Error creating project:", error);
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002' && 
-        'meta' in error && error.meta && typeof error.meta === 'object' && 'target' in error.meta &&
-        Array.isArray(error.meta.target) && error.meta.target.includes('slug')) {
+    console.error('Error creating project:', error);
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'P2002' &&
+      'meta' in error &&
+      error.meta &&
+      typeof error.meta === 'object' &&
+      'target' in error.meta &&
+      Array.isArray(error.meta.target) &&
+      error.meta.target.includes('slug')
+    ) {
       return NextResponse.json(
-        { error: "Failed to create project: Slug already exists. Please change the name." },
-        { status: 409 }
+        { error: 'Failed to create project: Slug already exists. Please change the name.' },
+        { status: 409 },
       );
     }
-    return NextResponse.json(
-      { error: "Failed to create project" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
   }
 }

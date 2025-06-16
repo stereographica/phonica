@@ -1,15 +1,12 @@
 /**
  * @jest-environment node
  */
-import { GET, PUT, DELETE } from '@/app/api/projects/[id]/route';
+import { GET, PUT, DELETE } from '@/app/api/projects/[slug]/route';
 import { prismaMock } from '../../../../../../jest.setup';
 import { NextRequest } from 'next/server';
 
-function createMockRequest(
-  method: string, 
-  body?: Record<string, unknown>
-): NextRequest {
-  const url = new URL(`http://localhost/api/projects/proj-1`);
+function createMockRequest(method: string, body?: Record<string, unknown>): NextRequest {
+  const url = new URL(`http://localhost/api/projects/nature-sounds`);
   let requestBody: BodyInit | null | undefined = undefined;
   const headers = new Headers();
 
@@ -30,7 +27,7 @@ function createMockRequest(
     Object.defineProperty(req, 'json', {
       value: async () => body,
       writable: true,
-      configurable: true
+      configurable: true,
     });
   }
 
@@ -38,16 +35,16 @@ function createMockRequest(
 }
 
 type RouteContext = {
-  params: Promise<{ id: string }>;
-}
+  params: Promise<{ slug: string }>;
+};
 
-function createMockContext(id: string): RouteContext {
+function createMockContext(slug: string): RouteContext {
   return {
-    params: Promise.resolve({ id }),
+    params: Promise.resolve({ slug }),
   };
 }
 
-describe('/api/projects/[id]', () => {
+describe('/api/projects/[slug]', () => {
   describe('GET', () => {
     const mockProject = {
       id: 'proj-1',
@@ -69,16 +66,16 @@ describe('/api/projects/[id]', () => {
           memo: 'Beautiful morning bird sounds',
           createdAt: new Date('2023-01-10T08:00:00Z'),
           updatedAt: new Date('2023-01-10T08:00:00Z'),
-        }
+        },
       ],
-      _count: { materials: 1 }
+      _count: { materials: 1 },
     };
 
     it('should return a project with its materials', async () => {
       prismaMock.project.findUnique.mockResolvedValue(mockProject);
 
       const request = createMockRequest('GET');
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await GET(request, context);
       const responseBody = await response.json();
 
@@ -90,7 +87,7 @@ describe('/api/projects/[id]', () => {
       expect(responseBody.materials[0].title).toBe('Bird Song');
       expect(responseBody.materials[0].recordedAt).toBe('2023-01-10T08:00:00.000Z');
       expect(prismaMock.project.findUnique).toHaveBeenCalledWith({
-        where: { id: 'proj-1' },
+        where: { slug: 'nature-sounds' },
         include: {
           materials: {
             select: {
@@ -105,13 +102,13 @@ describe('/api/projects/[id]', () => {
               memo: true,
               createdAt: true,
               updatedAt: true,
-            }
+            },
           },
           _count: {
             select: {
               materials: true,
-            }
-          }
+            },
+          },
         },
       });
     });
@@ -128,21 +125,21 @@ describe('/api/projects/[id]', () => {
       expect(responseBody.error).toBe('Project not found');
     });
 
-    it('should return 400 for invalid project ID', async () => {
+    it('should return 400 for invalid project slug', async () => {
       const request = createMockRequest('GET');
       const context = createMockContext('');
       const response = await GET(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(400);
-      expect(responseBody.error).toBe('Invalid project ID');
+      expect(responseBody.error).toBe('Invalid project slug');
     });
 
     it('should return 500 if database error occurs', async () => {
       prismaMock.project.findUnique.mockRejectedValue(new Error('DB Error'));
 
       const request = createMockRequest('GET');
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await GET(request, context);
       const responseBody = await response.json();
 
@@ -160,7 +157,7 @@ describe('/api/projects/[id]', () => {
       createdAt: new Date('2023-01-15T10:00:00Z'),
       updatedAt: new Date('2023-01-16T10:00:00Z'),
       materials: [],
-      _count: { materials: 0 }
+      _count: { materials: 0 },
     };
 
     it('should update a project successfully', async () => {
@@ -172,7 +169,7 @@ describe('/api/projects/[id]', () => {
       };
 
       const request = createMockRequest('PUT', updateData);
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await PUT(request, context);
       const responseBody = await response.json();
 
@@ -181,7 +178,7 @@ describe('/api/projects/[id]', () => {
       expect(responseBody.slug).toBe('updated-nature-sounds');
       expect(responseBody.description).toBe('Updated collection of natural sounds');
       expect(prismaMock.project.update).toHaveBeenCalledWith({
-        where: { id: 'proj-1' },
+        where: { slug: 'nature-sounds' },
         data: {
           name: 'Updated Nature Sounds',
           slug: 'updated-nature-sounds',
@@ -205,7 +202,7 @@ describe('/api/projects/[id]', () => {
       };
 
       const request = createMockRequest('PUT', updateData);
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await PUT(request, context);
       const responseBody = await response.json();
 
@@ -213,7 +210,7 @@ describe('/api/projects/[id]', () => {
       expect(responseBody.name).toBe('Only Name Updated');
       expect(responseBody.slug).toBe('only-name-updated');
       expect(prismaMock.project.update).toHaveBeenCalledWith({
-        where: { id: 'proj-1' },
+        where: { slug: 'nature-sounds' },
         data: {
           name: 'Only Name Updated',
           slug: 'only-name-updated',
@@ -234,14 +231,14 @@ describe('/api/projects/[id]', () => {
       };
 
       const request = createMockRequest('PUT', updateData);
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await PUT(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(200);
       expect(responseBody.description).toBe(null);
       expect(prismaMock.project.update).toHaveBeenCalledWith({
-        where: { id: 'proj-1' },
+        where: { slug: 'nature-sounds' },
         data: {
           description: null,
         },
@@ -251,7 +248,7 @@ describe('/api/projects/[id]', () => {
 
     it('should return 400 for invalid request body', async () => {
       const request = createMockRequest('PUT', { name: '' }); // 空の名前
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await PUT(request, context);
       const responseBody = await response.json();
 
@@ -279,12 +276,14 @@ describe('/api/projects/[id]', () => {
       });
 
       const request = createMockRequest('PUT', { name: 'Duplicate Name' });
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await PUT(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(409);
-      expect(responseBody.error).toBe('Failed to update project: Slug already exists. Please change the name.');
+      expect(responseBody.error).toBe(
+        'Failed to update project: Slug already exists. Please change the name.',
+      );
     });
   });
 
@@ -300,22 +299,24 @@ describe('/api/projects/[id]', () => {
 
     it('should delete a project successfully', async () => {
       prismaMock.project.findUnique.mockResolvedValue(mockProject);
-      (prismaMock.$transaction as jest.Mock).mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => {
-        return await callback(prismaMock);
-      });
+      (prismaMock.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: typeof prismaMock) => Promise<unknown>) => {
+          return await callback(prismaMock);
+        },
+      );
       prismaMock.project.update.mockResolvedValue(mockProject);
       prismaMock.project.delete.mockResolvedValue(mockProject);
 
       const request = createMockRequest('DELETE');
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await DELETE(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(200);
       expect(responseBody.message).toBe('Project deleted successfully');
       expect(prismaMock.project.findUnique).toHaveBeenCalledWith({
-        where: { id: 'proj-1' },
-        select: { id: true, name: true }
+        where: { slug: 'nature-sounds' },
+        select: { id: true, name: true },
       });
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     });
@@ -333,14 +334,14 @@ describe('/api/projects/[id]', () => {
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
 
-    it('should return 400 for invalid project ID', async () => {
+    it('should return 400 for invalid project slug', async () => {
       const request = createMockRequest('DELETE');
       const context = createMockContext('');
       const response = await DELETE(request, context);
       const responseBody = await response.json();
 
       expect(response.status).toBe(400);
-      expect(responseBody.error).toBe('Invalid project ID in URL');
+      expect(responseBody.error).toBe('Invalid project slug in URL');
     });
 
     it('should return 500 if database error occurs during deletion', async () => {
@@ -348,7 +349,7 @@ describe('/api/projects/[id]', () => {
       prismaMock.$transaction.mockRejectedValue(new Error('DB Transaction Error'));
 
       const request = createMockRequest('DELETE');
-      const context = createMockContext('proj-1');
+      const context = createMockContext('nature-sounds');
       const response = await DELETE(request, context);
       const responseBody = await response.json();
 

@@ -122,7 +122,7 @@ function ProjectDetailContent() {
       params.set('page', page);
       params.set('limit', limit);
 
-      const response = await fetch(`/api/projects/${project.id}/materials?${params.toString()}`);
+      const response = await fetch(`/api/projects/${projectSlug}/materials?${params.toString()}`);
 
       if (!response || !response.ok) {
         throw new Error(`HTTP error! status: ${response?.status || 'unknown'}`);
@@ -136,7 +136,7 @@ function ProjectDetailContent() {
     } finally {
       setIsMaterialsLoading(false);
     }
-  }, [project, searchParams, notifyError]);
+  }, [project, searchParams, notifyError, projectSlug]);
 
   // Initial fetch
   useEffect(() => {
@@ -159,7 +159,7 @@ function ProjectDetailContent() {
     }
 
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
+      const response = await fetch(`/api/projects/${projectSlug}`, {
         method: 'DELETE',
       });
 
@@ -181,7 +181,7 @@ function ProjectDetailContent() {
 
     try {
       for (const materialId of materialIds) {
-        const response = await fetch(`/api/projects/${project.id}/materials/${materialId}`, {
+        const response = await fetch(`/api/projects/${projectSlug}/materials/${materialId}`, {
           method: 'DELETE',
         });
 
@@ -411,8 +411,13 @@ function ProjectDetailContent() {
         isOpen={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
         initialData={project}
-        onSuccess={() => {
-          fetchProject();
+        onSuccess={(updatedProject) => {
+          // スラッグが変更された場合は新しいURLにリダイレクト
+          if (updatedProject && updatedProject.slug !== projectSlug) {
+            router.push(`/projects/${updatedProject.slug}`);
+          } else {
+            fetchProject();
+          }
           setIsEditModalOpen(false);
         }}
       />

@@ -7,11 +7,13 @@ import { NextRequest } from 'next/server';
 // Mock types for testing
 
 function createMockRequest(
-  method: string, 
+  method: string,
   body?: Record<string, unknown>,
-  searchParams?: URLSearchParams
+  searchParams?: URLSearchParams,
 ): NextRequest {
-  const url = new URL(`http://localhost/api/projects${searchParams ? '?' + searchParams.toString() : ''}`);
+  const url = new URL(
+    `http://localhost/api/projects${searchParams ? '?' + searchParams.toString() : ''}`,
+  );
   let requestBody: BodyInit | null | undefined = undefined;
   const headers = new Headers();
 
@@ -32,7 +34,7 @@ function createMockRequest(
     Object.defineProperty(req, 'json', {
       value: async () => body,
       writable: true,
-      configurable: true
+      configurable: true,
     });
   }
 
@@ -51,9 +53,9 @@ describe('/api/projects', () => {
         updatedAt: new Date('2023-01-15T10:00:00Z'),
         materials: [
           { id: 'mat1', title: 'Bird Song', slug: 'bird-song' },
-          { id: 'mat2', title: 'River Flow', slug: 'river-flow' }
+          { id: 'mat2', title: 'River Flow', slug: 'river-flow' },
         ],
-        _count: { materials: 2 }
+        _count: { materials: 2 },
       },
       {
         id: 'proj2',
@@ -62,10 +64,8 @@ describe('/api/projects', () => {
         description: 'City soundscapes',
         createdAt: new Date('2023-02-20T14:30:00Z'),
         updatedAt: new Date('2023-02-20T14:30:00Z'),
-        materials: [
-          { id: 'mat3', title: 'Traffic Noise', slug: 'traffic-noise' }
-        ],
-        _count: { materials: 1 }
+        materials: [{ id: 'mat3', title: 'Traffic Noise', slug: 'traffic-noise' }],
+        _count: { materials: 1 },
       },
       {
         id: 'proj3',
@@ -75,24 +75,43 @@ describe('/api/projects', () => {
         createdAt: new Date('2023-03-10T08:00:00Z'),
         updatedAt: new Date('2023-03-10T08:00:00Z'),
         materials: [],
-        _count: { materials: 0 }
+        _count: { materials: 0 },
       },
     ];
 
     beforeEach(() => {
       (prismaMock.project.findMany as jest.Mock).mockImplementation(async (args?: unknown) => {
         let filteredProjects = [...baseMockProjects];
-        
-        if (args && typeof args === 'object' && 'where' in args && args.where && 
-            typeof args.where === 'object' && 'name' in args.where && args.where.name &&
-            typeof args.where.name === 'object' && 'contains' in args.where.name) {
-          const nameQuery = (args.where.name as { contains: string; mode?: string }).contains.toLowerCase();
-          filteredProjects = filteredProjects.filter(p => p.name.toLowerCase().includes(nameQuery));
+
+        if (
+          args &&
+          typeof args === 'object' &&
+          'where' in args &&
+          args.where &&
+          typeof args.where === 'object' &&
+          'name' in args.where &&
+          args.where.name &&
+          typeof args.where.name === 'object' &&
+          'contains' in args.where.name
+        ) {
+          const nameQuery = (
+            args.where.name as { contains: string; mode?: string }
+          ).contains.toLowerCase();
+          filteredProjects = filteredProjects.filter((p) =>
+            p.name.toLowerCase().includes(nameQuery),
+          );
         }
 
-        if (args && typeof args === 'object' && 'orderBy' in args && args.orderBy && typeof args.orderBy === 'object' && !Array.isArray(args.orderBy)) {
+        if (
+          args &&
+          typeof args === 'object' &&
+          'orderBy' in args &&
+          args.orderBy &&
+          typeof args.orderBy === 'object' &&
+          !Array.isArray(args.orderBy)
+        ) {
           const [[sortBy, sortOrder]] = Object.entries(args.orderBy);
-          const key = sortBy as keyof typeof baseMockProjects[0];
+          const key = sortBy as keyof (typeof baseMockProjects)[0];
           filteredProjects.sort((a, b) => {
             const aVal = a[key];
             const bVal = b[key];
@@ -103,18 +122,32 @@ describe('/api/projects', () => {
           });
         }
 
-        const skip = (args && typeof args === 'object' && 'skip' in args ? Number(args.skip) : 0) || 0;
-        const take = (args && typeof args === 'object' && 'take' in args ? Number(args.take) : 10) || 10;
+        const skip =
+          (args && typeof args === 'object' && 'skip' in args ? Number(args.skip) : 0) || 0;
+        const take =
+          (args && typeof args === 'object' && 'take' in args ? Number(args.take) : 10) || 10;
         return filteredProjects.slice(skip, skip + take);
       });
-       
+
       (prismaMock.project.count as jest.Mock).mockImplementation(async (args?: unknown) => {
         let filteredProjects = [...baseMockProjects];
-        if (args && typeof args === 'object' && 'where' in args && args.where && 
-            typeof args.where === 'object' && 'name' in args.where && args.where.name &&
-            typeof args.where.name === 'object' && 'contains' in args.where.name) {
-          const nameQuery = (args.where.name as { contains: string; mode?: string }).contains.toLowerCase();
-          filteredProjects = filteredProjects.filter(p => p.name.toLowerCase().includes(nameQuery));
+        if (
+          args &&
+          typeof args === 'object' &&
+          'where' in args &&
+          args.where &&
+          typeof args.where === 'object' &&
+          'name' in args.where &&
+          args.where.name &&
+          typeof args.where.name === 'object' &&
+          'contains' in args.where.name
+        ) {
+          const nameQuery = (
+            args.where.name as { contains: string; mode?: string }
+          ).contains.toLowerCase();
+          filteredProjects = filteredProjects.filter((p) =>
+            p.name.toLowerCase().includes(nameQuery),
+          );
         }
         return filteredProjects.length;
       });
@@ -128,37 +161,43 @@ describe('/api/projects', () => {
       expect(response.status).toBe(200);
       expect(responseBody.data).toHaveLength(3);
       expect(responseBody.data[0].name).toBe('Experimental');
-      expect(responseBody.data[0].materialsCount).toBe(0);
-      expect(responseBody.data[0].materials).toBeDefined();
+      expect(responseBody.data[0]._count?.materials).toBe(0);
+      // materials is not included in the response, only _count
       expect(responseBody.pagination.page).toBe(1);
       expect(responseBody.pagination.limit).toBe(10);
       expect(responseBody.pagination.totalPages).toBe(1);
       expect(responseBody.pagination.totalItems).toBe(3);
-      expect(prismaMock.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          materials: {
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-            }
+      expect(prismaMock.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 0,
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            materials: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+              },
+            },
+            _count: {
+              select: {
+                materials: true,
+              },
+            },
           },
-          _count: {
-            select: {
-              materials: true,
-            }
-          }
-        },
-        where: {}
-      }));
-      expect(prismaMock.project.count).toHaveBeenCalledWith({where: {}});
+          where: {},
+        }),
+      );
+      expect(prismaMock.project.count).toHaveBeenCalledWith({ where: {} });
     });
 
     it('should handle page and limit parameters', async () => {
-      const request = createMockRequest('GET', undefined, new URLSearchParams({ page: '2', limit: '1' }));
+      const request = createMockRequest(
+        'GET',
+        undefined,
+        new URLSearchParams({ page: '2', limit: '1' }),
+      );
       const response = await GET(request);
       const responseBody = await response.json();
 
@@ -168,23 +207,31 @@ describe('/api/projects', () => {
       expect(responseBody.pagination.page).toBe(2);
       expect(responseBody.pagination.limit).toBe(1);
       expect(responseBody.pagination.totalPages).toBe(3);
-      expect(prismaMock.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        skip: 1,
-        take: 1,
-      }));
+      expect(prismaMock.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 1,
+          take: 1,
+        }),
+      );
     });
 
     it('should handle sortBy and sortOrder parameters (name asc)', async () => {
-      const request = createMockRequest('GET', undefined, new URLSearchParams({ sortBy: 'name', sortOrder: 'asc' }));
+      const request = createMockRequest(
+        'GET',
+        undefined,
+        new URLSearchParams({ sortBy: 'name', sortOrder: 'asc' }),
+      );
       const response = await GET(request);
       const responseBody = await response.json();
 
       expect(response.status).toBe(200);
       expect(responseBody.data).toHaveLength(3);
       expect(responseBody.data[0].name).toBe('Experimental');
-      expect(prismaMock.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        orderBy: { name: 'asc' },
-      }));
+      expect(prismaMock.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { name: 'asc' },
+        }),
+      );
     });
 
     it('should filter by name (case-insensitive)', async () => {
@@ -195,13 +242,19 @@ describe('/api/projects', () => {
       expect(response.status).toBe(200);
       expect(responseBody.data).toHaveLength(1);
       expect(responseBody.data[0].name).toBe('Nature Sounds');
-      expect(prismaMock.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: { name: { contains: 'nature', mode: 'insensitive' } },
-      }));
+      expect(prismaMock.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { name: { contains: 'nature', mode: 'insensitive' } },
+        }),
+      );
     });
 
     it('should return 400 for invalid query parameters', async () => {
-      const request = createMockRequest('GET', undefined, new URLSearchParams({ page: 'invalidPage' }));
+      const request = createMockRequest(
+        'GET',
+        undefined,
+        new URLSearchParams({ page: 'invalidPage' }),
+      );
       const response = await GET(request);
       const responseBody = await response.json();
 
@@ -236,7 +289,7 @@ describe('/api/projects', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         materials: [],
-        _count: { materials: 0 }
+        _count: { materials: 0 },
       };
       prismaMock.project.create.mockResolvedValue(createdProjectResponse);
 
@@ -248,8 +301,8 @@ describe('/api/projects', () => {
       expect(responseBody.name).toBe(validProjectData.name);
       expect(responseBody.slug).toBe('new-project');
       expect(responseBody.description).toBe(validProjectData.description);
-      expect(responseBody.materialsCount).toBe(0);
-      expect(responseBody.materials).toHaveLength(0);
+      expect(responseBody._count?.materials).toBe(0);
+      // materials is not included in the response, only _count
       expect(prismaMock.project.create).toHaveBeenCalledTimes(1);
       expect(prismaMock.project.create).toHaveBeenCalledWith({
         data: {
@@ -263,13 +316,13 @@ describe('/api/projects', () => {
               id: true,
               title: true,
               slug: true,
-            }
+            },
           },
           _count: {
             select: {
               materials: true,
-            }
-          }
+            },
+          },
         },
       });
     });
@@ -288,7 +341,7 @@ describe('/api/projects', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         materials: [],
-        _count: { materials: 0 }
+        _count: { materials: 0 },
       };
       prismaMock.project.create.mockResolvedValue(createdProjectResponse);
 
@@ -330,7 +383,9 @@ describe('/api/projects', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(409);
-      expect(responseBody.error).toBe('Failed to create project: Slug already exists. Please change the name.');
+      expect(responseBody.error).toBe(
+        'Failed to create project: Slug already exists. Please change the name.',
+      );
       expect(prismaMock.project.create).toHaveBeenCalledTimes(1);
     });
 
