@@ -153,8 +153,8 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
     // 初期状態では素材がないことを確認
     await expect(page.getByText('No materials in this project yet')).toBeVisible();
 
-    // 素材追加ボタンが表示されることを確認
-    await expect(page.getByRole('link', { name: /Add Materials/i })).toBeVisible();
+    // 素材管理ボタンが表示されることを確認
+    await expect(page.getByRole('button', { name: /Manage Materials/i })).toBeVisible();
   });
 
   test('プロジェクトの削除', async ({ page }) => {

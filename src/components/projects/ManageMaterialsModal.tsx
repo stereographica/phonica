@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Search, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useNotification } from '@/hooks/use-notification';
 
 interface Material {
@@ -61,12 +67,31 @@ export function ManageMaterialsModal({
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
   const [originalSelection, setOriginalSelection] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('recordedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedTag, setSelectedTag] = useState('');
+  const [availableTags, setAvailableTags] = useState<{ id: string; name: string }[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     totalPages: 1,
     totalItems: 0,
   });
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset pagination when search query or tag filter changes
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [debouncedSearchQuery, selectedTag]);
 
   // Calculate changes
   const calculateChanges = useCallback(() => {
@@ -95,10 +120,16 @@ export function ManageMaterialsModal({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         includeProjectStatus: projectSlug,
+        sortBy,
+        sortOrder,
       });
 
-      if (searchQuery) {
-        params.set('title', searchQuery);
+      if (debouncedSearchQuery) {
+        params.set('title', debouncedSearchQuery);
+      }
+
+      if (selectedTag) {
+        params.set('tag', selectedTag);
       }
 
       const response = await fetch(`/api/materials?${params.toString()}`);
@@ -125,17 +156,37 @@ export function ManageMaterialsModal({
     projectSlug,
     pagination.page,
     pagination.limit,
-    searchQuery,
+    debouncedSearchQuery,
+    sortBy,
+    sortOrder,
+    selectedTag,
     notifyError,
     originalSelection.size,
   ]);
 
-  // Fetch materials when modal opens
+  // Fetch tags
+  const fetchTags = useCallback(async () => {
+    try {
+      const response = await fetch('/api/tags');
+      if (!response.ok) {
+        throw new Error('Failed to fetch tags');
+      }
+      const data = await response.json();
+      setAvailableTags(data.data || []);
+    } catch (error) {
+      notifyError(error, { operation: 'fetch', entity: 'tags' });
+    }
+  }, [notifyError]);
+
+  // Fetch materials when modal opens or search/pagination changes
   useEffect(() => {
     if (isOpen) {
       fetchMaterials();
+      if (availableTags.length === 0) {
+        fetchTags();
+      }
     }
-  }, [isOpen, fetchMaterials]);
+  }, [isOpen, fetchMaterials, fetchTags, availableTags.length]);
 
   // Handle checkbox change
   const handleSelectMaterial = (materialId: string, checked: boolean) => {
@@ -167,6 +218,14 @@ export function ManageMaterialsModal({
     if (toAdd.length === 0 && toRemove.length === 0) {
       onOpenChange(false);
       return;
+    }
+
+    // Confirm large deletions
+    if (toRemove.length > 5) {
+      const confirmed = confirm(
+        `You are about to remove ${toRemove.length} materials from this project. Are you sure?`
+      );
+      if (!confirmed) return;
     }
 
     setIsLoading(true);
@@ -217,8 +276,34 @@ export function ManageMaterialsModal({
   const { toAdd, toRemove } = calculateChanges();
   const hasChanges = toAdd.length > 0 || toRemove.length > 0;
 
+  // Sort options
+  const sortOptions = [
+    { value: 'recordedAt-desc', label: 'Recorded Date (Newest First)' },
+    { value: 'recordedAt-asc', label: 'Recorded Date (Oldest First)' },
+    { value: 'title-asc', label: 'Title (A-Z)' },
+    { value: 'title-desc', label: 'Title (Z-A)' },
+    { value: 'createdAt-desc', label: 'Created Date (Newest First)' },
+    { value: 'createdAt-asc', label: 'Created Date (Oldest First)' },
+  ];
+
+  const currentSortLabel = sortOptions.find(
+    (opt) => opt.value === `${sortBy}-${sortOrder}`
+  )?.label || 'Sort';
+
+  // Handle modal close
+  const handleModalClose = (open: boolean) => {
+    if (!open) {
+      // Reset state when closing
+      setSearchQuery('');
+      setDebouncedSearchQuery('');
+      setSelectedTag('');
+      setPagination((prev) => ({ ...prev, page: 1 }));
+    }
+    onOpenChange(open);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Project Materials</DialogTitle>
@@ -228,15 +313,69 @@ export function ManageMaterialsModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
-          {/* Search input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search materials by title..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          {/* Search and filter controls */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search materials by title..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* Tag filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="min-w-[150px]">
+                  {selectedTag ? 
+                    availableTags.find(t => t.name === selectedTag)?.name || 'Tag' 
+                    : 'All Tags'}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setSelectedTag('')}
+                >
+                  All Tags
+                </DropdownMenuItem>
+                {availableTags.map((tag) => (
+                  <DropdownMenuItem
+                    key={tag.id}
+                    onClick={() => setSelectedTag(tag.name)}
+                  >
+                    {tag.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Sort dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="min-w-[200px]">
+                  {currentSortLabel}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {sortOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => {
+                      const [field, order] = option.value.split('-');
+                      setSortBy(field);
+                      setSortOrder(order as 'asc' | 'desc');
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Materials table */}
@@ -246,7 +385,34 @@ export function ManageMaterialsModal({
             ) : materials.length === 0 ? (
               <div className="text-center py-8 text-gray-500">No materials found</div>
             ) : (
-              <Table>
+              <>
+                {/* Batch operations */}
+                <div className="flex items-center justify-between px-2 py-2 border-b">
+                  <div className="text-sm text-muted-foreground">
+                    {selectedMaterials.size} of {pagination.totalItems} selected
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const allIds = materials.map((m) => m.id);
+                        setSelectedMaterials(new Set([...selectedMaterials, ...allIds]));
+                      }}
+                    >
+                      Select All on Page
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedMaterials(new Set())}
+                      disabled={selectedMaterials.size === 0}
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                </div>
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">
@@ -307,6 +473,7 @@ export function ManageMaterialsModal({
                   ))}
                 </TableBody>
               </Table>
+              </>
             )}
           </div>
 
