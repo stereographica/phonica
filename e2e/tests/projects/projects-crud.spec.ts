@@ -253,8 +253,10 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // 名前順でソート
     await page.getByRole('menuitem', { name: /Name \(A-Z\)/i }).click();
-    await page.waitForLoadState('networkidle');
-
+    
+    // URLが更新されるまで待機
+    await page.waitForURL(/sortBy=name/, { timeout: 5000 });
+    
     // URLにソートパラメータが含まれることを確認
     expect(page.url()).toContain('sortBy=name');
     expect(page.url()).toContain('sortOrder=asc');
