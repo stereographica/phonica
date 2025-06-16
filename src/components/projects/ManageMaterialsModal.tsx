@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -55,6 +55,12 @@ interface ManageMaterialsModalProps {
   onSuccess?: () => void;
 }
 
+// Material state tracking
+interface MaterialState {
+  originallyInProject: boolean;
+  currentlySelected: boolean;
+}
+
 export function ManageMaterialsModal({
   isOpen,
   onOpenChange,
@@ -64,9 +70,10 @@ export function ManageMaterialsModal({
   const { notifyError, notifySuccess } = useNotification();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
-  const [originalSelection, setOriginalSelection] = useState<Set<string>>(new Set());
-  const isInitializedRef = useRef(false);
+
+  // Track material states: materialId -> { originallyInProject, currentlySelected }
+  const [materialStates, setMaterialStates] = useState<Map<string, MaterialState>>(new Map());
+
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('recordedAt');
@@ -99,19 +106,16 @@ export function ManageMaterialsModal({
     const toAdd: string[] = [];
     const toRemove: string[] = [];
 
-    materials.forEach((material) => {
-      const wasSelected = originalSelection.has(material.id);
-      const isSelected = selectedMaterials.has(material.id);
-
-      if (!wasSelected && isSelected) {
-        toAdd.push(material.id);
-      } else if (wasSelected && !isSelected) {
-        toRemove.push(material.id);
+    materialStates.forEach((state, materialId) => {
+      if (!state.originallyInProject && state.currentlySelected) {
+        toAdd.push(materialId);
+      } else if (state.originallyInProject && !state.currentlySelected) {
+        toRemove.push(materialId);
       }
     });
 
     return { toAdd, toRemove };
-  }, [materials, selectedMaterials, originalSelection]);
+  }, [materialStates]);
 
   // Fetch materials with project status
   const fetchMaterials = useCallback(async () => {
@@ -139,16 +143,33 @@ export function ManageMaterialsModal({
       }
 
       const data: MaterialsApiResponse = await response.json();
-      setMaterials(data.data);
-      setPagination(data.pagination);
+      setMaterials(data.data || []);
+      setPagination(
+        data.pagination || {
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+          totalItems: 0,
+        },
+      );
 
-      // Set initial selection for materials already in project (only on first load)
-      if (pagination.page === 1 && !isInitializedRef.current) {
-        const inProjectIds = data.data.filter((m) => m.isInProject).map((m) => m.id);
-        setOriginalSelection(new Set(inProjectIds));
-        setSelectedMaterials(new Set(inProjectIds));
-        isInitializedRef.current = true;
-      }
+      // Update material states for current page
+      setMaterialStates((prevStates) => {
+        const newStates = new Map(prevStates);
+
+        (data.data || []).forEach((material) => {
+          const existingState = newStates.get(material.id);
+
+          // Always update the originallyInProject state with the latest from API
+          // This ensures we have the correct state when modal is reopened
+          newStates.set(material.id, {
+            originallyInProject: material.isInProject || false,
+            currentlySelected: existingState?.currentlySelected ?? (material.isInProject || false),
+          });
+        });
+
+        return newStates;
+      });
     } catch (error) {
       notifyError(error, { operation: 'fetch', entity: 'materials' });
     } finally {
@@ -186,7 +207,7 @@ export function ManageMaterialsModal({
     }
   }, [isOpen, fetchMaterials]);
 
-  // Fetch tags separately to avoid dependency cycles
+  // Fetch tags when modal opens
   useEffect(() => {
     if (isOpen && availableTags.length === 0) {
       fetchTags();
@@ -195,25 +216,38 @@ export function ManageMaterialsModal({
 
   // Handle checkbox change
   const handleSelectMaterial = (materialId: string, checked: boolean) => {
-    const newSelection = new Set(selectedMaterials);
-    if (checked) {
-      newSelection.add(materialId);
-    } else {
-      newSelection.delete(materialId);
-    }
-    setSelectedMaterials(newSelection);
+    setMaterialStates((prevStates) => {
+      const newStates = new Map(prevStates);
+      const state = newStates.get(materialId);
+
+      if (state) {
+        newStates.set(materialId, {
+          ...state,
+          currentlySelected: checked,
+        });
+      }
+
+      return newStates;
+    });
   };
 
   // Handle select all
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = materials.map((m) => m.id);
-      setSelectedMaterials(new Set([...selectedMaterials, ...allIds]));
-    } else {
-      const pageIds = new Set(materials.map((m) => m.id));
-      const newSelection = new Set(Array.from(selectedMaterials).filter((id) => !pageIds.has(id)));
-      setSelectedMaterials(newSelection);
-    }
+    setMaterialStates((prevStates) => {
+      const newStates = new Map(prevStates);
+
+      materials.forEach((material) => {
+        const state = newStates.get(material.id);
+        if (state) {
+          newStates.set(material.id, {
+            ...state,
+            currentlySelected: checked,
+          });
+        }
+      });
+
+      return newStates;
+    });
   };
 
   // Apply changes
@@ -223,14 +257,6 @@ export function ManageMaterialsModal({
     if (toAdd.length === 0 && toRemove.length === 0) {
       onOpenChange(false);
       return;
-    }
-
-    // Confirm large deletions
-    if (toRemove.length > 5) {
-      const confirmed = confirm(
-        `You are about to remove ${toRemove.length} materials from this project. Are you sure?`,
-      );
-      if (!confirmed) return;
     }
 
     setIsLoading(true);
@@ -261,18 +287,41 @@ export function ManageMaterialsModal({
     }
   };
 
-  // Get row style based on material state
-  const getMaterialRowStyle = (material: Material) => {
-    const wasInProject = originalSelection.has(material.id);
-    const isSelected = selectedMaterials.has(material.id);
+  // Get material display state
+  const getMaterialDisplayState = (material: Material) => {
+    const state = materialStates.get(material.id);
+    if (!state) return { isSelected: false, status: '' };
 
-    if (!wasInProject && isSelected) {
+    return {
+      isSelected: state.currentlySelected,
+      status: getStatusBadge(state),
+      rowStyle: getRowStyle(state),
+    };
+  };
+
+  // Get status badge
+  const getStatusBadge = (state: MaterialState) => {
+    if (state.originallyInProject && state.currentlySelected) {
+      return 'already-added';
+    }
+    if (!state.originallyInProject && state.currentlySelected) {
+      return 'to-add';
+    }
+    if (state.originallyInProject && !state.currentlySelected) {
+      return 'to-remove';
+    }
+    return '';
+  };
+
+  // Get row style
+  const getRowStyle = (state: MaterialState) => {
+    if (!state.originallyInProject && state.currentlySelected) {
       return 'bg-green-50';
     }
-    if (wasInProject && !isSelected) {
+    if (state.originallyInProject && !state.currentlySelected) {
       return 'bg-red-50';
     }
-    if (material.isInProject) {
+    if (state.originallyInProject) {
       return 'bg-gray-50';
     }
     return '';
@@ -297,15 +346,30 @@ export function ManageMaterialsModal({
   // Handle modal close
   const handleModalClose = (open: boolean) => {
     if (!open) {
-      // Reset state when closing
+      // Reset all state when closing
       setSearchQuery('');
       setDebouncedSearchQuery('');
       setSelectedTag('');
-      setPagination((prev) => ({ ...prev, page: 1 }));
-      isInitializedRef.current = false;
+      setPagination({
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+        totalItems: 0,
+      });
+      setMaterialStates(new Map());
+      setMaterials([]);
+      setAvailableTags([]);
     }
     onOpenChange(open);
   };
+
+  // Check if all materials on current page are selected
+  const areAllPageMaterialsSelected =
+    materials.length > 0 &&
+    materials.every((m) => {
+      const state = materialStates.get(m.id);
+      return state?.currentlySelected || false;
+    });
 
   return (
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
@@ -390,45 +454,47 @@ export function ManageMaterialsModal({
                     </div>
                   </div>
                   {/* Table skeleton */}
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="p-3 w-[50px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
                           <div className="h-4 w-4 bg-gray-200 rounded" />
-                        </th>
-                        <th className="p-3 text-left">
+                        </TableHead>
+                        <TableHead>
                           <div className="h-4 bg-gray-200 rounded w-16" />
-                        </th>
-                        <th className="p-3 text-left">
+                        </TableHead>
+                        <TableHead>
                           <div className="h-4 bg-gray-200 rounded w-16" />
-                        </th>
-                        <th className="p-3 text-left">
+                        </TableHead>
+                        <TableHead>
                           <div className="h-4 bg-gray-200 rounded w-16" />
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {Array.from({ length: 10 }).map((_, i) => (
-                        <tr key={i} className="border-b">
-                          <td className="p-3">
+                        <TableRow key={i}>
+                          <TableCell>
                             <div className="h-4 w-4 bg-gray-100 rounded" />
-                          </td>
-                          <td className="p-3">
+                          </TableCell>
+                          <TableCell>
                             <div className="h-4 bg-gray-100 rounded w-48" />
-                          </td>
-                          <td className="p-3">
-                            <div className="h-6 bg-gray-100 rounded w-24" />
-                          </td>
-                          <td className="p-3">
+                          </TableCell>
+                          <TableCell>
                             <div className="flex gap-1">
-                              <div className="h-5 bg-gray-100 rounded w-16" />
                               <div className="h-5 bg-gray-100 rounded w-20" />
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <div className="h-5 bg-gray-100 rounded w-12" />
+                              <div className="h-5 bg-gray-100 rounded w-16" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             ) : materials.length === 0 ? (
@@ -438,24 +504,18 @@ export function ManageMaterialsModal({
                 {/* Batch operations */}
                 <div className="flex items-center justify-between px-2 py-2 border-b">
                   <div className="text-sm text-muted-foreground">
-                    {selectedMaterials.size} of {pagination.totalItems} selected
+                    {[...materialStates.values()].filter((s) => s.currentlySelected).length} of{' '}
+                    {pagination.totalItems} selected
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const allIds = materials.map((m) => m.id);
-                        setSelectedMaterials(new Set([...selectedMaterials, ...allIds]));
-                      }}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => handleSelectAll(true)}>
                       Select All on Page
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedMaterials(new Set())}
-                      disabled={selectedMaterials.size === 0}
+                      onClick={() => handleSelectAll(false)}
+                      disabled={!areAllPageMaterialsSelected}
                     >
                       Clear Selection
                     </Button>
@@ -466,10 +526,7 @@ export function ManageMaterialsModal({
                     <TableRow>
                       <TableHead className="w-[50px]">
                         <Checkbox
-                          checked={
-                            materials.length > 0 &&
-                            materials.every((m) => selectedMaterials.has(m.id))
-                          }
+                          checked={areAllPageMaterialsSelected}
                           onCheckedChange={handleSelectAll}
                         />
                       </TableHead>
@@ -479,47 +536,49 @@ export function ManageMaterialsModal({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {materials.map((material) => (
-                      <TableRow key={material.id} className={getMaterialRowStyle(material)}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedMaterials.has(material.id)}
-                            onCheckedChange={(checked) =>
-                              handleSelectMaterial(material.id, checked as boolean)
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>{material.title}</TableCell>
-                        <TableCell>
-                          {material.isInProject && (
-                            <Badge variant="secondary" className="text-xs">
-                              Already added
-                            </Badge>
-                          )}
-                          {!originalSelection.has(material.id) &&
-                            selectedMaterials.has(material.id) && (
+                    {materials.map((material) => {
+                      const displayState = getMaterialDisplayState(material);
+
+                      return (
+                        <TableRow key={material.id} className={displayState.rowStyle}>
+                          <TableCell>
+                            <Checkbox
+                              checked={displayState.isSelected}
+                              onCheckedChange={(checked) =>
+                                handleSelectMaterial(material.id, checked as boolean)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>{material.title}</TableCell>
+                          <TableCell>
+                            {displayState.status === 'already-added' && (
+                              <Badge variant="secondary" className="text-xs">
+                                Already added
+                              </Badge>
+                            )}
+                            {displayState.status === 'to-add' && (
                               <Badge variant="default" className="text-xs bg-green-600">
                                 To add
                               </Badge>
                             )}
-                          {originalSelection.has(material.id) &&
-                            !selectedMaterials.has(material.id) && (
+                            {displayState.status === 'to-remove' && (
                               <Badge variant="destructive" className="text-xs">
                                 To remove
                               </Badge>
                             )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {material.tags.map((tag) => (
-                              <Badge key={tag.id} variant="outline" className="text-xs">
-                                {tag.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {material.tags.map((tag) => (
+                                <Badge key={tag.id} variant="outline" className="text-xs">
+                                  {tag.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </>
