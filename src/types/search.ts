@@ -3,8 +3,8 @@ import { Material, Tag, Equipment } from './material';
 // 検索結果の型定義
 export interface SearchResult {
   materials: (Material & { score?: number })[];
-  tags?: (Tag & { score?: number })[];
-  equipment?: (Equipment & { score?: number })[];
+  tags?: (Tag & { score?: number; _count?: { materials: number } })[];
+  equipment?: (Equipment & { score?: number; manufacturer?: string })[];
 }
 
 // 検索APIのレスポンス型
