@@ -119,6 +119,8 @@ export function ManageMaterialsModal({
 
   // Fetch materials with project status
   const fetchMaterials = useCallback(async () => {
+    if (!projectSlug) return;
+
     setIsLoading(true);
     try {
       const params = new URLSearchParams({

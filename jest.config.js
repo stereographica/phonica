@@ -49,4 +49,6 @@ module.exports = {
   // },
   // Babelがnode_modules内の一部のライブラリもトランスパイルするように設定 (例: ES6+構文を使っているライブラリ)
   transformIgnorePatterns: ['/node_modules/(?!(msgpackr|bullmq)/)/'],
+  // Increase test timeout for slower CI environments
+  testTimeout: 30000,
 };

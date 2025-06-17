@@ -253,15 +253,21 @@ describe('ProjectDetailPage', () => {
       expect(screen.getByText('Edit Project')).toBeInTheDocument();
     });
 
-    it.skip('should delete project when delete button is clicked and confirmed', async () => {
+    it('should delete project when delete button is clicked and confirmed', async () => {
       // Arrange
       global.confirm = jest.fn(() => true);
 
-      // Add mock for delete request (initial page load is already mocked in beforeEach)
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-      });
+      // Mock notification hook
+      const mockNotifySuccess = jest.fn();
+      const mockNotifyError = jest.fn();
+
+      // Use jest.requireMock to get the already mocked module
+      jest.requireMock('@/hooks/use-notification').useNotification = jest.fn(() => ({
+        notifyError: mockNotifyError,
+        notifySuccess: mockNotifySuccess,
+        notifyInfo: jest.fn(),
+        notifyWarning: jest.fn(),
+      }));
 
       // Act
       render(<ProjectDetailPage />);
@@ -270,21 +276,35 @@ describe('ProjectDetailPage', () => {
         expect(screen.getByText('Nature Sounds Collection')).toBeInTheDocument();
       });
 
-      // Open dropdown menu
-      const moreButton = screen.getByRole('button', { name: '' });
-      await user.click(moreButton);
+      // Add mock for delete request
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+      });
 
-      // Click delete option
-      const deleteButton = screen.getByRole('menuitem', { name: /delete project/i });
+      // Open dropdown menu
+      const moreButton = screen
+        .getAllByRole('button')
+        .find((btn) => btn.querySelector('svg.lucide-ellipsis-vertical'));
+      await user.click(moreButton!);
+
+      // Wait for dropdown menu to open and click delete option
+      await waitFor(() => {
+        const deleteButton = screen.getByText('Delete Project');
+        expect(deleteButton).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getByText('Delete Project');
       await user.click(deleteButton);
 
       // Assert
       expect(global.confirm).toHaveBeenCalledWith('Are you sure you want to delete this project?');
 
       await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith('/api/projects/proj-1', {
+        expect(fetch).toHaveBeenCalledWith('/api/projects/nature-sounds', {
           method: 'DELETE',
         });
+        expect(mockNotifySuccess).toHaveBeenCalledWith('delete', 'project');
         expect(mockPush).toHaveBeenCalledWith('/projects');
       });
     });
