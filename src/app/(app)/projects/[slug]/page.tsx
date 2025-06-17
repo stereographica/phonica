@@ -23,13 +23,14 @@ import {
   ArrowLeft,
   Edit,
   Trash2,
-  Plus,
+  Settings,
   X,
   ChevronLeft,
   ChevronRight,
   MoreVertical,
 } from 'lucide-react';
 import { ProjectFormModal } from '@/components/projects/ProjectFormModal';
+import { ManageMaterialsModal } from '@/components/projects/ManageMaterialsModal';
 import { useNotification } from '@/hooks/use-notification';
 
 interface Project {
@@ -75,6 +76,7 @@ function ProjectDetailContent() {
   const [isMaterialsLoading, setIsMaterialsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isManageMaterialsModalOpen, setIsManageMaterialsModalOpen] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({
     page: 1,
@@ -308,12 +310,10 @@ function ProjectDetailContent() {
                 Remove Selected ({selectedMaterials.size})
               </Button>
             )}
-            <Link href="/materials">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Materials
-              </Button>
-            </Link>
+            <Button size="sm" onClick={() => setIsManageMaterialsModalOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              Manage Materials
+            </Button>
           </div>
         </div>
 
@@ -420,6 +420,13 @@ function ProjectDetailContent() {
           }
           setIsEditModalOpen(false);
         }}
+      />
+
+      <ManageMaterialsModal
+        isOpen={isManageMaterialsModalOpen}
+        onOpenChange={setIsManageMaterialsModalOpen}
+        projectSlug={projectSlug}
+        onSuccess={fetchProjectMaterials}
       />
     </div>
   );

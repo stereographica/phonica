@@ -55,6 +55,7 @@ const GetMaterialsQuerySchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
   title: z.string().optional(),
   tag: z.string().optional(),
+  includeProjectStatus: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -71,7 +72,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { page, limit, sortBy, sortOrder, title, tag } = validationResult.data;
+    const { page, limit, sortBy, sortOrder, title, tag, includeProjectStatus } =
+      validationResult.data;
 
     const skip = (page - 1) * limit;
 
@@ -124,6 +126,23 @@ export async function GET(request: NextRequest) {
     const totalMaterials = await prisma.material.count({ where });
     const totalPages = Math.ceil(totalMaterials / limit);
 
+    // If includeProjectStatus is provided, get materials in that project
+    let materialsInProject: Set<string> = new Set();
+    if (includeProjectStatus) {
+      const project = await prisma.project.findUnique({
+        where: { slug: includeProjectStatus },
+        select: {
+          materials: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (project) {
+        materialsInProject = new Set(project.materials.map((m) => m.id));
+      }
+    }
+
     // APIレスポンスの形式を調整
     const formattedMaterials = materials.map((material) => ({
       id: material.id,
@@ -145,6 +164,7 @@ export async function GET(request: NextRequest) {
       createdAt: material.createdAt,
       updatedAt: material.updatedAt,
       slug: material.slug,
+      ...(includeProjectStatus && { isInProject: materialsInProject.has(material.id) }),
     }));
 
     return NextResponse.json({

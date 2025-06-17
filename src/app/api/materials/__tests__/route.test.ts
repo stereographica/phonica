@@ -301,6 +301,55 @@ describe('/api/materials', () => {
       });
     });
 
+    it('should include project status when includeProjectStatus is provided', async () => {
+      const mockProject = {
+        id: 'project-1',
+        slug: 'test-project',
+        materials: [{ id: 'mat1' }, { id: 'mat3' }],
+      };
+
+      prismaMock.project.findUnique.mockResolvedValue(mockProject as never);
+
+      const searchParams = new URLSearchParams({
+        includeProjectStatus: 'test-project',
+      });
+      const request = createMockRequest('GET', undefined, searchParams);
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toHaveLength(3);
+      expect(data.data.find((m: { id: string }) => m.id === 'mat1').isInProject).toBe(true); // mat1 is in project
+      expect(data.data.find((m: { id: string }) => m.id === 'mat2').isInProject).toBe(false); // mat2 is not in project
+      expect(data.data.find((m: { id: string }) => m.id === 'mat3').isInProject).toBe(true); // mat3 is in project
+      expect(prismaMock.project.findUnique).toHaveBeenCalledWith({
+        where: { slug: 'test-project' },
+        select: {
+          materials: {
+            select: { id: true },
+          },
+        },
+      });
+    });
+
+    it('should handle includeProjectStatus when project not found', async () => {
+      prismaMock.project.findUnique.mockResolvedValue(null);
+
+      const searchParams = new URLSearchParams({
+        includeProjectStatus: 'non-existent-project',
+      });
+      const request = createMockRequest('GET', undefined, searchParams);
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toHaveLength(3);
+      // All materials should have isInProject: false
+      data.data.forEach((material: { isInProject: boolean }) => {
+        expect(material.isInProject).toBe(false);
+      });
+    });
+
     it('should return a list of materials with default pagination and sorting', async () => {
       const request = createMockRequest('GET');
       const response = await GET(request);
