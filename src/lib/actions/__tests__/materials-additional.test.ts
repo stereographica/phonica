@@ -48,6 +48,7 @@ describe('materials actions - additional tests', () => {
   const mockAudioMetadataService = {
     saveTempFile: jest.fn(),
     extractMetadata: jest.fn(),
+    analyzeAudio: jest.fn(),
     verifyTempFile: jest.fn(),
     persistTempFile: jest.fn(),
   };
@@ -154,6 +155,7 @@ describe('materials actions - additional tests', () => {
 
       mockAudioMetadataService.saveTempFile.mockResolvedValue('temp-file-id');
       mockAudioMetadataService.extractMetadata.mockResolvedValue(mockMetadata);
+      mockAudioMetadataService.analyzeAudio.mockResolvedValue(mockMetadata);
 
       const result = await uploadAndAnalyzeAudio(mockFormData);
 
@@ -163,7 +165,7 @@ describe('materials actions - additional tests', () => {
       expect(result.metadata).toEqual(mockMetadata);
 
       expect(mockAudioMetadataService.saveTempFile).toHaveBeenCalledWith(mockFile);
-      expect(mockAudioMetadataService.extractMetadata).toHaveBeenCalledWith('temp-file-id');
+      expect(mockAudioMetadataService.analyzeAudio).toHaveBeenCalledWith('temp-file-id');
     });
 
     it('should return error when no file provided', async () => {
@@ -182,7 +184,7 @@ describe('materials actions - additional tests', () => {
       (mockFormData.get as jest.Mock).mockReturnValue(mockFile);
 
       mockAudioMetadataService.saveTempFile.mockResolvedValue('temp-file-id');
-      mockAudioMetadataService.extractMetadata.mockRejectedValue(new Error('Extraction failed'));
+      mockAudioMetadataService.analyzeAudio.mockRejectedValue(new Error('Extraction failed'));
 
       const result = await uploadAndAnalyzeAudio(mockFormData);
 

@@ -157,6 +157,7 @@ describe('materials server actions - complete coverage', () => {
       const mockAudioService = {
         saveTempFile: jest.fn().mockResolvedValue('temp-123'),
         extractMetadata: jest.fn().mockResolvedValue(mockMetadata),
+        analyzeAudio: jest.fn().mockResolvedValue(mockMetadata),
         verifyTempFile: jest.fn(),
         persistTempFile: jest.fn(),
         cleanupTempFiles: jest.fn(),
@@ -174,7 +175,7 @@ describe('materials server actions - complete coverage', () => {
       expect(result.metadata).toEqual(mockMetadata);
 
       expect(mockAudioService.saveTempFile).toHaveBeenCalledWith(mockFile);
-      expect(mockAudioService.extractMetadata).toHaveBeenCalledWith('temp-123');
+      expect(mockAudioService.analyzeAudio).toHaveBeenCalledWith('temp-123');
     });
 
     it('should return error when no file provided', async () => {

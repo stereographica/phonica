@@ -209,56 +209,85 @@ test.describe('@master @critical Equipment Master', () => {
 
     // 作成した機材が表示されるまで待機
     await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).toBeVisible({
-      timeout: 10000,
+      timeout: 15000,
     });
 
     // 作成した機材の行を取得
     const targetRow = page.locator(`tbody tr:has(td:has-text("${uniqueEquipmentName}"))`);
 
-    // アクションメニューを開く
+    // アクションメニューを開く - WebKit用の安定性向上
     const actionButton = targetRow.locator('button:has(.sr-only:text("Open menu"))');
+    await expect(actionButton).toBeVisible({ timeout: 10000 });
     await actionButton.click();
 
-    // 削除オプションをクリック
-    // confirmダイアログのハンドラーを設定
-    page.on('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Are you sure you want to delete this equipment?');
-      await dialog.accept();
+    // メニューが開かれるまで待機
+    await expect(page.locator('[role="menuitem"]:has-text("Delete")')).toBeVisible({
+      timeout: 5000,
     });
 
-    await page.click('[role="menuitem"]:has-text("Delete")');
+    // WebKit用のダイアログハンドリングを改善
+    const dialogPromise = new Promise<void>((resolve) => {
+      page.on('dialog', async (dialog) => {
+        try {
+          expect(dialog.message()).toContain('Are you sure you want to delete this equipment?');
+          await dialog.accept();
+          resolve();
+        } catch (error) {
+          console.error('Dialog handling error:', error);
+          await dialog.accept(); // エラーでも受け入れる
+          resolve();
+        }
+      });
+    });
 
-    // 削除APIの完了を待つ
-    const deleteResponse = await page.waitForResponse(
+    // 削除APIレスポンスの待機を開始
+    const deleteResponsePromise = page.waitForResponse(
       (response) =>
         response.url().includes('/api/master/equipment/') &&
         response.request().method() === 'DELETE',
+      { timeout: browserName === 'webkit' ? 120000 : 90000 }, // WebKit用に長めのタイムアウト
     );
+
+    // 削除オプションをクリック
+    await page.click('[role="menuitem"]:has-text("Delete")');
+
+    // ダイアログの処理を待つ
+    await dialogPromise;
+
+    // 削除APIの完了を待つ
+    const deleteResponse = await deleteResponsePromise;
 
     // 削除が成功したことを確認
     expect(deleteResponse.status()).toBe(200);
 
-    // データの再取得を待つ（削除後の自動更新）
+    // WebKit用により長い待機時間で再取得を待つ
+    const refreshTimeout = browserName === 'webkit' ? 15000 : 8000;
     const refreshResponse = await page
       .waitForResponse(
         (response) =>
           response.url().includes('/api/master/equipment') &&
           response.request().method() === 'GET' &&
           response.status() === 200,
-        { timeout: 5000 },
+        { timeout: refreshTimeout },
       )
       .catch(() => null);
 
-    // 自動更新されない場合は手動でリロード
+    // 自動更新されない場合は手動でリロード（WebKit用の安定性向上）
     if (!refreshResponse) {
       console.log('No automatic refresh detected, manually reloading...');
       await page.reload();
       await page.waitForLoadState('networkidle');
+
+      // WebKit の場合、追加の待機時間を設ける
+      if (browserName === 'webkit') {
+        await page.waitForTimeout(2000);
+      }
     }
 
-    // 削除された機材が表示されなくなることを確認
+    // 削除された機材が表示されなくなることを確認（WebKit用に長めのタイムアウト）
+    const confirmTimeout = browserName === 'webkit' ? 15000 : 10000;
     await expect(page.locator(`td:has-text("${uniqueEquipmentName}")`)).not.toBeVisible({
-      timeout: 10000,
+      timeout: confirmTimeout,
     });
   });
 

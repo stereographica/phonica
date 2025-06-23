@@ -104,7 +104,7 @@ export async function uploadAndAnalyzeAudio(formData: FormData) {
 
     // メタデータを抽出
     try {
-      const metadata = await audioMetadataService.extractMetadata(tempFileId);
+      const metadata = await audioMetadataService.analyzeAudio(tempFileId);
 
       return {
         success: true,
