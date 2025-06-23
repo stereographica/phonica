@@ -57,41 +57,55 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // Worker固有のデータベース設定
   workerDatabase: [
     async ({}, use) => {
+      const isCI = process.env.CI === 'true';
       const workerId = getWorkerID();
-      console.log(`🔧 Setting up database for worker: ${workerId}`);
 
-      // 元の環境変数を保存
-      const originalDatabaseUrl = process.env.DATABASE_URL;
-
-      try {
-        // Worker固有のデータベースをセットアップ
-        await setupOptimizedE2EEnvironment(workerId);
-        const databaseUrl = getE2EDatabaseURL(workerId);
-
-        // 環境変数を動的に設定してAPIリクエストでWorker固有のDBを使用
-        process.env.DATABASE_URL = databaseUrl;
+      if (isCI) {
+        // CI環境では既存のデータベースを使用
         console.log(
-          `🔗 Worker ${workerId} using database: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}`,
+          `🔧 CI environment detected - using existing test database for worker: ${workerId}`,
         );
+        const databaseUrl =
+          process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/test_db';
 
         await use({ databaseUrl, workerId });
-      } catch (error) {
-        console.error(`❌ Failed to setup database for worker ${workerId}:`, error);
-        throw error;
-      } finally {
-        // 環境変数を元に戻す
-        if (originalDatabaseUrl) {
-          process.env.DATABASE_URL = originalDatabaseUrl;
-        } else {
-          delete process.env.DATABASE_URL;
-        }
+      } else {
+        // ローカル環境ではWorker固有のデータベースを使用
+        console.log(`🔧 Setting up database for worker: ${workerId}`);
 
-        // テスト完了後にクリーンアップ
+        // 元の環境変数を保存
+        const originalDatabaseUrl = process.env.DATABASE_URL;
+
         try {
-          await cleanupE2EDatabase(workerId);
-          console.log(`✅ Cleaned up database for worker: ${workerId}`);
+          // Worker固有のデータベースをセットアップ
+          await setupOptimizedE2EEnvironment(workerId);
+          const databaseUrl = getE2EDatabaseURL(workerId);
+
+          // 環境変数を動的に設定してAPIリクエストでWorker固有のDBを使用
+          process.env.DATABASE_URL = databaseUrl;
+          console.log(
+            `🔗 Worker ${workerId} using database: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}`,
+          );
+
+          await use({ databaseUrl, workerId });
         } catch (error) {
-          console.error(`⚠️  Failed to cleanup database for worker ${workerId}:`, error);
+          console.error(`❌ Failed to setup database for worker ${workerId}:`, error);
+          throw error;
+        } finally {
+          // 環境変数を元に戻す
+          if (originalDatabaseUrl) {
+            process.env.DATABASE_URL = originalDatabaseUrl;
+          } else {
+            delete process.env.DATABASE_URL;
+          }
+
+          // テスト完了後にクリーンアップ
+          try {
+            await cleanupE2EDatabase(workerId);
+            console.log(`✅ Cleaned up database for worker: ${workerId}`);
+          } catch (error) {
+            console.error(`⚠️  Failed to cleanup database for worker ${workerId}:`, error);
+          }
         }
       }
     },

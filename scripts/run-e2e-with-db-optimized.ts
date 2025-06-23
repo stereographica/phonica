@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import {
   setupOptimizedE2EEnvironment,
   cleanupE2EDatabase,
@@ -15,18 +15,42 @@ async function runE2ETests() {
   try {
     console.log('🚀 Starting E2E test suite with optimized database setup...\n');
 
-    // 1. 最適化されたE2E環境のセットアップ
-    const setupStart = Date.now();
-    await setupOptimizedE2EEnvironment();
-    const setupDuration = Date.now() - setupStart;
-    console.log(`⚡ Database setup completed in ${(setupDuration / 1000).toFixed(2)}s\n`);
+    // CI環境では既存のデータベースを使用
+    const isCI = process.env.CI === 'true';
+    let databaseUrl: string;
+
+    if (isCI) {
+      console.log('🔧 CI environment detected - using existing database');
+      databaseUrl =
+        process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/test_db';
+
+      // CI環境ではマイグレーションとシードのみ実行
+      console.log('🔄 Running migrations...');
+      execSync('npx prisma migrate deploy', {
+        env: { ...process.env, DATABASE_URL: databaseUrl },
+        stdio: 'inherit',
+      });
+
+      console.log('🌱 Seeding database...');
+      execSync('tsx scripts/seed-test-data.ts', {
+        env: { ...process.env, DATABASE_URL: databaseUrl },
+        stdio: 'inherit',
+      });
+    } else {
+      // ローカル環境では最適化されたセットアップを使用
+      const setupStart = Date.now();
+      await setupOptimizedE2EEnvironment();
+      const setupDuration = Date.now() - setupStart;
+      console.log(`⚡ Database setup completed in ${(setupDuration / 1000).toFixed(2)}s\n`);
+      databaseUrl = E2E_DATABASE_URL;
+    }
 
     // 2. 開発サーバーを起動（E2E用データベースを使用）
     console.log('🌐 Starting development server with E2E database...');
     serverProcess = spawn('npm', ['run', 'dev'], {
       env: {
         ...process.env,
-        DATABASE_URL: E2E_DATABASE_URL,
+        DATABASE_URL: databaseUrl,
         NODE_ENV: 'test',
       },
       stdio: 'pipe',
@@ -125,8 +149,12 @@ async function runE2ETests() {
       testProcess.kill('SIGTERM');
     }
 
-    // データベースをクリーンアップ
-    await cleanupE2EDatabase();
+    // CI環境ではデータベースをクリーンアップしない
+    const isCI = process.env.CI === 'true';
+    if (!isCI) {
+      // データベースをクリーンアップ
+      await cleanupE2EDatabase();
+    }
 
     console.log('✅ Cleanup completed');
   }

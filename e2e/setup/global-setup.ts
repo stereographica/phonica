@@ -7,6 +7,12 @@ import { setupTemplate, cleanupAllWorkerDatabases } from '../../scripts/e2e-db-o
 async function globalSetup() {
   console.log('🌍 Global Setup: Initializing E2E test environment...');
 
+  // CI環境ではスキップ
+  if (process.env.CI === 'true') {
+    console.log('🔧 CI environment detected - skipping database setup');
+    return;
+  }
+
   try {
     // 既存のWorkerデータベースをクリーンアップ
     console.log('🧹 Cleaning up any existing worker databases...');
