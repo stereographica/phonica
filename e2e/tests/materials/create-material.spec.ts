@@ -41,8 +41,8 @@ test.describe('@materials Create Material', () => {
   test('shows errors when required fields are empty', async ({ page }) => {
     // Server Actionsに移行したため、WebKitでも動作するはず
 
-    // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
-    test.skip();
+    // ファイル選択問題修正により再有効化
+    // test.skip();
 
     // ファイルを選択しない状態で、保存ボタンが無効になっていることを確認
     const saveButton = page.locator('button[type="submit"]');
@@ -105,8 +105,13 @@ test.describe('@materials Create Material', () => {
   test('uploads file and extracts metadata automatically', async ({ page }) => {
     // Server Actionsに移行したため、全ブラウザで動作
 
-    // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
-    test.skip();
+    // ファイル選択ボタンのクリック問題の調査のため一時的に有効化
+    // test.skip();
+
+    // コンソールログをキャプチャ（デバッグ用）
+    // page.on('console', msg => {
+    //   console.log(`📱 Browser Console [${msg.type()}]:`, msg.text());
+    // });
 
     // テスト用の音声ファイルを使用
     const testAudioPath = path.join(process.cwd(), 'e2e', 'fixtures', 'test-audio.wav');
@@ -144,8 +149,8 @@ test.describe('@materials Create Material', () => {
   test('can create a valid material', async ({ page }) => {
     // Server Actionsに移行したため、全ブラウザで動作
 
-    // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
-    test.skip();
+    // ファイル選択問題修正により再有効化
+    // test.skip();
 
     // フォームに入力
     await form.fillByLabel('Title', 'E2E Test Material');

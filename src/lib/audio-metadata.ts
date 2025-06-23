@@ -178,37 +178,37 @@ export class AudioMetadataService {
         reject(new Error('FFProbe timeout'));
       }, this.ANALYSIS_TIMEOUT);
 
-      exec(
-        `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
-        (error, stdout) => {
-          clearTimeout(timeout);
+      const command = `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`;
 
-          if (error) {
-            reject(error);
+      exec(command, (error, stdout) => {
+        clearTimeout(timeout);
+
+        if (error) {
+          console.error('FFprobe failed for file:', filePath, error);
+          reject(error);
+          return;
+        }
+
+        try {
+          const data = JSON.parse(stdout) as FFProbeOutput;
+          const audioStream = data.streams?.find((s) => s.codec_type === 'audio');
+
+          if (!audioStream || !data.format) {
+            reject(new Error('No audio stream found'));
             return;
           }
 
-          try {
-            const data = JSON.parse(stdout) as FFProbeOutput;
-            const audioStream = data.streams?.find((s) => s.codec_type === 'audio');
-
-            if (!audioStream || !data.format) {
-              reject(new Error('No audio stream found'));
-              return;
-            }
-
-            resolve({
-              fileFormat: this.normalizeFileFormat(data.format.format_name || ''),
-              sampleRate: parseInt(audioStream.sample_rate || '0'),
-              bitDepth: this.detectBitDepth(audioStream),
-              durationSeconds: parseFloat(data.format.duration || '0'),
-              channels: audioStream.channels || 0,
-            });
-          } catch (parseError) {
-            reject(parseError);
-          }
-        },
-      );
+          resolve({
+            fileFormat: this.normalizeFileFormat(data.format.format_name || ''),
+            sampleRate: parseInt(audioStream.sample_rate || '0'),
+            bitDepth: this.detectBitDepth(audioStream),
+            durationSeconds: parseFloat(data.format.duration || '0'),
+            channels: audioStream.channels || 0,
+          });
+        } catch (parseError) {
+          reject(parseError);
+        }
+      });
     });
   }
 

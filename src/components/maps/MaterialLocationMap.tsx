@@ -58,7 +58,15 @@ const MapRenderer: React.FC<MaterialLocationMapProps> = ({
 
   if (!MapComponents) {
     return (
-      <div className="flex items-center justify-center h-full bg-secondary/20 rounded-lg">
+      <div
+        className="flex items-center justify-center bg-secondary/20 rounded-lg"
+        style={{
+          height: '300px',
+          width: '100%',
+          minHeight: '300px',
+        }}
+        data-testid="leaflet-loading"
+      >
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
           <p className="text-xs text-muted-foreground">地図を読み込み中...</p>
@@ -72,12 +80,13 @@ const MapRenderer: React.FC<MaterialLocationMapProps> = ({
   return (
     <div
       style={{
-        height: '100%',
+        height: '300px',
         width: '100%',
-        minHeight: '200px',
+        minHeight: '300px',
         position: 'relative',
         zIndex: 1,
       }}
+      data-testid="map-wrapper"
     >
       <MapContainer
         key={`map-${latitude}-${longitude}`}
@@ -130,7 +139,15 @@ const MaterialLocationMap: React.FC<MaterialLocationMapProps> = (props) => {
 
   if (!isClient) {
     return (
-      <div className="flex items-center justify-center h-full bg-secondary/20 rounded-lg">
+      <div
+        className="flex items-center justify-center bg-secondary/20 rounded-lg"
+        style={{
+          height: '300px',
+          width: '100%',
+          minHeight: '300px',
+        }}
+        data-testid="map-loading"
+      >
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
           <p className="text-xs text-muted-foreground">地図を初期化中...</p>

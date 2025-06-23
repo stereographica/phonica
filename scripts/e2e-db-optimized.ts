@@ -16,18 +16,22 @@ const E2E_DB_PORT = process.env.POSTGRES_PORT || '5432';
 
 /**
  * Worker IDを取得（環境変数からまたは自動生成）
+ * 複数ターミナルでの同時実行を考慮してユニーク性を強化
  */
 export function getWorkerID(): string {
+  const pid = process.pid;
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+
   // PlaywrightのWorker IDを環境変数から取得
   const pwWorker = process.env.PLAYWRIGHT_WORKER_INDEX;
   if (pwWorker !== undefined) {
-    return `w${pwWorker}`;
+    // Playwright環境でも、プロセスIDと時間戳、ランダム値を含めてユニーク性を確保
+    return `w${pwWorker}_p${pid.toString(36)}_${timestamp}_${random}`;
   }
 
   // プロセスIDベースのWorker ID生成（フォールバック）
-  const pid = process.pid;
-  const timestamp = Date.now().toString(36);
-  return `p${pid.toString(36)}_${timestamp}`;
+  return `p${pid.toString(36)}_${timestamp}_${random}`;
 }
 
 /**
@@ -252,14 +256,36 @@ export async function createE2EDatabaseFromTemplate(workerId?: string) {
 
   try {
     // 既存の接続を切断
-    await prisma.$executeRawUnsafe(`
+    const terminateResult = await prisma.$executeRawUnsafe(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
       WHERE datname = '${workerDbName}' AND pid <> pg_backend_pid()
     `);
 
-    // E2Eデータベースを削除
-    await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${workerDbName}`);
+    console.log(
+      `🔌 Terminated ${Array.isArray(terminateResult) ? terminateResult.length : 0} connections for ${workerDbName}`,
+    );
+
+    // 接続切断の完了を待つ（PostgreSQLの接続クリーンアップ時間を考慮）
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // E2Eデータベースを削除（リトライ機構付き）
+    let dropRetries = 3;
+    while (dropRetries > 0) {
+      try {
+        await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${workerDbName}`);
+        console.log(`🗑️ Successfully dropped database: ${workerDbName}`);
+        break;
+      } catch (dropError) {
+        dropRetries--;
+        if (dropRetries === 0) {
+          console.error(`❌ Failed to drop database after retries: ${workerDbName}`, dropError);
+          throw dropError;
+        }
+        console.log(`⏳ Retrying database drop (${3 - dropRetries}/3): ${workerDbName}`);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
 
     // テンプレートからE2Eデータベースを作成（超高速）
     await prisma.$executeRawUnsafe(`
@@ -267,9 +293,22 @@ export async function createE2EDatabaseFromTemplate(workerId?: string) {
       WITH TEMPLATE ${E2E_TEMPLATE_DB_NAME}
     `);
 
-    console.log(`✅ E2E database created from template in milliseconds: ${workerDbName}`);
+    console.log(`✅ E2E database created from template successfully: ${workerDbName}`);
   } catch (error) {
     console.error(`❌ Failed to create E2E database from template: ${workerDbName}`, error);
+
+    // デバッグ情報を出力
+    try {
+      const existingDbs = await prisma.$queryRaw<Array<{ datname: string }>>`
+        SELECT datname FROM pg_database WHERE datname = ${workerDbName}
+      `;
+      console.log(
+        `🔍 Database existence check: ${existingDbs.length > 0 ? 'EXISTS' : 'NOT EXISTS'}`,
+      );
+    } catch (debugError) {
+      console.log(`🔍 Debug query failed:`, debugError);
+    }
+
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -353,18 +392,40 @@ export async function cleanupE2EDatabase(workerId?: string) {
 
   try {
     // 接続を切断
-    await prisma.$executeRawUnsafe(`
+    const terminateResult = await prisma.$executeRawUnsafe(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
       WHERE datname = '${workerDbName}' AND pid <> pg_backend_pid()
     `);
 
-    // データベースを削除
-    await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${workerDbName}`);
-    console.log(`✅ E2E database cleaned up: ${workerDbName}`);
+    console.log(
+      `🔌 Terminated ${Array.isArray(terminateResult) ? terminateResult.length : 0} connections for cleanup: ${workerDbName}`,
+    );
+
+    // 接続切断の完了を待つ
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // データベースを削除（リトライ機構付き）
+    let dropRetries = 3;
+    while (dropRetries > 0) {
+      try {
+        await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${workerDbName}`);
+        console.log(`✅ E2E database cleaned up successfully: ${workerDbName}`);
+        break;
+      } catch (dropError) {
+        dropRetries--;
+        if (dropRetries === 0) {
+          console.error(`❌ Failed to cleanup database after retries: ${workerDbName}`, dropError);
+          throw dropError;
+        }
+        console.log(`⏳ Retrying cleanup (${3 - dropRetries}/3): ${workerDbName}`);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
   } catch (error) {
     console.error(`❌ Failed to cleanup E2E database: ${workerDbName}`, error);
-    throw error;
+    // クリーンアップ時はエラーを投げずに警告のみ（既存のデータベースが無い場合もあるため）
+    console.warn(`⚠️ Cleanup may have failed, but continuing: ${workerDbName}`);
   } finally {
     await prisma.$disconnect();
   }

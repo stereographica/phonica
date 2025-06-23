@@ -287,4 +287,97 @@ export class WaitHelper {
       });
     }
   }
+
+  /**
+   * Leafletマップの完全な読み込みと表示を待機
+   * 複数の非同期読み込み段階に対応
+   */
+  async waitForLeafletMap(options?: {
+    timeout?: number;
+    containerSelector?: string;
+    skipLocationPreviewCheck?: boolean;
+  }) {
+    const {
+      timeout = 30000,
+      containerSelector = '.leaflet-container',
+      skipLocationPreviewCheck = false,
+    } = options || {};
+
+    // Step 1: Wait for Location Preview label to appear (only if not in modal)
+    if (!skipLocationPreviewCheck) {
+      try {
+        await this.waitForElementVisible('text=Location Preview', 5000);
+      } catch {
+        // Location Preview might not exist in modal context, continue
+      }
+    }
+
+    // Step 2: Wait for either loading state or map container
+    await this.page.waitForFunction(
+      (containerSelector) => {
+        // Check if we're still in loading state
+        const loadingStates = document.querySelectorAll(
+          '[data-testid="map-loading"], [data-testid="leaflet-loading"]',
+        );
+        if (loadingStates.length > 0) {
+          return false; // Still loading
+        }
+
+        // Check if map container exists and is visible
+        const mapContainer = document.querySelector(containerSelector);
+        if (!mapContainer) {
+          return false; // Map not yet created
+        }
+
+        const rect = mapContainer.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0; // Map has dimensions
+      },
+      containerSelector,
+      { timeout },
+    );
+
+    // Step 3: Wait for tiles to load
+    await this.page
+      .waitForFunction(
+        (containerSelector) => {
+          const mapContainer = document.querySelector(containerSelector);
+          if (!mapContainer) return false;
+
+          const tileElements = mapContainer.querySelectorAll('.leaflet-tile-loaded');
+          return tileElements.length > 0;
+        },
+        containerSelector,
+        { timeout: 15000 },
+      )
+      .catch(() => {
+        // Tiles might not load in test environment, continue anyway
+      });
+
+    // Step 4: Final verification that the container is visible
+    await this.waitForElementVisible(containerSelector, 5000);
+
+    // Step 5: Wait for any final animations to complete
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Leafletマップのタイル読み込み完了を待機
+   */
+  async waitForLeafletTiles(timeout: number = 10000) {
+    await this.page
+      .waitForFunction(
+        () => {
+          const loadedTiles = document.querySelectorAll('.leaflet-tile-loaded');
+
+          // At least some tiles should be loaded
+          return loadedTiles.length > 0;
+        },
+        {},
+        { timeout },
+      )
+      .catch(() => {
+        // In test environment, tiles might not load properly
+        // This is acceptable as we're mainly testing UI functionality
+      });
+  }
 }

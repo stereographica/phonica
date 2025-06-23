@@ -24,11 +24,14 @@ const MaterialLocationMap = dynamic(() => import('@/components/maps/MaterialLoca
     <div
       style={{
         height: '300px',
+        width: '100%',
+        minHeight: '300px',
         background: '#f0f0f0',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}
+      data-testid="modal-map-loading"
     >
       Loading map...
     </div>
@@ -374,11 +377,20 @@ export function MaterialDetailModal({
             {detailedMaterial.latitude && detailedMaterial.longitude && (
               <div className="md:col-span-2 mt-4">
                 <h3 className="font-semibold mb-2 text-sm">Recorded Location Map:</h3>
-                <MaterialLocationMap
-                  latitude={detailedMaterial.latitude}
-                  longitude={detailedMaterial.longitude}
-                  popupText={detailedMaterial.title || 'Recorded Location'}
-                />
+                <div
+                  style={{
+                    height: '300px',
+                    width: '100%',
+                    minHeight: '300px',
+                  }}
+                  data-testid="modal-map-container"
+                >
+                  <MaterialLocationMap
+                    latitude={detailedMaterial.latitude}
+                    longitude={detailedMaterial.longitude}
+                    popupText={detailedMaterial.title || 'Recorded Location'}
+                  />
+                </div>
               </div>
             )}
             {(!detailedMaterial.latitude || !detailedMaterial.longitude) && (

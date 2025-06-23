@@ -18,6 +18,7 @@ import {
   updateMaterialWithMetadata,
 } from '@/lib/actions/materials';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import LocationInputField from '@/components/materials/LocationInputField';
 
 // APIから返される素材データの型 (GET /api/materials/[slug] のレスポンスに合わせる)
 interface MaterialData {
@@ -444,42 +445,14 @@ export default function EditMaterialPage() {
         )}
 
         {/* Location Section */}
-        <div className="space-y-6 p-6 border rounded-lg">
-          <h2 className="text-xl font-semibold">Location (Manual Input)</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-            <div className="space-y-2">
-              <Label htmlFor="latitude">Latitude</Label>
-              <Input
-                id="latitude"
-                type="number"
-                step="any"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="e.g., 35.681236"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="longitude">Longitude</Label>
-              <Input
-                id="longitude"
-                type="number"
-                step="any"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="e.g., 139.767125"
-              />
-            </div>
-          </div>
-          <div className="space-y-2 mt-4">
-            <Label htmlFor="locationName">Location Name (Optional)</Label>
-            <Input
-              id="locationName"
-              value={locationName}
-              onChange={(e) => setLocationName(e.target.value)}
-              placeholder="e.g., Yoyogi Park"
-            />
-          </div>
-        </div>
+        <LocationInputField
+          latitude={latitude}
+          longitude={longitude}
+          locationName={locationName}
+          onLatitudeChange={setLatitude}
+          onLongitudeChange={setLongitude}
+          onLocationNameChange={setLocationName}
+        />
 
         {/* Equipment Section */}
         <div className="space-y-4 p-6 border rounded-lg">
