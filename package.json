@@ -2,6 +2,10 @@
   "name": "phonica",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "concurrently -n \"next,worker\" -c \"blue,green\" \"npm run dev:next\" \"npm run dev:worker\"",
     "dev:next": "next dev --turbopack",
