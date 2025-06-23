@@ -103,7 +103,10 @@ export const mockFsPromises = {
   stat: jest.fn(),
 };
 
-jest.mock('fs/promises', () => mockFsPromises);
+jest.mock('fs/promises', () => ({
+  default: mockFsPromises,
+  ...mockFsPromises,
+}));
 
 // UUID mock
 export const mockUuidV4 = jest.fn(() => 'test-uuid');

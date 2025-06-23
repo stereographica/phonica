@@ -528,28 +528,18 @@ test.describe('@materials Edit Material', () => {
     // タグを追加 (ラベルテキストを正確に指定)
     await page.fill('input#tags', 'edited, test, update');
 
-    // Server Actionを使用しているため、通常のフォーム送信を使用
-    // Server Actionを使用しているので、API監視は不要
-    // 保存
-    await form.submitForm();
+    // CrossBrowserHelperを使用してFirefox対応の送信処理を実行
+    const crossBrowser = new (await import('../../helpers/cross-browser')).CrossBrowserHelper(page);
+    const browserName = crossBrowser.getBrowserName();
 
-    // 更新中ボタンが解除されるまで待つ（Server Actionの完了を待つ）
-    await expect(page.locator('button:has-text("Updating...")')).not.toBeVisible({
-      timeout: 10000,
-    });
+    console.log(`Browser: ${browserName} - Using cross-browser form submission`);
 
-    // ナビゲーション完了を待つ
-    try {
-      await page.waitForURL('/materials', { timeout: 30000 });
-    } catch (navError) {
-      const currentUrl = page.url();
-      console.log(`Navigation timeout - current URL: ${currentUrl}`);
-      if (currentUrl.includes('/materials') && !currentUrl.includes('/edit')) {
-        console.log('Already on materials page, continuing...');
-      } else {
-        throw navError;
-      }
-    }
+    // Server Actionを使用したフォーム送信（Firefox対応）
+    await crossBrowser.submitFormWithDialog(
+      'button[type="submit"]',
+      undefined, // Server Actionなのでダイアログなし
+      '/materials', // 期待されるナビゲーション先
+    );
 
     // データが更新されるまで少し待つ
     await wait.waitForNetworkStable({ timeout: 4000 });

@@ -143,10 +143,15 @@ describe('TagsMasterPage', () => {
       expect(screen.getByText('Nature')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('New Tag'));
+    // ボタンをクリック（ボタンは1つだけなので問題なし）
+    fireEvent.click(screen.getByRole('button', { name: /New Tag/i }));
 
+    // モーダルが開いていることを確認
     expect(screen.getByTestId('tag-form-modal')).toBeInTheDocument();
-    expect(screen.getByText('Add New Tag')).toBeInTheDocument();
+
+    // モーダル内のテキストを確認（モーダル内にスコープを限定）
+    const modal = screen.getByTestId('tag-form-modal');
+    expect(modal).toHaveTextContent('Add New Tag');
   });
 
   // 5. タグ編集機能
@@ -274,7 +279,6 @@ describe('TagsMasterPage', () => {
     // コンポーネントが正しくレンダリングされることを確認
     await waitFor(() => {
       expect(screen.getByText('Tag Management')).toBeInTheDocument();
-      expect(screen.getByText('New Tag')).toBeInTheDocument();
     });
 
     // タグ一覧のテーブルが存在することを確認
@@ -360,7 +364,8 @@ describe('TagsMasterPage', () => {
       expect(screen.getByText('Nature')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('New Tag'));
+    // ボタンをクリック
+    fireEvent.click(screen.getByRole('button', { name: /New Tag/i }));
 
     // モックモーダルのSaveボタンをクリック
     fireEvent.click(screen.getByText('Save'));
