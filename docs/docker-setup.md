@@ -1,200 +1,200 @@
-# Docker Setup Guide
+# Docker セットアップガイド
 
-This guide explains how to run Phonica using Docker for both development and production environments.
+このガイドでは、開発環境と本番環境の両方でDockerを使用してPhonicaを実行する方法を説明します。
 
-## Prerequisites
+## 前提条件
 
-- Docker Desktop (for Mac/Windows) or Docker Engine (for Linux)
-- Docker Compose v2.0 or higher
-- At least 4GB of available RAM for Docker
+- Docker Desktop（Mac/Windows用）またはDocker Engine（Linux用）
+- Docker Compose v2.0以上
+- Docker用に最低4GBのRAMが利用可能
 
-## Architecture Overview
+## アーキテクチャ概要
 
-The Docker setup includes the following services:
+Dockerセットアップには以下のサービスが含まれます：
 
-1. **PostgreSQL** - Primary database for application data
-2. **Redis** - Queue management for background jobs
-3. **Web** - Next.js application server
-4. **Worker** - Background job processor for file cleanup and async tasks
+1. **PostgreSQL** - アプリケーションデータ用のプライマリデータベース
+2. **Redis** - バックグラウンドジョブのキュー管理
+3. **Web** - Next.jsアプリケーションサーバー
+4. **Worker** - ファイルクリーンアップと非同期タスク用のバックグラウンドジョブプロセッサ
 
-## Development Setup
+## 開発環境セットアップ
 
-For development, we recommend running only the infrastructure services (PostgreSQL and Redis) in Docker while running the application locally for hot reloading.
+開発では、ホットリロード機能のために、インフラサービス（PostgreSQLとRedis）のみをDockerで実行し、アプリケーションはローカルで実行することを推奨します。
 
-### 1. Start Infrastructure Services
+### 1. インフラサービスの起動
 
 ```bash
-# Start PostgreSQL and Redis
+# PostgreSQLとRedisの起動
 docker-compose -f docker-compose.dev.yml up -d
 
-# Verify services are running
+# サービスが実行中であることを確認
 docker-compose -f docker-compose.dev.yml ps
 ```
 
-### 2. Configure Environment Variables
+### 2. 環境変数の設定
 
 ```bash
-# Copy the example environment file
+# 環境変数ファイルのコピー
 cp .env.example .env.local
 
-# Update DATABASE_URL and REDIS_URL to use localhost
+# localhostを使用するようにDATABASE_URLとREDIS_URLを更新
 DATABASE_URL=postgresql://phonica_user:phonica_password@localhost:5432/phonica_db
 REDIS_URL=redis://localhost:6379
 ```
 
-### 3. Run Application Locally
+### 3. アプリケーションのローカル実行
 
 ```bash
-# Install dependencies
+# 依存関係のインストール
 npm install
 
-# Run database migrations
+# データベースマイグレーションの実行
 npx prisma migrate dev
 
-# Start the development server
+# 開発サーバーの起動
 npm run dev
 
-# In another terminal, start the worker
+# 別のターミナルでワーカーを起動
 npm run worker:dev
 ```
 
-## Production Setup
+## 本番環境セットアップ
 
-For production, all services run in Docker containers.
+本番環境では、すべてのサービスがDockerコンテナで実行されます。
 
-### 1. Configure Environment Variables
+### 1. 環境変数の設定
 
 ```bash
-# Copy the Docker environment example
+# Docker用環境変数ファイルのコピー
 cp .env.docker.example .env.docker
 
-# Edit .env.docker with your production values
-# Important: Generate a secure NEXTAUTH_SECRET
+# 本番環境の値で.env.dockerを編集
+# 重要：安全なNEXTAUTH_SECRETを生成
 openssl rand -base64 32
 ```
 
-### 2. Build and Start Services
+### 2. イメージのビルドとサービス起動
 
 ```bash
-# Build images and start all services
+# イメージをビルドしてすべてのサービスを起動
 docker-compose up -d --build
 
-# View logs
+# ログの確認
 docker-compose logs -f
 
-# Check service health
+# サービスの状態確認
 docker-compose ps
 ```
 
-### 3. Initialize Database
+### 3. データベースの初期化
 
-On first run, the database migrations will be applied automatically. You can also run them manually:
+初回実行時は、データベースマイグレーションが自動的に適用されます。手動で実行することも可能です：
 
 ```bash
 docker-compose exec web npx prisma migrate deploy
 ```
 
-### 4. Create Initial Data (Optional)
+### 4. 初期データ作成（オプション）
 
 ```bash
-# Seed the database with sample data
+# サンプルデータでデータベースをシード
 docker-compose exec web npx prisma db seed
 ```
 
-## Service Management
+## サービス管理
 
-### Starting Services
+### サービスの起動
 
 ```bash
-# Start all services
+# すべてのサービスを起動
 docker-compose up -d
 
-# Start specific service
+# 特定のサービスを起動
 docker-compose up -d postgres redis
 ```
 
-### Stopping Services
+### サービスの停止
 
 ```bash
-# Stop all services
+# すべてのサービスを停止
 docker-compose down
 
-# Stop and remove volumes (WARNING: Deletes all data)
+# ボリュームも削除して停止（警告：すべてのデータが削除されます）
 docker-compose down -v
 ```
 
-### Viewing Logs
+### ログの確認
 
 ```bash
-# All services
+# すべてのサービス
 docker-compose logs -f
 
-# Specific service
+# 特定のサービス
 docker-compose logs -f web
 docker-compose logs -f worker
 ```
 
-### Accessing Services
+### サービスへのアクセス
 
-- **Web Application**: http://localhost:3000
-- **PostgreSQL**: localhost:5432 (use any PostgreSQL client)
-- **Redis**: localhost:6379 (use redis-cli or any Redis client)
+- **Webアプリケーション**: http://localhost:3000
+- **PostgreSQL**: localhost:5432（任意のPostgreSQLクライアントを使用）
+- **Redis**: localhost:6379（redis-cliまたは任意のRedisクライアントを使用）
 
-## File Uploads and Storage
+## ファイルアップロードとストレージ
 
-The Docker setup includes proper volume mounting for file uploads:
+Dockerセットアップには、ファイルアップロード用の適切なボリュームマウントが含まれています：
 
-- **Uploaded files**: `./public/uploads` (persisted on host)
-- **Temporary files**: Docker volume `temp_uploads` (cleaned automatically)
+- **アップロードファイル**: `./public/uploads`（ホストに永続化）
+- **一時ファイル**: Dockerボリューム`temp_uploads`（自動クリーンアップ）
 
-The worker service runs periodic cleanup of temporary files older than 1 hour.
+ワーカーサービスは、1時間より古い一時ファイルの定期的なクリーンアップを実行します。
 
-## Troubleshooting
+## トラブルシューティング
 
-### Container Won't Start
+### コンテナが起動しない
 
 ```bash
-# Check logs for errors
+# エラーのログを確認
 docker-compose logs web
 docker-compose logs worker
 
-# Rebuild images
+# イメージを再ビルド
 docker-compose build --no-cache
 ```
 
-### Database Connection Issues
+### データベース接続の問題
 
 ```bash
-# Check if PostgreSQL is ready
+# PostgreSQLの準備状況を確認
 docker-compose exec postgres pg_isready
 
-# Test connection
+# 接続をテスト
 docker-compose exec postgres psql -U phonica_user -d phonica_db
 ```
 
-### File Permission Issues
+### ファイル権限の問題
 
 ```bash
-# Fix upload directory permissions
+# アップロードディレクトリの権限を修正
 docker-compose exec web chown -R nextjs:nodejs /app/public/uploads
 docker-compose exec worker chown -R worker:nodejs /app/public/uploads
 ```
 
-### FFmpeg/FFprobe Not Working
+### FFmpeg/FFprobeが動作しない
 
-The Docker images include FFmpeg for audio metadata extraction. To verify:
+Dockerイメージには音声メタデータ抽出用のFFmpegが含まれています。確認方法：
 
 ```bash
-# Check FFmpeg installation
+# FFmpegのインストールを確認
 docker-compose exec web ffmpeg -version
 docker-compose exec worker ffprobe -version
 ```
 
-## Performance Optimization
+## パフォーマンス最適化
 
-### Resource Limits
+### リソース制限
 
-Add resource limits to docker-compose.yml:
+docker-compose.ymlにリソース制限を追加：
 
 ```yaml
 services:
@@ -209,51 +209,51 @@ services:
           memory: 1G
 ```
 
-### Production Optimizations
+### 本番環境最適化
 
-1. Use Docker BuildKit for faster builds:
+1. より高速なビルドのためにDocker BuildKitを使用：
 
    ```bash
    DOCKER_BUILDKIT=1 docker-compose build
    ```
 
-2. Enable Next.js standalone output (already configured in Dockerfile)
+2. Next.jsスタンドアロン出力を有効化（Dockerfileで既に設定済み）
 
-3. Use multi-stage builds to reduce image size (already implemented)
+3. イメージサイズ削減のためのマルチステージビルドを使用（既に実装済み）
 
-## Backup and Restore
+## バックアップと復元
 
-### Database Backup
+### データベースバックアップ
 
 ```bash
-# Create backup
+# バックアップ作成
 docker-compose exec postgres pg_dump -U phonica_user phonica_db > backup.sql
 
-# Restore backup
+# バックアップ復元
 docker-compose exec -T postgres psql -U phonica_user phonica_db < backup.sql
 ```
 
-### File Backup
+### ファイルバックアップ
 
 ```bash
-# Backup uploaded files
+# アップロードファイルのバックアップ
 tar -czf uploads-backup.tar.gz ./public/uploads
 ```
 
-## Security Considerations
+## セキュリティ考慮事項
 
-1. **Change default passwords** in production
-2. **Use secrets management** for sensitive environment variables
-3. **Enable SSL/TLS** for production deployments
-4. **Restrict port exposure** in production (only expose necessary ports)
-5. **Regular security updates** for base images
+1. **デフォルトパスワードの変更** - 本番環境では必須
+2. **シークレット管理** - 機密環境変数にはシークレット管理を使用
+3. **SSL/TLSの有効化** - 本番デプロイメント用
+4. **ポートの制限** - 本番環境では必要なポートのみ公開
+5. **定期的なセキュリティ更新** - ベースイメージの定期更新
 
-## Monitoring
+## 監視
 
-Consider adding monitoring services:
+監視サービスの追加を検討：
 
 ```yaml
-# Add to docker-compose.yml
+# docker-compose.ymlに追加
 cadvisor:
   image: gcr.io/cadvisor/cadvisor:latest
   ports:
@@ -264,3 +264,7 @@ cadvisor:
     - /sys:/sys:ro
     - /var/lib/docker/:/var/lib/docker:ro
 ```
+
+---
+
+最終更新：2025年6月23日

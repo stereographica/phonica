@@ -1,245 +1,244 @@
-# System Requirements
+# システム要件
 
-This document outlines the system requirements for running the Phonica field recording material management tool.
+このドキュメントでは、Phonicaフィールドレコーディング素材管理ツールを実行するためのシステム要件について説明します。
 
-## Overview
+## 概要
 
-Phonica is a web-based application that manages field recording materials with automatic audio metadata extraction. The system consists of a Next.js web application, background workers for async processing, and requires specific system dependencies for audio file analysis.
+Phonicaは、自動音声メタデータ抽出機能を備えたフィールドレコーディング素材を管理するWebベースのアプリケーションです。システムは、Next.js Webアプリケーション、非同期処理用のバックグラウンドワーカー、および音声ファイル解析用の特定のシステム依存関係で構成されています。
 
-## Minimum System Requirements
+## 最小システム要件
 
-### Hardware Requirements
+### ハードウェア要件
 
-- **CPU**: 2 cores (4 cores recommended)
-- **RAM**: 4GB minimum (8GB recommended)
-- **Storage**:
-  - 2GB for application and dependencies
-  - Additional space for audio file storage (varies by usage)
-- **Network**: Stable internet connection for web access
+- **CPU**: 2コア（4コア推奨）
+- **RAM**: 最低4GB（8GB推奨）
+- **ストレージ**:
+  - アプリケーションと依存関係用に2GB
+  - 音声ファイルストレージ用の追加容量（使用量によって変動）
+- **ネットワーク**: Webアクセス用の安定したインターネット接続
 
-### Operating System
+### オペレーティングシステム
 
-- **Linux**: Ubuntu 20.04 LTS or newer, Debian 10+, CentOS 8+, or any modern Linux distribution
-- **macOS**: macOS 11 (Big Sur) or newer
-- **Windows**: Windows 10/11 with WSL2 (Windows Subsystem for Linux)
+- **Linux**: Ubuntu 20.04 LTS以降、Debian 10+、CentOS 8+、または任意の最新Linuxディストリビューション
+- **macOS**: macOS 11（Big Sur）以降
+- **Windows**: WSL2（Windows Subsystem for Linux）を使用したWindows 10/11
 
-## Software Dependencies
+## ソフトウェア依存関係
 
-### Core Requirements
+### コア要件
 
-1. **Node.js**: v20.0.0 or higher (LTS version recommended)
+1. **Node.js**: v20.0.0以上（LTSバージョン推奨）
 
    ```bash
-   # Check version
+   # バージョン確認
    node --version
    ```
 
-2. **npm**: v10.0.0 or higher (comes with Node.js)
+2. **npm**: v10.0.0以上（Node.jsに付属）
 
    ```bash
-   # Check version
+   # バージョン確認
    npm --version
    ```
 
-3. **PostgreSQL**: v14.0 or higher
+3. **PostgreSQL**: v14.0以上
 
-   - Required for data persistence
-   - Can be installed locally or via Docker
+   - データ永続化に必要
+   - ローカルインストールまたはDocker経由で利用可能
 
    ```bash
-   # Check version
+   # バージョン確認
    psql --version
    ```
 
-4. **Redis**: v6.0 or higher
-   - Required for background job queue management
-   - Can be installed locally or via Docker
+4. **Redis**: v6.0以上
+   - バックグラウンドジョブキュー管理に必要
+   - ローカルインストールまたはDocker経由で利用可能
    ```bash
-   # Check version
+   # バージョン確認
    redis-server --version
    ```
 
-### Audio Processing Requirements
+### 音声処理要件
 
-5. **FFmpeg**: v4.0 or higher (REQUIRED for audio metadata extraction)
+5. **FFmpeg**: v4.0以上（音声メタデータ抽出に必須）
 
-   - Must include ffprobe for metadata analysis
+   - メタデータ解析にはffprobeが必要
 
-   **Installation:**
+   **インストール方法:**
 
    ```bash
    # Ubuntu/Debian
    sudo apt update
    sudo apt install ffmpeg
 
-   # macOS (using Homebrew)
+   # macOS（Homebrewを使用）
    brew install ffmpeg
 
    # CentOS/RHEL/Fedora
    sudo dnf install ffmpeg
 
-   # Verify installation
+   # インストール確認
    ffmpeg -version
    ffprobe -version
    ```
 
-### Optional (Recommended)
+### オプション（推奨）
 
-6. **Docker**: v20.10 or higher
-   - For containerized deployment
-   - Docker Compose v2.0 or higher
+6. **Docker**: v20.10以上
+   - コンテナ化デプロイメント用
+   - Docker Compose v2.0以上
    ```bash
-   # Check version
+   # バージョン確認
    docker --version
    docker-compose --version
    ```
 
-## Browser Requirements
+## ブラウザ要件
 
-The web interface supports modern browsers:
+Webインターフェースは最新ブラウザをサポートします：
 
-- **Chrome/Chromium**: v90 or higher
-- **Firefox**: v88 or higher
-- **Safari**: v14 or higher
-- **Edge**: v90 or higher
+- **Chrome/Chromium**: v90以上
+- **Firefox**: v88以上
+- **Safari**: v14以上
+- **Edge**: v90以上
 
-**Note**: Internet Explorer is not supported.
+**注意**: Internet Explorerはサポートされていません。
 
-## Network Requirements
+## ネットワーク要件
 
-### Ports
+### ポート
 
-The following ports need to be available:
+以下のポートが利用可能である必要があります：
 
-- **3000**: Next.js web application (configurable)
-- **5432**: PostgreSQL database
-- **6379**: Redis server
+- **3000**: Next.js Webアプリケーション（設定可能）
+- **5432**: PostgreSQLデータベース
+- **6379**: Redisサーバー
 
-### Firewall Configuration
+### ファイアウォール設定
 
-If running behind a firewall, ensure the following:
+ファイアウォール配下で実行する場合は、以下を確認してください：
 
-- Inbound access to port 3000 (or configured application port)
-- Outbound HTTPS access for npm package installation
-- Internal access between application and database/Redis services
+- ポート3000（または設定されたアプリケーションポート）への受信アクセス
+- npmパッケージインストール用のHTTPS送信アクセス
+- アプリケーションとデータベース/Redisサービス間の内部アクセス
 
-## File System Requirements
+## ファイルシステム要件
 
-### Directory Permissions
+### ディレクトリ権限
 
-The application requires read/write access to:
+アプリケーションには以下への読み書きアクセスが必要です：
 
-- `/public/uploads/materials/`: Permanent audio file storage
-- `/tmp/phonica-uploads/`: Temporary file storage during processing
-- Application directory for Next.js cache and build files
+- `/public/uploads/materials/`: 永続音声ファイルストレージ
+- `/tmp/phonica-uploads/`: 処理中の一時ファイルストレージ
+- Next.jsキャッシュとビルドファイル用のアプリケーションディレクトリ
 
-### File Upload Limits
+### ファイルアップロード制限
 
-- **Maximum file size**: 100MB per audio file (configurable)
-- **Supported formats**: MP3, WAV, FLAC, M4A, OGG, AAC, WMA
-- **Temporary storage**: At least 500MB for processing large files
+- **最大ファイルサイズ**: 音声ファイルあたり100MB（設定可能）
+- **サポート形式**: MP3、WAV、FLAC、M4A、OGG、AAC、WMA
+- **一時ストレージ**: 大きなファイル処理用に最低500MB
 
-## Performance Considerations
+## パフォーマンス考慮事項
 
-### Concurrent Processing
+### 同時処理
 
-- The system can handle multiple file uploads simultaneously
-- Background workers process metadata extraction asynchronously
-- Recommended: 1 worker per 2 CPU cores
+- システムは複数ファイルのアップロードを同時に処理可能
+- バックグラウンドワーカーがメタデータ抽出を非同期処理
+- 推奨：CPUコア2つにつき1ワーカー
 
-### Memory Usage
+### メモリ使用量
 
-- Base application: ~500MB
-- Per concurrent upload: ~50-100MB (depending on file size)
-- PostgreSQL: ~200MB minimum
-- Redis: ~100MB minimum
+- ベースアプリケーション：約500MB
+- 同時アップロードあたり：約50-100MB（ファイルサイズに依存）
+- PostgreSQL：最低200MB
+- Redis：最低100MB
 
-### Scaling Recommendations
+### スケーリング推奨事項
 
-For production deployments with high usage:
+高使用量の本番デプロイメントの場合：
 
-- Use separate servers/containers for web, worker, database, and Redis
-- Implement load balancing for multiple web instances
-- Use Redis clustering for high availability
-- Consider object storage (S3, etc.) for audio files
+- Web、ワーカー、データベース、Redisを別サーバー/コンテナで分離
+- 複数Webインスタンス用のロードバランシングを実装
+- 高可用性のためにRedisクラスタリングを使用
+- 音声ファイル用にオブジェクトストレージ（S3等）を検討
 
-## Docker Deployment
+## Dockerデプロイメント
 
-### Docker System Requirements
+### Dockerシステム要件
 
-When using Docker, ensure:
+Dockerを使用する場合の確認事項：
 
-- Docker daemon has at least 4GB memory allocated
-- Sufficient disk space for images and volumes
-- Docker BuildKit enabled for optimal build performance
+- Dockerデーモンに最低4GBのメモリが割り当てられている
+- イメージとボリューム用の十分なディスク容量
+- 最適なビルドパフォーマンスのためにDocker BuildKitが有効
 
-### Pre-built Images
+### プリビルドイメージ
 
-The application includes Dockerfiles for:
+アプリケーションには以下のDockerfileが含まれています：
 
-- Web service (with FFmpeg pre-installed)
-- Worker service (with FFmpeg pre-installed)
-- Development environment setup
+- Webサービス（FFmpeg事前インストール済み）
+- ワーカーサービス（FFmpeg事前インストール済み）
+- 開発環境セットアップ
 
-## Installation Verification
+## インストール確認
 
-After installing all dependencies, verify the setup:
+すべての依存関係をインストール後、セットアップを確認：
 
 ```bash
-# Check Node.js
+# Node.jsの確認
 node --version
 
-# Check PostgreSQL
+# PostgreSQLの確認
 pg_isready
 
-# Check Redis
+# Redisの確認
 redis-cli ping
 
-# Check FFmpeg and ffprobe
+# FFmpegとffprobeの確認
 ffmpeg -version
 ffprobe -version
 
-# Check ffprobe can analyze audio
+# ffprobeが音声解析可能か確認
 ffprobe -v quiet -print_format json -show_format -show_streams /path/to/test/audio.mp3
 ```
 
-## Troubleshooting
+## トラブルシューティング
 
-### Common Issues
+### よくある問題
 
-1. **FFmpeg not found**
-   - Error: "ffprobe command not found"
-   - Solution: Install FFmpeg with your package manager
-2. **Database connection failed**
+1. **FFmpegが見つからない**
+   - エラー: "ffprobe command not found"
+   - 解決策: パッケージマネージャーでFFmpegをインストール
 
-   - Error: "ECONNREFUSED ::1:5432"
-   - Solution: Ensure PostgreSQL is running and accepting connections
+2. **データベース接続失敗**
+   - エラー: "ECONNREFUSED ::1:5432"
+   - 解決策: PostgreSQLが起動し、接続を受け付けていることを確認
 
-3. **Redis connection failed**
+3. **Redis接続失敗**
+   - エラー: "Redis connection to localhost:6379 failed"
+   - 解決策: Redisサービスを開始
 
-   - Error: "Redis connection to localhost:6379 failed"
-   - Solution: Start Redis service
+4. **ファイルアップロード失敗**
+   - エラー: "EACCES: permission denied"
+   - 解決策: uploadsフォルダのディレクトリ権限を確認
 
-4. **File upload fails**
-   - Error: "EACCES: permission denied"
-   - Solution: Check directory permissions for uploads folder
+### サポートを受ける
 
-### Getting Help
+追加サポートについては：
 
-For additional support:
+- コンテナ化デプロイメントの場合は[Dockerセットアップガイド](./docker-setup.md)を確認
+- 開発モードでアプリケーションログを確認
+- すべてのシステム要件が満たされていることを確認
 
-- Check the [Docker Setup Guide](./docker-setup.md) for containerized deployment
-- Review application logs in development mode
-- Ensure all system requirements are met
+## セキュリティ考慮事項
 
-## Security Considerations
-
-1. **File Uploads**: Implement virus scanning for production deployments
-2. **FFmpeg**: Keep FFmpeg updated to patch security vulnerabilities
-3. **Database**: Use strong passwords and encrypted connections
-4. **File Permissions**: Restrict access to upload directories
-5. **Network**: Use HTTPS in production, implement rate limiting
+1. **ファイルアップロード**: 本番デプロイメントではウイルススキャンを実装
+2. **FFmpeg**: セキュリティ脆弱性の修正のためFFmpegを最新に保つ
+3. **データベース**: 強力なパスワードと暗号化接続を使用
+4. **ファイル権限**: アップロードディレクトリへのアクセスを制限
+5. **ネットワーク**: 本番環境でHTTPSを使用、レート制限を実装
 
 ---
 
-Last updated: 2025-06-04
+最終更新：2025年6月23日
