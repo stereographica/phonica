@@ -49,11 +49,17 @@ describe('workers comprehensive tests', () => {
       scheduleOrphanedFilesCleanup: mockScheduleOrphanedFilesCleanup,
       shutdownWorkers: mockShutdownWorkers,
     }));
+
+    jest.doMock('../zip-generation-queue', () => ({
+      getZipGenerationWorker: jest.fn(() => mockFileDeletionWorker), // Use same mock structure
+      shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+    }));
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
     jest.dontMock('../file-deletion-queue');
+    jest.dontMock('../zip-generation-queue');
     jest.resetModules();
     process.on = originalProcessOn;
     processExitSpy.mockRestore();
@@ -67,11 +73,13 @@ describe('workers comprehensive tests', () => {
       await freshStartWorkers();
 
       // ワーカーのイベントハンドラーが設定されたことを確認
-      expect(mockFileDeletionWorker.on).toHaveBeenCalledTimes(2);
+      // mockFileDeletionWorker は FileDeletionWorker と ZipGenerationWorker で使用
+      expect(mockFileDeletionWorker.on).toHaveBeenCalledTimes(4); // 2 workers × 2 events
       expect(mockFileDeletionWorker.on).toHaveBeenCalledWith('failed', expect.any(Function));
       expect(mockFileDeletionWorker.on).toHaveBeenCalledWith('completed', expect.any(Function));
 
-      expect(mockOrphanedFilesCleanupWorker.on).toHaveBeenCalledTimes(2);
+      // mockOrphanedFilesCleanupWorker は OrphanedFilesCleanupWorker で使用
+      expect(mockOrphanedFilesCleanupWorker.on).toHaveBeenCalledTimes(2); // 1 worker × 2 events
       expect(mockOrphanedFilesCleanupWorker.on).toHaveBeenCalledWith(
         'failed',
         expect.any(Function),
@@ -137,6 +145,11 @@ describe('workers comprehensive tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockOrphanedFilesCleanupWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockRejectedValue(new Error('Schedule failed')),
         shutdownWorkers: mockShutdownWorkers,
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockFileDeletionWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports

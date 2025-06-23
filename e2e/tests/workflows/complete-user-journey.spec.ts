@@ -407,7 +407,7 @@ test.describe('@workflow Complete User Journey', () => {
     if (rowCount > 0) {
       // 最初の素材のタイトルセルのボタンをクリック
       const firstRow = page.locator('tbody tr').first();
-      const titleButton = firstRow.locator('td').first().locator('button');
+      const titleButton = firstRow.locator('td').nth(1).locator('button');
       const materialTitle = await titleButton.textContent();
       await titleButton.click();
 

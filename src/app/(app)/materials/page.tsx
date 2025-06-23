@@ -19,10 +19,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PlusCircle, Search, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MaterialDetailModal } from '@/components/materials/MaterialDetailModal';
+import { BulkOperationToolbar } from '@/components/materials/BulkOperationToolbar';
+import { BulkDeleteConfirmationModal } from '@/components/materials/BulkDeleteConfirmationModal';
+import { BulkTagModal } from '@/components/materials/BulkTagModal';
+import { BulkProjectModal } from '@/components/materials/BulkProjectModal';
 import { StarRating } from '@/components/ui/star-rating';
 import { Material } from '@/types/material';
+import { useNotification } from '@/hooks/use-notification';
 
 interface ApiResponse {
   data: Material[];
@@ -38,12 +44,13 @@ function MaterialsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { notifyError, notifySuccess } = useNotification();
 
   // State
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMaterialSlug, setSelectedMaterialSlug] = useState<string | null>(null);
+  const [selectedMaterialSlug, setSelectedMaterialSlug] = useState<string>('');
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [pagination, setPagination] = useState({
@@ -52,6 +59,13 @@ function MaterialsPageContent() {
     totalPages: 1,
     totalItems: 0,
   });
+
+  // Selection state
+  const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isBulkTagModalOpen, setIsBulkTagModalOpen] = useState(false);
+  const [isBulkProjectModalOpen, setIsBulkProjectModalOpen] = useState(false);
 
   // Filter state
   const [tempTitleFilter, setTempTitleFilter] = useState(searchParams.get('title') || '');
@@ -68,6 +82,15 @@ function MaterialsPageContent() {
     // Reset navigation state when URL changes
     setIsNavigating(false);
   }, [searchParams]);
+
+  // Update isAllSelected when selectedMaterials or materials change
+  useEffect(() => {
+    if (materials.length > 0) {
+      setIsAllSelected(materials.every((material) => selectedMaterials.has(material.id)));
+    } else {
+      setIsAllSelected(false);
+    }
+  }, [selectedMaterials, materials]);
 
   // Fetch materials
   const fetchMaterials = useCallback(async () => {
@@ -109,6 +132,8 @@ function MaterialsPageContent() {
   // Fetch materials when component mounts or searchParams change
   useEffect(() => {
     fetchMaterials();
+    // Clear selection when fetching new materials
+    setSelectedMaterials(new Set());
   }, [fetchMaterials]);
 
   // Handlers
@@ -119,7 +144,7 @@ function MaterialsPageContent() {
 
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
-    setSelectedMaterialSlug(null);
+    setSelectedMaterialSlug('');
   };
 
   const handleApplyFilters = () => {
@@ -162,6 +187,25 @@ function MaterialsPageContent() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  // Selection handlers
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedMaterials(new Set());
+    } else {
+      setSelectedMaterials(new Set(materials.map((m) => m.id)));
+    }
+  };
+
+  const handleSelectMaterial = (materialId: string) => {
+    const newSelected = new Set(selectedMaterials);
+    if (newSelected.has(materialId)) {
+      newSelected.delete(materialId);
+    } else {
+      newSelected.add(materialId);
+    }
+    setSelectedMaterials(newSelected);
+  };
+
   const handlePageChange = (newPage: number) => {
     // Prevent navigation if already navigating or on the requested page
     if (isNavigating) {
@@ -179,6 +223,60 @@ function MaterialsPageContent() {
 
     // Update URL
     router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  // Check download status with polling
+  const checkDownloadStatus = async (requestId: string) => {
+    const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+    let attempts = 0;
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/materials/bulk/download?requestId=${requestId}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to check download status');
+        }
+
+        const status = await response.json();
+
+        if (status.status === 'completed' && status.result) {
+          notifySuccess(
+            'Download ready',
+            'Your ZIP file is ready. The download will start automatically.',
+          );
+
+          // Start download
+          const downloadUrl = status.result.downloadUrl;
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = status.result.fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          // Clear selection after successful download
+          setSelectedMaterials(new Set());
+        } else if (status.status === 'failed') {
+          notifyError(new Error(status.error || 'Failed to generate ZIP file'));
+        } else if (status.status === 'processing' || status.status === 'pending') {
+          // Continue polling
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(pollStatus, 5000); // Poll every 5 seconds
+          } else {
+            notifyError(
+              new Error('The download is taking longer than expected. Please try again later.'),
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check download status:', error);
+        notifyError(new Error('Failed to check download status'));
+      }
+    };
+
+    pollStatus();
   };
 
   // Format date for display
@@ -260,7 +358,12 @@ function MaterialsPageContent() {
 
       {/* Sort Controls */}
       <div className="mb-4 flex justify-between items-center">
-        <div className="text-sm text-muted-foreground">{pagination.totalItems} materials found</div>
+        <div className="text-sm text-muted-foreground">
+          {pagination.totalItems} materials found
+          {selectedMaterials.size > 0 && (
+            <span className="ml-2 font-medium">• {selectedMaterials.size} selected</span>
+          )}
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
@@ -292,6 +395,13 @@ function MaterialsPageContent() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all materials"
+                  />
+                </TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Recorded At</TableHead>
                 <TableHead>Tags</TableHead>
@@ -301,7 +411,17 @@ function MaterialsPageContent() {
             </TableHeader>
             <TableBody>
               {materials.map((material) => (
-                <TableRow key={material.id}>
+                <TableRow
+                  key={material.id}
+                  className={selectedMaterials.has(material.id) ? 'bg-muted/50' : ''}
+                >
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedMaterials.has(material.id)}
+                      onCheckedChange={() => handleSelectMaterial(material.id)}
+                      aria-label={`Select ${material.title}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <button
                       onClick={() => handleMaterialClick(material.slug)}
@@ -369,6 +489,84 @@ function MaterialsPageContent() {
           handleCloseDetailModal();
         }}
         onMaterialEdited={() => {
+          fetchMaterials();
+        }}
+      />
+
+      <BulkOperationToolbar
+        selectedCount={selectedMaterials.size}
+        onBulkDelete={() => {
+          setIsBulkDeleteModalOpen(true);
+        }}
+        onBulkTag={() => {
+          setIsBulkTagModalOpen(true);
+        }}
+        onBulkAddToProject={() => {
+          setIsBulkProjectModalOpen(true);
+        }}
+        onBulkDownload={async () => {
+          try {
+            const response = await fetch('/api/materials/bulk/download', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                materialIds: Array.from(selectedMaterials),
+              }),
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to start download');
+            }
+
+            const result = await response.json();
+
+            notifySuccess(
+              'Download started',
+              `Preparing ZIP file for ${result.materialCount} materials. We'll notify you when it's ready.`,
+            );
+
+            // Start polling for status
+            checkDownloadStatus(result.requestId);
+          } catch (error) {
+            console.error('Failed to start bulk download:', error);
+            notifyError(error instanceof Error ? error : new Error('Failed to start download'));
+          }
+        }}
+      />
+
+      <BulkDeleteConfirmationModal
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        selectedMaterials={materials
+          .filter((m) => selectedMaterials.has(m.id))
+          .map((m) => ({ id: m.id, title: m.title }))}
+        onDeleted={() => {
+          setSelectedMaterials(new Set());
+          fetchMaterials();
+        }}
+      />
+
+      <BulkTagModal
+        isOpen={isBulkTagModalOpen}
+        onClose={() => setIsBulkTagModalOpen(false)}
+        selectedMaterialCount={selectedMaterials.size}
+        selectedMaterialIds={Array.from(selectedMaterials)}
+        onTagged={() => {
+          setSelectedMaterials(new Set());
+          fetchMaterials();
+        }}
+      />
+
+      <BulkProjectModal
+        isOpen={isBulkProjectModalOpen}
+        onClose={() => setIsBulkProjectModalOpen(false)}
+        selectedMaterialCount={selectedMaterials.size}
+        selectedMaterialIds={Array.from(selectedMaterials)}
+        onProjectAdded={() => {
+          setSelectedMaterials(new Set());
           fetchMaterials();
         }}
       />
