@@ -2,11 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
 @layer base {
   :root {
-
     --background: 0 0% 100%;
 
     --foreground: 0 0% 3.9%;
@@ -55,10 +52,9 @@
 
     --chart-5: 27 87% 67%;
 
-    --radius: 0.5rem
+    --radius: 0.5rem;
   }
   .dark {
-
     --background: 0 0% 3.9%;
 
     --foreground: 0 0% 98%;
@@ -105,11 +101,9 @@
 
     --chart-4: 280 65% 60%;
 
-    --chart-5: 340 75% 55%
+    --chart-5: 340 75% 55%;
   }
 }
-
-
 
 @layer base {
   * {
@@ -118,4 +112,78 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* GridStack customization */
+.grid-stack {
+  background: transparent;
+}
+
+.grid-stack-item > .grid-stack-item-content {
+  overflow: hidden;
+}
+
+.grid-stack-item.ui-draggable-dragging {
+  z-index: 100;
+}
+
+.grid-stack-item.ui-resizable-resizing {
+  z-index: 100;
+}
+
+/* GridStackのリサイズハンドルのスタイル調整 */
+.grid-stack > .grid-stack-item > .ui-resizable-se,
+.grid-stack > .grid-stack-item > .ui-resizable-sw,
+.grid-stack > .grid-stack-item > .ui-resizable-ne,
+.grid-stack > .grid-stack-item > .ui-resizable-nw {
+  background: none;
+  border: 0;
+}
+
+.grid-stack > .grid-stack-item > .ui-resizable-se::before,
+.grid-stack > .grid-stack-item > .ui-resizable-sw::before,
+.grid-stack > .grid-stack-item > .ui-resizable-ne::before,
+.grid-stack > .grid-stack-item > .ui-resizable-nw::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid hsl(var(--border));
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.grid-stack > .grid-stack-item:hover > .ui-resizable-se::before,
+.grid-stack > .grid-stack-item:hover > .ui-resizable-sw::before,
+.grid-stack > .grid-stack-item:hover > .ui-resizable-ne::before,
+.grid-stack > .grid-stack-item:hover > .ui-resizable-nw::before {
+  opacity: 1;
+}
+
+.grid-stack > .grid-stack-item > .ui-resizable-se::before {
+  border-left: 0;
+  border-top: 0;
+  right: 4px;
+  bottom: 4px;
+}
+
+.grid-stack > .grid-stack-item > .ui-resizable-sw::before {
+  border-right: 0;
+  border-top: 0;
+  left: 4px;
+  bottom: 4px;
+}
+
+.grid-stack > .grid-stack-item > .ui-resizable-ne::before {
+  border-left: 0;
+  border-bottom: 0;
+  right: 4px;
+  top: 4px;
+}
+
+.grid-stack > .grid-stack-item > .ui-resizable-nw::before {
+  border-right: 0;
+  border-bottom: 0;
+  left: 4px;
+  top: 4px;
 }
