@@ -2,16 +2,21 @@ import { test, expect } from '../../fixtures/test-fixtures';
 
 test.describe('@materials Direct API Duplicate Title Test', () => {
   test('API should return 409 for duplicate title on update', async ({ request }) => {
-    // シードデータから既知の素材を使用
-    // "New York Subway" のslugは通常 "nyc-subway" または類似の形式
-    const targetSlug = 'nyc-subway';
-    const duplicateTitle = '温泉の音 ♨️'; // 既存の素材タイトル
+    // シードデータから2つの異なる素材を使用
+    const sourceSlug = 'nyc-subway'; // 更新対象の素材
+    const targetSlug = 'forest-morning'; // タイトルを取得する素材
 
-    console.log(`Testing update of material with slug: ${targetSlug}`);
-    console.log(`Attempting to set duplicate title: ${duplicateTitle}`);
+    // まず、targetSlugの現在のタイトルを取得
+    const targetResponse = await request.get(`/api/materials/${targetSlug}`);
+    expect(targetResponse.status()).toBe(200);
+    const targetMaterial = await targetResponse.json();
+    const duplicateTitle = targetMaterial.title;
 
-    // 直接APIを叩く
-    const response = await request.put(`/api/materials/${targetSlug}`, {
+    console.log(`Testing update of material with slug: ${sourceSlug}`);
+    console.log(`Attempting to set duplicate title: ${duplicateTitle} (from ${targetSlug})`);
+
+    // sourceSlugの素材を、targetSlugの素材と同じタイトルに変更
+    const response = await request.put(`/api/materials/${sourceSlug}`, {
       data: {
         title: duplicateTitle, // 既存の素材と同じタイトルに変更
         recordedAt: new Date().toISOString(),
@@ -32,7 +37,12 @@ test.describe('@materials Direct API Duplicate Title Test', () => {
   test('API should allow update without title change', async ({ request }) => {
     // タイトルを変更しない場合は成功するはず
     const targetSlug = 'nyc-subway';
-    const originalTitle = 'New York Subway';
+
+    // まず、現在のタイトルを取得
+    const getResponse = await request.get(`/api/materials/${targetSlug}`);
+    expect(getResponse.status()).toBe(200);
+    const currentMaterial = await getResponse.json();
+    const originalTitle = currentMaterial.title;
 
     console.log(`Testing update of material with slug: ${targetSlug}`);
     console.log(`Keeping original title: ${originalTitle}`);

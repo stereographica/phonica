@@ -46,11 +46,17 @@ test.describe('@materials Location Input Enhancement', () => {
     await form.fillByLabel('Latitude', '35.681236');
     await form.fillByLabel('Longitude', '139.767125');
 
-    // Wait for map preview to appear
-    await expect(page.locator('text=Location Preview')).toBeVisible();
+    // Use robust waiting for Leaflet map
+    await wait.waitForLeafletMap({ timeout: 30000 });
 
-    // Map container should be visible
-    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 10000 });
+    // Verify map components are present
+    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 5000 });
+
+    // Additional verification: check that map has proper dimensions
+    const mapContainer = page.locator('.leaflet-container');
+    const boundingBox = await mapContainer.boundingBox();
+    expect(boundingBox?.width).toBeGreaterThan(0);
+    expect(boundingBox?.height).toBeGreaterThan(0);
   });
 
   test('opens photo extractor modal when Extract from Photo is clicked', async ({ page }) => {
@@ -107,9 +113,11 @@ test.describe('@materials Location Input Enhancement', () => {
       ),
     ).toBeVisible();
 
-    // Map should be visible in modal
-    await expect(page.locator('[role="dialog"] .leaflet-container')).toBeVisible({
-      timeout: 20000,
+    // Map should be visible in modal - use custom waiting
+    await wait.waitForLeafletMap({
+      timeout: 30000,
+      containerSelector: '[role="dialog"] .leaflet-container',
+      skipLocationPreviewCheck: true,
     });
 
     // Cancel button should close modal - use more specific selector for dialog button
@@ -292,8 +300,8 @@ test.describe('@materials Location Input Enhancement', () => {
     await form.fillByLabel('Longitude', '-74.0060');
     await form.fillByLabel('Location Name (Optional)', 'New York');
 
-    // Map preview should update
-    await expect(page.locator('text=Location Preview')).toBeVisible();
+    // Map preview should update - use robust waiting
+    await wait.waitForLeafletMap({ timeout: 30000 });
   });
 });
 

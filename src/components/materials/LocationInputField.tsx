@@ -148,7 +148,14 @@ export default function LocationInputField({
       {hasValidCoordinates() && (
         <div className="mt-4">
           <Label className="text-sm text-muted-foreground mb-2 block">Location Preview</Label>
-          <div className="rounded-md overflow-hidden border">
+          <div
+            className="rounded-md overflow-hidden border"
+            style={{
+              height: '300px',
+              minHeight: '300px',
+            }}
+            data-testid="location-preview-container"
+          >
             <MaterialLocationMap
               latitude={typeof latitude === 'string' ? parseFloat(latitude) : latitude}
               longitude={typeof longitude === 'string' ? parseFloat(longitude) : longitude}
