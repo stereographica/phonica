@@ -44,6 +44,25 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
     await expect(page.getByRole('button', { name: /Sort by/i })).toBeVisible();
   });
 
+  test('can apply filters using Enter key', async ({ page }) => {
+    await page.goto('/projects');
+    await page.waitForLoadState('networkidle');
+
+    // 名前フィルターに入力してEnterキーを押す
+    await page.fill('input#nameFilter', 'Test');
+    await page.locator('input#nameFilter').press('Enter');
+
+    // URLパラメータが更新されることを確認
+    await expect(page).toHaveURL(/\?name=Test/);
+
+    // フィルターをクリアして再度Enterキーを押す
+    await page.fill('input#nameFilter', '');
+    await page.locator('input#nameFilter').press('Enter');
+
+    // URLがクリアされることを確認（page=1パラメータは許容）
+    await expect(page).toHaveURL(/\/projects(\?page=1)?$/);
+  });
+
   test('新規プロジェクトの作成', async ({ page }) => {
     await page.goto('/projects');
 
@@ -253,10 +272,10 @@ test.describe('@projects @smoke Project CRUD Operations', () => {
 
     // 名前順でソート
     await page.getByRole('menuitem', { name: /Name \(A-Z\)/i }).click();
-    
+
     // URLが更新されるまで待機
     await page.waitForURL(/sortBy=name/, { timeout: 5000 });
-    
+
     // URLにソートパラメータが含まれることを確認
     expect(page.url()).toContain('sortBy=name');
     expect(page.url()).toContain('sortOrder=asc');

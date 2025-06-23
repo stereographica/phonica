@@ -583,6 +583,66 @@ describe('MaterialsPage - Improved Tests', () => {
         expect(screen.queryByText('Rain Sound')).not.toBeInTheDocument();
       });
     });
+
+    it('should apply filters when Enter key is pressed in title filter', async () => {
+      // Arrange
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: mockMaterials,
+          pagination: { page: 1, limit: 10, totalPages: 1, totalItems: 3 },
+        }),
+      });
+
+      // Act
+      render(<MaterialsPage />);
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByText('Forest Recording')).toBeInTheDocument();
+      });
+
+      // Type in title filter and press Enter
+      const titleInput = screen.getByPlaceholderText('Search by title...');
+      await user.type(titleInput, 'Forest');
+      await user.keyboard('{Enter}');
+
+      // Assert - verify URL update was requested without clicking button
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('title=Forest'));
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('page=1'));
+      });
+    });
+
+    it('should apply filters when Enter key is pressed in tag filter', async () => {
+      // Arrange
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: mockMaterials,
+          pagination: { page: 1, limit: 10, totalPages: 1, totalItems: 3 },
+        }),
+      });
+
+      // Act
+      render(<MaterialsPage />);
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByText('City Ambience')).toBeInTheDocument();
+      });
+
+      // Type in tag filter and press Enter
+      const tagInput = screen.getByPlaceholderText('Search by tag...');
+      await user.type(tagInput, 'Urban');
+      await user.keyboard('{Enter}');
+
+      // Assert - verify URL update was requested without clicking button
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('tag=Urban'));
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('page=1'));
+      });
+    });
   });
 
   describe('Edge Cases', () => {

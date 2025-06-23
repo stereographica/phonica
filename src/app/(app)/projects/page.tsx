@@ -131,6 +131,13 @@ function ProjectsPageContent() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  const handleFilterKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleApplyFilters();
+    }
+  };
+
   const handleSortChange = (sortBy: string, sortOrder: string) => {
     const params = new URLSearchParams(searchParams);
     params.set('sortBy', sortBy);
@@ -200,6 +207,7 @@ function ProjectsPageContent() {
               placeholder="Search by project name..."
               value={tempNameFilter}
               onChange={(e) => setTempNameFilter(e.target.value)}
+              onKeyDown={handleFilterKeyDown}
             />
           </div>
           <Button onClick={handleApplyFilters} className="md:self-end">

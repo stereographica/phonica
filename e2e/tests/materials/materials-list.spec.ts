@@ -32,7 +32,7 @@ test.describe('@materials @critical Materials List Page', () => {
   test('can navigate to materials list from sidebar', async ({ page }) => {
     // ホームページから開始
     await page.goto('/');
-    
+
     // サイドバーから素材一覧へ移動（実際のサイドバー構造に合わせて修正）
     await page.click('nav a[href="/materials"]');
     await page.waitForLoadState('networkidle');
@@ -58,7 +58,7 @@ test.describe('@materials @critical Materials List Page', () => {
 
     // タイトル検索フィールドに入力
     await page.fill('input#titleFilter', 'Forest');
-    
+
     // 検索ボタンをクリック
     await page.click('button:has-text("Apply Filters")');
 
@@ -77,7 +77,7 @@ test.describe('@materials @critical Materials List Page', () => {
 
     // タグ検索フィールドに入力
     await page.fill('input#tagFilter', 'nature');
-    
+
     // 検索ボタンをクリック
     await page.click('button:has-text("Apply Filters")');
 
@@ -91,13 +91,34 @@ test.describe('@materials @critical Materials List Page', () => {
     await expect(page).toHaveURL(/\/materials(\?page=1)?$/);
   });
 
+  test('can apply filters using Enter key', async ({ page }) => {
+    await navigation.goToMaterialsPage();
+
+    // タイトル検索フィールドに入力してEnterキーを押す
+    await page.fill('input#titleFilter', 'Forest');
+    await page.locator('input#titleFilter').press('Enter');
+
+    // URLパラメータが更新されることを確認
+    await expect(page).toHaveURL(/\?title=Forest/);
+
+    // ページをリロードしてURLパラメータをクリア
+    await navigation.goToMaterialsPage();
+
+    // タグ検索フィールドに入力してEnterキーを押す
+    await page.fill('input#tagFilter', 'nature');
+    await page.locator('input#tagFilter').press('Enter');
+
+    // URLパラメータが更新されることを確認
+    await expect(page).toHaveURL(/\?tag=nature/);
+  });
+
   test('pagination is displayed', async ({ page }) => {
     await navigation.goToMaterialsPage();
 
     // ページネーションコントロールが存在することを確認（実際の実装に合わせて修正）
     // ページネーションは1ページ以上ある場合のみ表示される
     const pageInfo = page.locator('text=/Page \d+ of \d+/');
-    
+
     // ページ情報が存在する場合、ページネーションボタンも確認
     if (await pageInfo.isVisible()) {
       await expect(page.locator('button:has-text("Previous")')).toBeVisible();
