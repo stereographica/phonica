@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Loader2, FileAudio, Tag, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -16,11 +16,14 @@ export function GlobalSearch() {
   const { query, updateQuery, searchResults, isLoading } = useSearch();
 
   // 検索結果の表示数制限
-  const displayResults = {
-    materials: searchResults.materials?.slice(0, 5) || [],
-    tags: searchResults.tags?.slice(0, 3) || [],
-    equipment: searchResults.equipment?.slice(0, 3) || [],
-  };
+  const displayResults = useMemo(
+    () => ({
+      materials: searchResults.materials?.slice(0, 5) || [],
+      tags: searchResults.tags?.slice(0, 3) || [],
+      equipment: searchResults.equipment?.slice(0, 3) || [],
+    }),
+    [searchResults],
+  );
 
   const hasResults =
     displayResults.materials.length > 0 ||
@@ -28,11 +31,14 @@ export function GlobalSearch() {
     displayResults.equipment.length > 0;
 
   // すべての検索結果を1つの配列にまとめる（キーボードナビゲーション用）
-  const allResults = [
-    ...displayResults.materials.map((item) => ({ type: 'material', item })),
-    ...displayResults.tags.map((item) => ({ type: 'tag', item })),
-    ...displayResults.equipment.map((item) => ({ type: 'equipment', item })),
-  ];
+  const allResults = useMemo(
+    () => [
+      ...displayResults.materials.map((item) => ({ type: 'material', item })),
+      ...displayResults.tags.map((item) => ({ type: 'tag', item })),
+      ...displayResults.equipment.map((item) => ({ type: 'equipment', item })),
+    ],
+    [displayResults],
+  );
 
   // 検索ボックスがフォーカスされたらPopoverを開く
   const handleFocus = () => {
