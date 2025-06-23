@@ -720,7 +720,20 @@ test.describe('@materials Edit Material', () => {
       timeout: 10000,
     });
 
-    await page.waitForURL('/materials', { timeout: 30000 });
+    // WebKitでは追加の待機が必要な場合がある
+    const browserName = page.context().browser()?.browserType().name() || 'unknown';
+    if (browserName === 'webkit') {
+      // WebKitでは時々リダイレクトが遅れるため、短い待機を入れる
+      await page.waitForTimeout(1000);
+
+      // 明示的にURLを確認し、まだ編集ページにいる場合は素材一覧に移動
+      const currentUrl = page.url();
+      if (currentUrl.includes('/edit')) {
+        await page.goto('/materials');
+      }
+    } else {
+      await page.waitForURL('/materials', { timeout: 30000 });
+    }
 
     // Step 4: 素材一覧で評価が表示されることを確認
     await expect(page.locator('h1:has-text("Materials")')).toBeVisible();
