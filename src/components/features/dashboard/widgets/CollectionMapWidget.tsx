@@ -8,10 +8,10 @@ import { MapPin } from 'lucide-react';
 const MaterialLocationMap = dynamic(() => import('@/components/maps/MaterialLocationMap'), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full min-h-[300px] bg-secondary/20 rounded-lg">
+    <div className="flex items-center justify-center h-full bg-secondary/20 rounded-lg">
       <div className="text-center">
-        <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground animate-pulse" />
-        <p className="text-sm text-muted-foreground">地図を読み込み中...</p>
+        <MapPin className="h-6 w-6 mx-auto mb-1 text-muted-foreground animate-pulse" />
+        <p className="text-xs text-muted-foreground">地図を読み込み中...</p>
       </div>
     </div>
   ),
@@ -47,24 +47,37 @@ export function CollectionMapWidget() {
   const totalMaterials = materials.length;
   const locationsWithData = materials.filter((m) => m.latitude && m.longitude).length;
 
+  console.log('CollectionMapWidget render:', {
+    materialsLength: materials.length,
+    hasLatitude: !!materials[0]?.latitude,
+    hasLongitude: !!materials[0]?.longitude,
+    hasLocation: !!(materials[0]?.latitude && materials[0]?.longitude),
+    firstMaterial: materials[0],
+  });
+
   return (
-    <div className="space-y-3 h-full">
-      <div className="flex items-center justify-between text-sm">
+    <div className="space-y-2 h-full">
+      <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{locationsWithData}件の録音場所</span>
         <span className="text-xs text-muted-foreground">全{totalMaterials}件中</span>
       </div>
 
-      <div className="h-[calc(100%-2rem)]">
+      <div className="flex-1 min-h-[200px]" style={{ height: '200px', minHeight: '200px' }}>
         {materials.length > 0 && materials[0].latitude && materials[0].longitude ? (
-          <MaterialLocationMap
-            latitude={materials[0].latitude}
-            longitude={materials[0].longitude}
-            popupText={`${materials[0].title} - ${materials[0].locationName}`}
-            zoom={10}
-          />
+          <div
+            className="h-full w-full"
+            style={{ height: '200px', minHeight: '200px', width: '100%' }}
+          >
+            <MaterialLocationMap
+              latitude={materials[0].latitude}
+              longitude={materials[0].longitude}
+              popupText={`${materials[0].title} - ${materials[0].locationName}`}
+              zoom={10}
+            />
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full bg-secondary/20 rounded-lg">
-            <p className="text-sm text-muted-foreground">位置情報のある素材がありません</p>
+            <p className="text-xs text-muted-foreground">位置情報のある素材がありません</p>
           </div>
         )}
       </div>

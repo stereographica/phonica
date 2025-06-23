@@ -11,11 +11,11 @@ import { ja } from 'date-fns/locale';
 export function TodaySoundWidget() {
   const [isLoading, setIsLoading] = useState(false);
 
-  // プレースホルダーデータ
+  // プレースホルダーデータ（実際のAPIからデータを取得するまでの仮データ）
   const todayMaterial = {
     id: 'sample-1',
     title: '朝の鳥のさえずり',
-    filePath: '/audio/sample.wav', // TODO: 実際のファイルパスに置き換え
+    filePath: '', // 実際のファイルが見つからない場合は空文字に
     recordedAt: new Date('2024-01-15T06:30:00'),
     locationName: '代々木公園',
     tags: ['鳥', '朝', '公園'],
@@ -58,7 +58,13 @@ export function TodaySoundWidget() {
           </div>
 
           <div className="w-full">
-            <AudioPlayer audioUrl={todayMaterial.filePath} />
+            {todayMaterial.filePath ? (
+              <AudioPlayer audioUrl={todayMaterial.filePath} />
+            ) : (
+              <div className="text-xs text-muted-foreground p-2 bg-muted rounded text-center">
+                音声ファイルが利用できません
+              </div>
+            )}
           </div>
 
           {todayMaterial.tags.length > 0 && (

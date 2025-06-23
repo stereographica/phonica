@@ -57,7 +57,7 @@ describe('Dashboard Store', () => {
         setLayout(newLayout);
       });
 
-      const savedData = localStorage.getItem('phonica-dashboard-layout');
+      const savedData = localStorage.getItem('phonica-dashboard-layout-v11-ultrathink-fixed');
       expect(savedData).toBeTruthy();
       expect(JSON.parse(savedData!)).toEqual(newLayout);
     });

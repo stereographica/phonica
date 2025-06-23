@@ -62,24 +62,24 @@ export function StatisticsWidget() {
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 h-full">
       {/* サマリーカード */}
       <div className="grid grid-cols-2 gap-2">
-        <Card className="p-3">
+        <Card className="p-2">
           <div className="flex items-center gap-2">
-            <Mic className="h-4 w-4 text-muted-foreground" />
+            <Mic className="h-3 w-3 text-muted-foreground" />
             <div>
               <p className="text-xs text-muted-foreground">総素材数</p>
-              <p className="text-lg font-semibold">{summary.totalMaterials}</p>
+              <p className="text-sm font-semibold">{summary.totalMaterials}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-3">
+        <Card className="p-2">
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-3 w-3 text-muted-foreground" />
             <div>
               <p className="text-xs text-muted-foreground">総録音時間</p>
-              <p className="text-lg font-semibold">{Math.floor(summary.totalDuration / 60)}時間</p>
+              <p className="text-sm font-semibold">{Math.floor(summary.totalDuration / 60)}時間</p>
             </div>
           </div>
         </Card>
@@ -87,14 +87,20 @@ export function StatisticsWidget() {
 
       {/* グラフタブ */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="tags">タグ</TabsTrigger>
-          <TabsTrigger value="monthly">月別</TabsTrigger>
-          <TabsTrigger value="equipment">機材</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-8">
+          <TabsTrigger value="tags" className="text-xs">
+            タグ
+          </TabsTrigger>
+          <TabsTrigger value="monthly" className="text-xs">
+            月別
+          </TabsTrigger>
+          <TabsTrigger value="equipment" className="text-xs">
+            機材
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="tags" className="mt-4">
-          <ResponsiveContainer width="100%" height={200}>
+        <TabsContent value="tags" className="mt-1">
+          <ResponsiveContainer width="100%" height={150}>
             <PieChart>
               <Pie
                 data={tagData}
@@ -102,7 +108,7 @@ export function StatisticsWidget() {
                 cy="50%"
                 labelLine={false}
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={60}
+                outerRadius={40}
                 fill="#8884d8"
                 dataKey="count"
               >
@@ -115,12 +121,12 @@ export function StatisticsWidget() {
           </ResponsiveContainer>
         </TabsContent>
 
-        <TabsContent value="monthly" className="mt-4">
-          <ResponsiveContainer width="100%" height={200}>
+        <TabsContent value="monthly" className="mt-1">
+          <ResponsiveContainer width="100%" height={150}>
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="month" fontSize={12} />
-              <YAxis fontSize={12} />
+              <XAxis dataKey="month" fontSize={10} />
+              <YAxis fontSize={10} />
               <Tooltip />
               <Line
                 type="monotone"
@@ -131,18 +137,18 @@ export function StatisticsWidget() {
               />
             </LineChart>
           </ResponsiveContainer>
-          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
             <TrendingUp className="h-3 w-3" />
             <span>前月比 +12%</span>
           </div>
         </TabsContent>
 
-        <TabsContent value="equipment" className="mt-4">
-          <ResponsiveContainer width="100%" height={200}>
+        <TabsContent value="equipment" className="mt-1">
+          <ResponsiveContainer width="100%" height={150}>
             <BarChart data={equipmentData} layout="horizontal">
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis type="number" fontSize={12} />
-              <YAxis dataKey="name" type="category" fontSize={12} width={100} />
+              <XAxis type="number" fontSize={10} />
+              <YAxis dataKey="name" type="category" fontSize={10} width={80} />
               <Tooltip />
               <Bar dataKey="count" fill="#3b82f6" />
             </BarChart>

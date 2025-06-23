@@ -23,7 +23,7 @@ export interface WidgetLayout {
   maxH?: number;
 }
 
-// ウィジェットのメタデータ
+// ウィジェットのメタデータ（コンテンツに最適化されたサイズ）
 export const WIDGET_METADATA: Record<
   WidgetType,
   {
@@ -36,70 +36,70 @@ export const WIDGET_METADATA: Record<
 > = {
   unorganizedMaterials: {
     title: '要整理素材',
-    minW: 2,
-    minH: 3,
-    defaultW: 4,
-    defaultH: 5,
+    minW: 3, // 最小サイズを小さく
+    minH: 3, // 適度な高さで内容表示
+    defaultW: 4, // よりコンパクトに
+    defaultH: 3, // 内容に合わせて適度な高さ
   },
   todaySound: {
     title: '今日の音',
-    minW: 3,
-    minH: 3,
-    defaultW: 4,
-    defaultH: 4,
+    minW: 3, // 最小サイズを小さく
+    minH: 3, // 適度な高さ
+    defaultW: 4, // よりコンパクトに
+    defaultH: 3, // 内容に合わせて適度な高さ
   },
   collectionMap: {
     title: 'コレクションマップ',
-    minW: 4,
-    minH: 4,
-    defaultW: 6,
-    defaultH: 6,
+    minW: 8, // マップには最低限の幅が必要
+    minH: 2, // 最小高さを小さく
+    defaultW: 12, // 全幅
+    defaultH: 2, // マップはよりコンパクトに
   },
   recordingCalendar: {
     title: '録音カレンダー',
-    minW: 4,
-    minH: 3,
-    defaultW: 6,
-    defaultH: 4,
+    minW: 6, // カレンダーには最低限の幅
+    minH: 2, // 最小高さを小さく
+    defaultW: 12, // 全幅
+    defaultH: 2, // カレンダーはよりコンパクトに
   },
   statistics: {
     title: '統計データ',
-    minW: 3,
-    minH: 3,
-    defaultW: 4,
-    defaultH: 5,
+    minW: 3, // 最小サイズを小さく
+    minH: 3, // グラフに適した最小高さ
+    defaultW: 4, // よりコンパクトに
+    defaultH: 3, // グラフが適切に表示されるサイズ
   },
 };
 
-// デフォルトのレイアウト設定
+// デフォルトのレイアウト設定（コンテンツに最適化されたサイズ）
 export const DEFAULT_LAYOUT: WidgetLayout[] = [
   {
     id: 'unorganized-1',
     type: 'unorganizedMaterials',
     x: 0,
     y: 0,
-    w: 4,
-    h: 5,
-    minW: 2,
-    minH: 3,
-  },
-  {
-    id: 'today-sound-1',
-    type: 'todaySound',
-    x: 4,
-    y: 0,
-    w: 4,
-    h: 4,
+    w: 4, // コンパクトな幅
+    h: 3, // 内容に合わせて適度な高さ
     minW: 3,
     minH: 3,
   },
   {
     id: 'statistics-1',
     type: 'statistics',
+    x: 4,
+    y: 0,
+    w: 4, // コンパクトな幅
+    h: 3, // グラフが適切に表示される高さ
+    minW: 3,
+    minH: 3,
+  },
+  {
+    id: 'today-sound-1',
+    type: 'todaySound',
     x: 8,
     y: 0,
-    w: 4,
-    h: 5,
+    w: 4, // 右端に配置、コンパクト
+    h: 3, // 内容に合わせて適度な高さ
     minW: 3,
     minH: 3,
   },
@@ -107,27 +107,27 @@ export const DEFAULT_LAYOUT: WidgetLayout[] = [
     id: 'collection-map-1',
     type: 'collectionMap',
     x: 0,
-    y: 5,
-    w: 6,
-    h: 6,
-    minW: 4,
-    minH: 4,
+    y: 3, // 上のウィジェットが高くなったので調整
+    w: 12, // マップは全幅
+    h: 2, // マップはよりコンパクトに
+    minW: 8,
+    minH: 2,
   },
   {
     id: 'recording-calendar-1',
     type: 'recordingCalendar',
-    x: 6,
-    y: 5,
-    w: 6,
-    h: 4,
-    minW: 4,
-    minH: 3,
+    x: 0,
+    y: 5, // 上のウィジェットの位置変更に合わせて調整
+    w: 12, // カレンダーは全幅
+    h: 2, // カレンダーのコンテンツに合わせてコンパクトに
+    minW: 6,
+    minH: 2,
   },
 ];
 
-// レイアウトをLocalStorageに保存するatom
+// レイアウトをLocalStorageに保存するatom（コンテンツ最適化版）
 export const dashboardLayoutAtom = atomWithStorage<WidgetLayout[]>(
-  'phonica-dashboard-layout',
+  'phonica-dashboard-layout-v11-ultrathink-fixed',
   DEFAULT_LAYOUT,
 );
 
