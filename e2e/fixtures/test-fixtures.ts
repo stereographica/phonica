@@ -2,6 +2,12 @@
 import { test as base, expect, BrowserContext, Page } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
+import {
+  setupOptimizedE2EEnvironment,
+  cleanupE2EDatabase,
+  getE2EDatabaseURL,
+  getWorkerID,
+} from '../../scripts/e2e-db-optimized';
 
 // キャッシュディレクトリ
 const CACHE_DIR = path.join(process.cwd(), '.e2e-cache');
@@ -24,8 +30,45 @@ type TestFixtures = {
   cachedPage: Page;
 };
 
+// Worker scopeフィクスチャの型定義
+type WorkerFixtures = {
+  // Worker固有のデータベース
+  workerDatabase: {
+    databaseUrl: string;
+    workerId: string;
+  };
+};
+
 // カスタムテストインスタンスを作成
-export const test = base.extend<TestFixtures>({
+export const test = base.extend<TestFixtures, WorkerFixtures>({
+  // Worker固有のデータベース設定
+  workerDatabase: [
+    async ({}, use) => {
+      const workerId = getWorkerID();
+      console.log(`🔧 Setting up database for worker: ${workerId}`);
+
+      try {
+        // Worker固有のデータベースをセットアップ
+        await setupOptimizedE2EEnvironment(workerId);
+        const databaseUrl = getE2EDatabaseURL(workerId);
+
+        await use({ databaseUrl, workerId });
+      } catch (error) {
+        console.error(`❌ Failed to setup database for worker ${workerId}:`, error);
+        throw error;
+      } finally {
+        // テスト完了後にクリーンアップ
+        try {
+          await cleanupE2EDatabase(workerId);
+          console.log(`✅ Cleaned up database for worker: ${workerId}`);
+        } catch (error) {
+          console.error(`⚠️  Failed to cleanup database for worker ${workerId}:`, error);
+        }
+      }
+    },
+    { scope: 'worker' },
+  ],
+
   // 認証状態をキャッシュするコンテキスト
   authenticatedContext: async ({ browser }, use) => {
     let context: BrowserContext;

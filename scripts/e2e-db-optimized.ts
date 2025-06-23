@@ -7,17 +7,52 @@ import * as path from 'path';
 const execAsync = promisify(exec);
 
 // E2E用のデータベース設定
-const E2E_DB_NAME = 'phonica_e2e_test';
+const E2E_DB_BASE_NAME = 'phonica_e2e_test';
 const E2E_TEMPLATE_DB_NAME = 'phonica_e2e_template';
 const E2E_DB_USER = process.env.POSTGRES_USER || 'phonica_user';
 const E2E_DB_PASSWORD = process.env.POSTGRES_PASSWORD || 'phonica_password';
 const E2E_DB_HOST = process.env.POSTGRES_HOST || 'localhost';
 const E2E_DB_PORT = process.env.POSTGRES_PORT || '5432';
 
+/**
+ * Worker IDを取得（環境変数からまたは自動生成）
+ */
+export function getWorkerID(): string {
+  // PlaywrightのWorker IDを環境変数から取得
+  const pwWorker = process.env.PLAYWRIGHT_WORKER_INDEX;
+  if (pwWorker !== undefined) {
+    return `w${pwWorker}`;
+  }
+
+  // プロセスIDベースのWorker ID生成（フォールバック）
+  const pid = process.pid;
+  const timestamp = Date.now().toString(36);
+  return `p${pid.toString(36)}_${timestamp}`;
+}
+
+/**
+ * Worker固有のデータベース名を生成
+ * PostgreSQLの命名規則に従って安全な名前を生成
+ */
+export function getWorkerDbName(workerId?: string): string {
+  const wid = workerId || getWorkerID();
+  // ハイフンをアンダースコアに変換、英数字とアンダースコアのみを許可
+  const sanitizedWid = wid.replace(/[^a-zA-Z0-9_]/g, '_');
+  return `${E2E_DB_BASE_NAME}_${sanitizedWid}`;
+}
+
 // 管理用のデータベースURL（postgres データベースに接続）
 const ADMIN_DATABASE_URL = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/postgres`;
-// E2E用のデータベースURL
-export const E2E_DATABASE_URL = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${E2E_DB_NAME}`;
+
+// E2E用のデータベースURL（Worker固有）
+export function getE2EDatabaseURL(workerId?: string): string {
+  const workerDbName = getWorkerDbName(workerId);
+  return `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${workerDbName}`;
+}
+
+// 後方互換性のためのエクスポート（デフォルトWorker用）
+export const E2E_DATABASE_URL = getE2EDatabaseURL();
+
 // テンプレート用のデータベースURL
 const TEMPLATE_DATABASE_URL = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${E2E_TEMPLATE_DB_NAME}`;
 
@@ -203,8 +238,9 @@ export async function freezeTemplateDatabase() {
 /**
  * テンプレートからE2Eデータベースを高速作成
  */
-export async function createE2EDatabaseFromTemplate() {
-  console.log('⚡ Creating E2E database from template...');
+export async function createE2EDatabaseFromTemplate(workerId?: string) {
+  const workerDbName = getWorkerDbName(workerId);
+  console.log(`⚡ Creating E2E database from template: ${workerDbName}...`);
 
   const prisma = new PrismaClient({
     datasources: {
@@ -219,21 +255,21 @@ export async function createE2EDatabaseFromTemplate() {
     await prisma.$executeRawUnsafe(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
-      WHERE datname = '${E2E_DB_NAME}' AND pid <> pg_backend_pid()
+      WHERE datname = '${workerDbName}' AND pid <> pg_backend_pid()
     `);
 
     // E2Eデータベースを削除
-    await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${E2E_DB_NAME}`);
+    await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${workerDbName}`);
 
     // テンプレートからE2Eデータベースを作成（超高速）
     await prisma.$executeRawUnsafe(`
-      CREATE DATABASE ${E2E_DB_NAME} 
+      CREATE DATABASE ${workerDbName} 
       WITH TEMPLATE ${E2E_TEMPLATE_DB_NAME}
     `);
 
-    console.log(`✅ E2E database created from template in milliseconds!`);
+    console.log(`✅ E2E database created from template in milliseconds: ${workerDbName}`);
   } catch (error) {
-    console.error('❌ Failed to create E2E database from template:', error);
+    console.error(`❌ Failed to create E2E database from template: ${workerDbName}`, error);
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -272,8 +308,9 @@ export async function setupTemplate() {
 /**
  * 最適化されたE2E環境のセットアップ
  */
-export async function setupOptimizedE2EEnvironment() {
+export async function setupOptimizedE2EEnvironment(workerId?: string) {
   const startTime = Date.now();
+  const workerDbName = getWorkerDbName(workerId);
 
   try {
     // テンプレートが最新かチェック
@@ -287,12 +324,14 @@ export async function setupOptimizedE2EEnvironment() {
     }
 
     // テンプレートからE2Eデータベースを高速作成
-    await createE2EDatabaseFromTemplate();
+    await createE2EDatabaseFromTemplate(workerId);
 
     const duration = Date.now() - startTime;
-    console.log(`✅ E2E environment setup completed in ${(duration / 1000).toFixed(2)}s`);
+    console.log(
+      `✅ E2E environment setup completed for ${workerDbName} in ${(duration / 1000).toFixed(2)}s`,
+    );
   } catch (error) {
-    console.error('❌ E2E environment setup failed:', error);
+    console.error(`❌ E2E environment setup failed for ${workerDbName}:`, error);
     throw error;
   }
 }
@@ -300,8 +339,9 @@ export async function setupOptimizedE2EEnvironment() {
 /**
  * E2Eデータベースのクリーンアップ（通常の削除のみ）
  */
-export async function cleanupE2EDatabase() {
-  console.log('🧹 Cleaning up E2E database...');
+export async function cleanupE2EDatabase(workerId?: string) {
+  const workerDbName = getWorkerDbName(workerId);
+  console.log(`🧹 Cleaning up E2E database: ${workerDbName}...`);
 
   const prisma = new PrismaClient({
     datasources: {
@@ -316,14 +356,14 @@ export async function cleanupE2EDatabase() {
     await prisma.$executeRawUnsafe(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
-      WHERE datname = '${E2E_DB_NAME}' AND pid <> pg_backend_pid()
+      WHERE datname = '${workerDbName}' AND pid <> pg_backend_pid()
     `);
 
     // データベースを削除
-    await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${E2E_DB_NAME}`);
-    console.log(`✅ E2E database cleaned up`);
+    await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${workerDbName}`);
+    console.log(`✅ E2E database cleaned up: ${workerDbName}`);
   } catch (error) {
-    console.error('❌ Failed to cleanup E2E database:', error);
+    console.error(`❌ Failed to cleanup E2E database: ${workerDbName}`, error);
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -333,10 +373,10 @@ export async function cleanupE2EDatabase() {
 /**
  * テンプレートも含めた完全クリーンアップ
  */
-export async function fullCleanup() {
+export async function fullCleanup(workerId?: string) {
   console.log('🧹 Full cleanup including template...');
 
-  await cleanupE2EDatabase();
+  await cleanupE2EDatabase(workerId);
 
   const prisma = new PrismaClient({
     datasources: {
@@ -370,33 +410,88 @@ export async function fullCleanup() {
   }
 }
 
+/**
+ * すべてのWorker用データベースをクリーンアップ
+ */
+export async function cleanupAllWorkerDatabases() {
+  console.log('🧹 Cleaning up all worker databases...');
+
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: ADMIN_DATABASE_URL,
+      },
+    },
+  });
+
+  try {
+    // E2Eテスト用データベース一覧を取得
+    const result = await prisma.$queryRaw<Array<{ datname: string }>>`
+      SELECT datname FROM pg_database 
+      WHERE datname LIKE ${E2E_DB_BASE_NAME + '_%'}
+    `;
+
+    for (const db of result) {
+      console.log(`Dropping database: ${db.datname}`);
+
+      // 接続を切断
+      await prisma.$executeRawUnsafe(`
+        SELECT pg_terminate_backend(pid)
+        FROM pg_stat_activity
+        WHERE datname = '${db.datname}' AND pid <> pg_backend_pid()
+      `);
+
+      // データベースを削除
+      await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${db.datname}`);
+    }
+
+    console.log(`✅ Cleaned up ${result.length} worker databases`);
+  } catch (error) {
+    console.error('❌ Failed to cleanup worker databases:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 // CLIとして実行された場合の処理
 if (require.main === module) {
   const command = process.argv[2];
 
   async function run() {
+    const workerId = process.argv[3]; // オプションのworker ID
+
     switch (command) {
       case 'setup':
-        await setupOptimizedE2EEnvironment();
+        await setupOptimizedE2EEnvironment(workerId);
         break;
       case 'cleanup':
-        await cleanupE2EDatabase();
+        await cleanupE2EDatabase(workerId);
+        break;
+      case 'cleanup-all':
+        await cleanupAllWorkerDatabases();
         break;
       case 'full-cleanup':
-        await fullCleanup();
+        await fullCleanup(workerId);
         break;
       case 'template-setup':
         await setupTemplate();
         break;
       default:
         console.log(`
-Usage: tsx scripts/e2e-db-optimized.ts [command]
+Usage: tsx scripts/e2e-db-optimized.ts [command] [worker-id]
 
 Commands:
-  setup          - Optimized E2E setup (uses template if available)
-  cleanup        - Clean up E2E database only
-  full-cleanup   - Clean up both E2E and template databases
-  template-setup - Force recreate template database
+  setup [worker-id]     - Optimized E2E setup (uses template if available)
+  cleanup [worker-id]   - Clean up specific worker E2E database
+  cleanup-all           - Clean up ALL worker databases
+  full-cleanup          - Clean up both E2E and template databases
+  template-setup        - Force recreate template database
+
+Examples:
+  tsx scripts/e2e-db-optimized.ts setup w1
+  tsx scripts/e2e-db-optimized.ts cleanup w2
+  tsx scripts/e2e-db-optimized.ts cleanup-all
         `);
         process.exit(1);
     }
