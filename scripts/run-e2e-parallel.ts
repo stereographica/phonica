@@ -1,57 +1,22 @@
-import { spawn, ChildProcess, execSync } from 'child_process';
-import {
-  setupOptimizedE2EEnvironment,
-  cleanupE2EDatabase,
-  E2E_DATABASE_URL,
-} from './e2e-db-optimized';
+import { spawn, ChildProcess } from 'child_process';
 
 /**
- * E2Eテストを実行（最適化されたデータベースセットアップ付き）
+ * 並列E2Eテストを実行（Worker毎に独立したデータベース）
  */
-async function runE2ETests() {
+async function runParallelE2ETests() {
   let testProcess: ChildProcess | undefined;
   let serverProcess: ChildProcess | undefined;
 
   try {
-    console.log('🚀 Starting E2E test suite with optimized database setup...\n');
+    console.log('🚀 Starting parallel E2E test suite with worker-isolated databases...\n');
 
-    // CI環境では既存のデータベースを使用
-    const isCI = process.env.CI === 'true';
-    let databaseUrl: string;
-
-    if (isCI) {
-      console.log('🔧 CI environment detected - using existing database');
-      databaseUrl =
-        process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/test_db';
-
-      // CI環境ではマイグレーションとシードのみ実行
-      console.log('🔄 Running migrations...');
-      execSync('npx prisma migrate deploy', {
-        env: { ...process.env, DATABASE_URL: databaseUrl },
-        stdio: 'inherit',
-      });
-
-      console.log('🌱 Seeding database...');
-      execSync('tsx scripts/seed-test-data.ts', {
-        env: { ...process.env, DATABASE_URL: databaseUrl },
-        stdio: 'inherit',
-      });
-    } else {
-      // ローカル環境では最適化されたセットアップを使用
-      const setupStart = Date.now();
-      await setupOptimizedE2EEnvironment();
-      const setupDuration = Date.now() - setupStart;
-      console.log(`⚡ Database setup completed in ${(setupDuration / 1000).toFixed(2)}s\n`);
-      databaseUrl = E2E_DATABASE_URL;
-    }
-
-    // 2. 開発サーバーを起動（E2E用データベースを使用）
-    console.log('🌐 Starting development server with E2E database...');
+    // 1. 開発サーバーを起動（メインのデータベースURLは使用しない）
+    console.log('🌐 Starting development server for parallel testing...');
     serverProcess = spawn('npm', ['run', 'dev'], {
       env: {
         ...process.env,
-        DATABASE_URL: databaseUrl,
         NODE_ENV: 'test',
+        // データベースURLは各テストでWorker固有のものを使用
       },
       stdio: 'pipe',
     });
@@ -74,7 +39,7 @@ async function runE2ETests() {
         // Next.jsの起動完了を検知
         if (output.includes('Ready in') || output.includes('✓ Ready')) {
           serverReady = true;
-          setTimeout(resolve, 500); // 待機時間を短縮
+          setTimeout(resolve, 500);
         }
       });
 
@@ -91,25 +56,26 @@ async function runE2ETests() {
         }
       });
 
-      // タイムアウト設定（短縮）
+      // タイムアウト設定
       setTimeout(() => {
         if (!serverReady) {
           console.log('⚠️  Server startup timeout, proceeding with tests...');
           resolve(undefined);
         }
-      }, 20000); // 30秒から20秒に短縮
+      }, 20000);
     });
 
-    console.log('\n📋 Running E2E tests...\n');
+    console.log('\n📋 Running parallel E2E tests with worker isolation...\n');
 
-    // 3. E2Eテストを実行
-    // プロセスの引数を取得（--grep など）
+    // 2. E2Eテストを実行（並列実行でWorker毎にDB分離）
     const args: string[] = process.argv.slice(2);
-    testProcess = spawn('npm', ['run', 'e2e:run', '--', ...args], {
+    testProcess = spawn('npx', ['playwright', 'test', ...args], {
       stdio: 'inherit',
       env: {
         ...process.env,
         PLAYWRIGHT_BASE_URL: `http://localhost:${serverPort}`,
+        // Playwright が Worker ID を環境変数で提供
+        PLAYWRIGHT_WORKER_INDEX: process.env.PLAYWRIGHT_WORKER_INDEX || '0',
       },
     });
 
@@ -121,15 +87,15 @@ async function runE2ETests() {
     });
 
     if (testExitCode !== 0) {
-      throw new Error(`E2E tests failed with exit code ${testExitCode}`);
+      throw new Error(`Parallel E2E tests failed with exit code ${testExitCode}`);
     }
 
-    console.log('\n✅ E2E tests completed successfully');
+    console.log('\n✅ Parallel E2E tests completed successfully');
   } catch (error) {
-    console.error('\n❌ E2E tests failed:', error);
+    console.error('\n❌ Parallel E2E tests failed:', error);
     throw error;
   } finally {
-    // 4. クリーンアップ
+    // 3. クリーンアップ
     console.log('\n🧹 Cleaning up...');
 
     // サーバーを停止
@@ -140,7 +106,7 @@ async function runE2ETests() {
       // プロセスの終了を待つ
       await new Promise((resolve) => {
         serverProcess!.on('close', resolve);
-        setTimeout(resolve, 3000); // タイムアウトを短縮
+        setTimeout(resolve, 3000);
       });
     }
 
@@ -149,14 +115,7 @@ async function runE2ETests() {
       testProcess.kill('SIGTERM');
     }
 
-    // CI環境ではデータベースをクリーンアップしない
-    const isCI = process.env.CI === 'true';
-    if (!isCI) {
-      // データベースをクリーンアップ
-      await cleanupE2EDatabase();
-    }
-
-    console.log('✅ Cleanup completed');
+    console.log('✅ Cleanup completed (databases cleaned up by global teardown)');
   }
 }
 
@@ -172,13 +131,13 @@ if (require.main === module) {
   process.on('SIGINT', () => exitHandler(130));
   process.on('SIGTERM', () => exitHandler(143));
 
-  runE2ETests()
+  runParallelE2ETests()
     .then(() => {
-      console.log('\n🎉 E2E test suite completed successfully!');
+      console.log('\n🎉 Parallel E2E test suite completed successfully!');
       exitHandler(0);
     })
     .catch((error) => {
-      console.error('\n💥 E2E test suite failed:', error);
+      console.error('\n💥 Parallel E2E test suite failed:', error);
       exitHandler(1);
     });
 }

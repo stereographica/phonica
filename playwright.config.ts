@@ -21,7 +21,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Optimized worker configuration */
+  /* Optimized worker configuration for parallel database isolation */
   workers: process.env.CI ? 1 : 4, // CI環境では安定性優先で1、ローカルでは4並列で高速化
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
@@ -48,6 +48,10 @@ export default defineConfig({
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
   },
+
+  /* Global setup for worker isolation */
+  globalSetup: require.resolve('./e2e/setup/global-setup.ts'),
+  globalTeardown: require.resolve('./e2e/setup/global-teardown.ts'),
 
   /* Timeout configurations */
   timeout: 90 * 1000, // 90 seconds per test
