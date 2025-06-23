@@ -22,6 +22,7 @@ describe('workers enhanced tests', () => {
     jest.restoreAllMocks();
     jest.resetModules();
     jest.dontMock('../file-deletion-queue');
+    jest.dontMock('../zip-generation-queue');
     process.on = originalProcessOn;
     processExitSpy.mockRestore();
   });
@@ -39,13 +40,18 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers } = require('../workers');
 
       await startWorkers();
 
       // ワーカーのイベントハンドラーが設定されたことを確認
-      expect(mockWorker.on).toHaveBeenCalledTimes(4); // 2 workers × 2 events
+      expect(mockWorker.on).toHaveBeenCalledTimes(6); // 3 workers × 2 events
       expect(console.log).toHaveBeenCalledWith('[Workers] All queue workers started successfully');
     });
 
@@ -59,6 +65,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -86,6 +97,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => null),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers } = require('../workers');
 
@@ -110,6 +126,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers } = require('../workers');
 
@@ -132,6 +153,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -167,6 +193,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers } = require('../workers');
 
@@ -196,6 +227,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -228,6 +264,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockOrphanedWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockFileDeletionWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -266,6 +307,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockFileDeletionWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers } = require('../workers');
 
@@ -298,6 +344,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockOrphanedWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockFileDeletionWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -334,6 +385,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: mockShutdownWorkers,
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers, stopWorkers } = require('../workers');
 
@@ -357,6 +413,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => null),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { stopWorkers } = require('../workers');
 
@@ -376,6 +437,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => mockWorker),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: mockShutdownWorkers,
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -476,6 +542,11 @@ describe('workers enhanced tests', () => {
         shutdownWorkers: mockShutdownWorkers,
       }));
 
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => mockWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       // processイベントリスナーをモック
       const listeners: { [key: string]: (() => void | Promise<void>)[] } = {};
       process.on = jest.fn((event: string, handler: () => void | Promise<void>) => {
@@ -520,6 +591,11 @@ describe('workers enhanced tests', () => {
         getOrphanedFilesCleanupWorker: jest.fn(() => null),
         scheduleOrphanedFilesCleanup: jest.fn().mockResolvedValue(undefined),
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn(() => null),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
       }));
 
       // モジュールをロード

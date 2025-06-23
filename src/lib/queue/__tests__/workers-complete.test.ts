@@ -2,16 +2,9 @@
  * @jest-environment node
  */
 
-import { startWorkers, stopWorkers } from '../workers';
-import {
-  getFileDeletionWorker,
-  getOrphanedFilesCleanupWorker,
-  scheduleOrphanedFilesCleanup,
-  shutdownWorkers,
-} from '../file-deletion-queue';
+/* eslint-disable @typescript-eslint/no-require-imports */
 
-// file-deletion-queueモジュールのモック
-jest.mock('../file-deletion-queue');
+// 注意: jest.mock() はファイルの先頭で行わず、各テストで jest.doMock() を使用します
 
 describe('workers - complete coverage', () => {
   let mockFileDeletionWorker: {
@@ -20,9 +13,12 @@ describe('workers - complete coverage', () => {
   let mockOrphanedFilesWorker: {
     on: jest.Mock;
   };
+  let mockScheduleOrphanedFilesCleanup: jest.Mock;
+  let mockShutdownWorkers: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetModules();
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -36,29 +32,43 @@ describe('workers - complete coverage', () => {
       on: jest.fn(),
     };
 
-    // モックの戻り値を設定
-    (getFileDeletionWorker as jest.Mock).mockReturnValue(mockFileDeletionWorker);
-    (getOrphanedFilesCleanupWorker as jest.Mock).mockReturnValue(mockOrphanedFilesWorker);
-    (scheduleOrphanedFilesCleanup as jest.Mock).mockResolvedValue(undefined);
-    (shutdownWorkers as jest.Mock).mockResolvedValue(undefined);
+    // モック関数を作成
+    mockScheduleOrphanedFilesCleanup = jest.fn().mockResolvedValue(undefined);
+    mockShutdownWorkers = jest.fn().mockResolvedValue(undefined);
+
+    // デフォルトモックをdoMockで設定
+    jest.doMock('../file-deletion-queue', () => ({
+      getFileDeletionWorker: jest.fn(() => mockFileDeletionWorker),
+      getOrphanedFilesCleanupWorker: jest.fn(() => mockOrphanedFilesWorker),
+      scheduleOrphanedFilesCleanup: mockScheduleOrphanedFilesCleanup,
+      shutdownWorkers: mockShutdownWorkers,
+    }));
+
+    jest.doMock('../zip-generation-queue', () => ({
+      getZipGenerationWorker: jest.fn(() => mockFileDeletionWorker), // Use same mock structure
+      shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+    }));
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
     jest.dontMock('../file-deletion-queue');
+    jest.dontMock('../zip-generation-queue');
     jest.resetModules();
   });
 
   describe('startWorkers', () => {
     it('should start workers successfully', async () => {
-      await startWorkers();
+      const { startWorkers: freshStartWorkers } = require('../workers');
+
+      await freshStartWorkers();
 
       expect(console.log).toHaveBeenCalledWith('[Workers] All queue workers started successfully');
       expect(mockFileDeletionWorker.on).toHaveBeenCalledWith('failed', expect.any(Function));
       expect(mockFileDeletionWorker.on).toHaveBeenCalledWith('completed', expect.any(Function));
       expect(mockOrphanedFilesWorker.on).toHaveBeenCalledWith('failed', expect.any(Function));
       expect(mockOrphanedFilesWorker.on).toHaveBeenCalledWith('completed', expect.any(Function));
-      expect(scheduleOrphanedFilesCleanup).toHaveBeenCalledWith(
+      expect(mockScheduleOrphanedFilesCleanup).toHaveBeenCalledWith(
         expect.stringContaining('public/uploads/materials'),
         {
           maxAge: 24 * 60 * 60 * 1000,
@@ -69,15 +79,17 @@ describe('workers - complete coverage', () => {
     });
 
     it('should skip starting when workers already started', async () => {
+      const { startWorkers: freshStartWorkers } = require('../workers');
+
       // 最初の起動
-      await startWorkers();
+      await freshStartWorkers();
       jest.clearAllMocks();
 
       // 2回目の起動
-      await startWorkers();
+      await freshStartWorkers();
 
       expect(console.log).toHaveBeenCalledWith('[Workers] Workers already started');
-      expect(scheduleOrphanedFilesCleanup).not.toHaveBeenCalled();
+      expect(mockScheduleOrphanedFilesCleanup).not.toHaveBeenCalled();
     });
 
     it('should skip when workers are not available', async () => {
@@ -91,7 +103,11 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn().mockReturnValue(null),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       const { startWorkers: freshStartWorkers } = require('../workers');
 
       await freshStartWorkers();
@@ -114,7 +130,11 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      jest.doMock('../zip-generation-queue', () => ({
+        getZipGenerationWorker: jest.fn().mockReturnValue(mockFileDeletionWorker),
+        shutdownZipGenerationWorker: jest.fn().mockResolvedValue(undefined),
+      }));
+
       const { startWorkers: freshStartWorkers } = require('../workers');
 
       await expect(freshStartWorkers()).rejects.toThrow('Failed to schedule cleanup');
@@ -143,7 +163,6 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers: freshStartWorkers } = require('../workers');
 
       await freshStartWorkers();
@@ -183,7 +202,6 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers: freshStartWorkers } = require('../workers');
 
       await freshStartWorkers();
@@ -221,7 +239,6 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers: freshStartWorkers } = require('../workers');
 
       await freshStartWorkers();
@@ -260,7 +277,6 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { startWorkers: freshStartWorkers } = require('../workers');
 
       await freshStartWorkers();
@@ -281,32 +297,44 @@ describe('workers - complete coverage', () => {
 
   describe('stopWorkers', () => {
     it('should stop workers successfully when started', async () => {
+      const {
+        startWorkers: freshStartWorkers,
+        stopWorkers: freshStopWorkers,
+      } = require('../workers');
+
       // まずワーカーを起動
-      await startWorkers();
+      await freshStartWorkers();
       jest.clearAllMocks();
 
       // ワーカーを停止
-      await stopWorkers();
+      await freshStopWorkers();
 
-      expect(shutdownWorkers).toHaveBeenCalled();
+      expect(mockShutdownWorkers).toHaveBeenCalled();
       expect(console.log).toHaveBeenCalledWith('[Workers] All queue workers stopped successfully');
     });
 
     it('should skip stopping when workers not started', async () => {
-      await stopWorkers();
+      const { stopWorkers: freshStopWorkers } = require('../workers');
+
+      await freshStopWorkers();
 
       expect(console.log).toHaveBeenCalledWith('[Workers] Workers not started');
-      expect(shutdownWorkers).not.toHaveBeenCalled();
+      expect(mockShutdownWorkers).not.toHaveBeenCalled();
     });
 
     it('should handle shutdown errors', async () => {
+      const {
+        startWorkers: freshStartWorkers,
+        stopWorkers: freshStopWorkers,
+      } = require('../workers');
+
       // ワーカーを起動
-      await startWorkers();
+      await freshStartWorkers();
       jest.clearAllMocks();
 
-      (shutdownWorkers as jest.Mock).mockRejectedValue(new Error('Shutdown failed'));
+      mockShutdownWorkers.mockRejectedValue(new Error('Shutdown failed'));
 
-      await expect(stopWorkers()).rejects.toThrow('Shutdown failed');
+      await expect(freshStopWorkers()).rejects.toThrow('Shutdown failed');
       expect(console.error).toHaveBeenCalledWith(
         '[Workers] Failed to stop workers:',
         expect.any(Error),
@@ -340,7 +368,6 @@ describe('workers - complete coverage', () => {
       jest.resetModules();
       (process.env as { NODE_ENV?: string }).NODE_ENV = 'test';
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('../workers');
 
       expect(process.listenerCount('SIGTERM')).toBe(0);
@@ -368,7 +395,6 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('../workers');
 
       // SIGTERMシグナルを発生させる
@@ -408,7 +434,6 @@ describe('workers - complete coverage', () => {
         shutdownWorkers: jest.fn().mockResolvedValue(undefined),
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('../workers');
 
       // SIGINTシグナルを発生させる
