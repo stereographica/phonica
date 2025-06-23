@@ -438,6 +438,36 @@ describe('ProjectsPage', () => {
         expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('page=1'));
       });
     });
+
+    it('should apply filters when Enter key is pressed in name filter', async () => {
+      // Arrange
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: mockProjects,
+          pagination: { page: 1, limit: 12, totalPages: 1, totalItems: 3 },
+        }),
+      });
+
+      // Act
+      render(<ProjectsPage />);
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByText('Nature Sounds Collection')).toBeInTheDocument();
+      });
+
+      // Type in name filter and press Enter
+      const nameInput = screen.getByPlaceholderText('Search by project name...');
+      await user.type(nameInput, 'Nature');
+      await user.keyboard('{Enter}');
+
+      // Assert - verify URL update was requested without clicking button
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('name=Nature'));
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('page=1'));
+      });
+    });
   });
 
   describe('Edge Cases', () => {

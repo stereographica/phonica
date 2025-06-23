@@ -146,6 +146,13 @@ function MaterialsPageContent() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  const handleFilterKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleApplyFilters();
+    }
+  };
+
   const handleSortChange = (sortBy: string, sortOrder: string) => {
     const params = new URLSearchParams(searchParams);
     params.set('sortBy', sortBy);
@@ -228,6 +235,7 @@ function MaterialsPageContent() {
               placeholder="Search by title..."
               value={tempTitleFilter}
               onChange={(e) => setTempTitleFilter(e.target.value)}
+              onKeyDown={handleFilterKeyDown}
             />
           </div>
           <div>
@@ -240,6 +248,7 @@ function MaterialsPageContent() {
               placeholder="Search by tag..."
               value={tempTagFilter}
               onChange={(e) => setTempTagFilter(e.target.value)}
+              onKeyDown={handleFilterKeyDown}
             />
           </div>
           <Button onClick={handleApplyFilters} className="md:self-end">
