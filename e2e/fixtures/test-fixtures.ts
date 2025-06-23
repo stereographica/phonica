@@ -41,22 +41,51 @@ type WorkerFixtures = {
 
 // カスタムテストインスタンスを作成
 export const test = base.extend<TestFixtures, WorkerFixtures>({
+  // すべてのテストでWorker固有のデータベースを自動使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  page: async ({ page, workerDatabase: _workerDatabase }, use) => {
+    // workerDatabaseが自動的に初期化されることを保証
+    await use(page);
+  },
+
+  // API直接テストでもWorker固有のデータベースを自動使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  request: async ({ request, workerDatabase: _workerDatabase }, use) => {
+    // workerDatabaseが自動的に初期化されることを保証
+    await use(request);
+  },
   // Worker固有のデータベース設定
   workerDatabase: [
     async ({}, use) => {
       const workerId = getWorkerID();
       console.log(`🔧 Setting up database for worker: ${workerId}`);
 
+      // 元の環境変数を保存
+      const originalDatabaseUrl = process.env.DATABASE_URL;
+
       try {
         // Worker固有のデータベースをセットアップ
         await setupOptimizedE2EEnvironment(workerId);
         const databaseUrl = getE2EDatabaseURL(workerId);
+
+        // 環境変数を動的に設定してAPIリクエストでWorker固有のDBを使用
+        process.env.DATABASE_URL = databaseUrl;
+        console.log(
+          `🔗 Worker ${workerId} using database: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}`,
+        );
 
         await use({ databaseUrl, workerId });
       } catch (error) {
         console.error(`❌ Failed to setup database for worker ${workerId}:`, error);
         throw error;
       } finally {
+        // 環境変数を元に戻す
+        if (originalDatabaseUrl) {
+          process.env.DATABASE_URL = originalDatabaseUrl;
+        } else {
+          delete process.env.DATABASE_URL;
+        }
+
         // テスト完了後にクリーンアップ
         try {
           await cleanupE2EDatabase(workerId);
@@ -70,7 +99,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   // 認証状態をキャッシュするコンテキスト
-  authenticatedContext: async ({ browser }, use) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  authenticatedContext: async ({ browser, workerDatabase: _workerDatabase }, use) => {
     let context: BrowserContext;
 
     // 認証状態のキャッシュが存在するか確認
@@ -96,7 +126,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
   // 静的リソースをキャッシュするページ（現在は通常のpageと同じ）
   // 将来的により安全なキャッシュ実装を追加予定
-  cachedPage: async ({ page }, use) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cachedPage: async ({ page, workerDatabase: _workerDatabase }, use) => {
+    // workerDatabaseが自動的に初期化されることを保証
     await use(page);
   },
 });
