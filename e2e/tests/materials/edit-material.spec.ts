@@ -2,6 +2,7 @@ import { test, expect } from '../../fixtures/test-fixtures';
 import { NavigationHelper } from '../../helpers/navigation';
 import { FormHelper } from '../../helpers/form';
 import { WaitHelper } from '../../helpers/wait';
+import { CrossBrowserHelper } from '../../helpers/cross-browser';
 import { Page } from '@playwright/test';
 import path from 'path';
 
@@ -11,11 +12,13 @@ test.describe('@materials Edit Material', () => {
   let navigation: NavigationHelper;
   let form: FormHelper;
   let wait: WaitHelper;
+  let crossBrowser: CrossBrowserHelper;
 
   test.beforeEach(async ({ page }) => {
     navigation = new NavigationHelper(page);
     form = new FormHelper(page);
     wait = new WaitHelper(page);
+    crossBrowser = new CrossBrowserHelper(page);
 
     // 素材一覧ページに移動
     await navigation.goToMaterialsPage();
@@ -529,8 +532,6 @@ test.describe('@materials Edit Material', () => {
     await page.fill('input#tags', 'edited, test, update');
 
     // CrossBrowserHelperを使用してFirefox対応の送信処理を実行
-    const { CrossBrowserHelper } = await import('../../helpers/cross-browser');
-    const crossBrowser = new CrossBrowserHelper(page);
     const browserName = crossBrowser.getBrowserName();
 
     console.log(`Browser: ${browserName} - Using cross-browser form submission`);
