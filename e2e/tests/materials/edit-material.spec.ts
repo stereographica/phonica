@@ -529,7 +529,8 @@ test.describe('@materials Edit Material', () => {
     await page.fill('input#tags', 'edited, test, update');
 
     // CrossBrowserHelperを使用してFirefox対応の送信処理を実行
-    const crossBrowser = new (await import('../../helpers/cross-browser')).CrossBrowserHelper(page);
+    const { CrossBrowserHelper } = await import('../../helpers/cross-browser');
+    const crossBrowser = new CrossBrowserHelper(page);
     const browserName = crossBrowser.getBrowserName();
 
     console.log(`Browser: ${browserName} - Using cross-browser form submission`);
