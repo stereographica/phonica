@@ -50,7 +50,7 @@ function MaterialsPageContent() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMaterialSlug, setSelectedMaterialSlug] = useState<string | null>(null);
+  const [selectedMaterialSlug, setSelectedMaterialSlug] = useState<string>('');
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [pagination, setPagination] = useState({
@@ -144,7 +144,7 @@ function MaterialsPageContent() {
 
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
-    setSelectedMaterialSlug(null);
+    setSelectedMaterialSlug('');
   };
 
   const handleApplyFilters = () => {
