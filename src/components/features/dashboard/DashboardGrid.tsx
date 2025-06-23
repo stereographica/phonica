@@ -78,15 +78,14 @@ export function DashboardGrid() {
           });
 
         // レイアウトが実際に変更された場合のみ状態を更新
-        if (newLayout.length > 0 && newLayout.length === 5) {
-          // 5つのウィジェット確認
+        if (newLayout.length > 0) {
           console.log(
             'Layout updated:',
             newLayout.map((l) => `${l.id}: ${l.w}x${l.h}`),
           );
           setLayout(newLayout);
         } else {
-          console.warn(`Invalid layout: ${newLayout.length} widgets found, expected 5`);
+          console.warn(`Invalid layout: ${newLayout.length} widgets found`);
         }
       } catch (error) {
         console.error('Error in handleLayoutChange:', error);
@@ -97,13 +96,22 @@ export function DashboardGrid() {
   // ウィジェット削除ハンドラー
   const handleRemoveWidget = useCallback(
     (widgetId: string) => {
-      if (gridStackRef.current) {
-        const element = document.getElementById(widgetId);
-        if (element) {
-          gridStackRef.current.removeWidget(element);
-        }
+      try {
+        // まずJotaiの状態を更新
+        removeWidget(widgetId);
+
+        // その後、GridStackからも削除（DOM更新後に実行）
+        setTimeout(() => {
+          if (gridStackRef.current) {
+            const element = document.getElementById(widgetId);
+            if (element && element.parentElement) {
+              gridStackRef.current.removeWidget(element, false);
+            }
+          }
+        }, 0);
+      } catch (error) {
+        console.error('Error removing widget:', error);
       }
-      removeWidget(widgetId);
     },
     [removeWidget],
   );
@@ -150,32 +158,34 @@ export function DashboardGrid() {
 
       const initialGridItems = gridRef.current.querySelectorAll('.grid-stack-item');
       if (initialGridItems && initialGridItems.length > 0) {
-        console.log(`Initializing ${initialGridItems.length} widgets with layout:`, layout);
+        // DOMの要素から初期レイアウトを構築
+        console.log(`Initializing ${initialGridItems.length} widgets`);
 
         // GridStackに要素を追加（v11 API完全対応）
-        layout.forEach((widgetData, index) => {
+        initialGridItems.forEach((element: Element, index) => {
           try {
-            if (gridStackRef.current) {
-              const element = document.getElementById(widgetData.id);
+            if (gridStackRef.current && element instanceof HTMLElement) {
+              const widgetId = element.id;
+              const widgetType = element.getAttribute('data-widget-type');
 
-              if (element) {
-                // GridStack v11では、makeWidget()の第二引数でオプションを指定
+              if (widgetId && widgetType) {
+                // data-gs-*属性から初期値を取得
                 const gridOptions = {
-                  x: widgetData.x,
-                  y: widgetData.y,
-                  w: widgetData.w,
-                  h: widgetData.h,
-                  id: widgetData.id,
-                  minW: widgetData.minW,
-                  maxW: widgetData.maxW,
-                  minH: widgetData.minH,
-                  maxH: widgetData.maxH,
+                  x: parseInt(element.getAttribute('data-gs-x') || '0'),
+                  y: parseInt(element.getAttribute('data-gs-y') || '0'),
+                  w: parseInt(element.getAttribute('data-gs-w') || '4'),
+                  h: parseInt(element.getAttribute('data-gs-h') || '3'),
+                  id: widgetId,
+                  minW: parseInt(element.getAttribute('data-gs-min-w') || '3'),
+                  maxW: parseInt(element.getAttribute('data-gs-max-w') || '12'),
+                  minH: parseInt(element.getAttribute('data-gs-min-h') || '2'),
+                  maxH: parseInt(element.getAttribute('data-gs-max-h') || '6'),
                 };
 
                 // v11のmakeWidget()を正しく使用
                 const node = gridStackRef.current.makeWidget(element, gridOptions);
                 console.log(
-                  `Widget ${index + 1} (${widgetData.id}) initialized: ${widgetData.w}x${widgetData.h} at (${widgetData.x},${widgetData.y})`,
+                  `Widget ${index + 1} (${widgetId}) initialized: ${gridOptions.w}x${gridOptions.h} at (${gridOptions.x},${gridOptions.y})`,
                 );
 
                 // ノードが作成された後、レイアウト情報を追加で適用
@@ -191,14 +201,14 @@ export function DashboardGrid() {
                     h: (node as GridStackNode).h,
                   });
                 } else {
-                  console.warn(`Failed to create node for widget: ${widgetData.id}`);
+                  console.warn(`Failed to create node for widget: ${widgetId}`);
                 }
               } else {
-                console.warn(`DOM element not found for widget ID: ${widgetData.id}`);
+                console.warn(`Widget ID or type not found for element`);
               }
             }
           } catch (error) {
-            console.error(`Error initializing widget ${index + 1} (${widgetData.id}):`, error);
+            console.error(`Error initializing widget ${index + 1}:`, error);
           }
         });
 
@@ -260,7 +270,7 @@ export function DashboardGrid() {
         isInitialized.current = false;
       }
     };
-  }, [handleLayoutChange, isClient, layout]);
+  }, [handleLayoutChange, isClient]);
 
   // ウィジェットが追加・削除された場合の処理（安定性重視の完全改修版）
   useEffect(() => {

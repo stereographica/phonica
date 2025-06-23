@@ -3,6 +3,15 @@ import { test, expect } from '@playwright/test';
 test.describe('@smoke @dashboard Dashboard Widgets', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/dashboard');
+
+    // GridStackの初期化を待つ（初期化には350ms以上かかる）
+    await page.waitForTimeout(500);
+
+    // ウィジェットが表示されるまで待機
+    await page.waitForSelector('.grid-stack-item', {
+      state: 'visible',
+      timeout: 10000,
+    });
   });
 
   test('ダッシュボードページが正常に表示される', async ({ page }) => {
@@ -154,9 +163,34 @@ test.describe('@smoke @dashboard Dashboard Widgets', () => {
 test.describe('@dashboard Dashboard Layout Customization', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/dashboard');
+
+    // GridStackの初期化を待つ
+    await page.waitForTimeout(500);
+
+    // ウィジェットが表示されるまで待機
+    await page.waitForSelector('.grid-stack-item', {
+      state: 'visible',
+      timeout: 10000,
+    });
   });
 
   test('ウィジェット追加機能', async ({ page }) => {
+    // 初期状態のウィジェット数を確認（デフォルトで5つ）
+    await page.waitForSelector('.grid-stack-item', { state: 'visible' });
+    const initialWidgetCount = await page.locator('.grid-stack-item').count();
+    expect(initialWidgetCount).toBe(5);
+
+    // 最初のウィジェットの情報を取得
+    const firstWidget = page.locator('.grid-stack-item').first();
+    const firstWidgetTitle = await firstWidget.locator('.text-base').textContent();
+    await firstWidget.hover();
+
+    const deleteButton = firstWidget.getByRole('button', { name: /削除/ });
+    await deleteButton.click();
+
+    // 削除されたウィジェットのタイトルが消えるのを待つ
+    await page.waitForTimeout(1000);
+
     // ウィジェット追加ボタンをクリック
     const addButton = page.getByRole('button', { name: 'ウィジェット追加' });
     await addButton.click();
@@ -164,71 +198,133 @@ test.describe('@dashboard Dashboard Layout Customization', () => {
     // ドロップダウンメニューが表示される
     await expect(page.getByText('追加可能なウィジェット')).toBeVisible();
 
-    // 既に表示されていないウィジェットがあれば追加できる
-    const menuItems = page.locator('[role="menuitem"]');
-    const menuCount = await menuItems.count();
+    // 削除したウィジェットのタイトルがメニューに表示されていることを確認
+    if (firstWidgetTitle) {
+      await expect(
+        page.locator('[role="menuitem"]').filter({ hasText: firstWidgetTitle }),
+      ).toBeVisible();
 
-    if (menuCount > 0) {
-      // 最初のメニュー項目をクリック
-      await menuItems.first().click();
-
-      // ウィジェットが追加されたことを確認（具体的な確認はウィジェットに依存）
-      await page.waitForTimeout(500); // レイアウト更新を待つ
+      // そのメニュー項目をクリックして追加
+      await page.locator('[role="menuitem"]').filter({ hasText: firstWidgetTitle }).click();
     } else {
-      // すべてのウィジェットが追加済みの場合
-      await expect(page.getByText('すべてのウィジェットが追加済みです')).toBeVisible();
+      // タイトルが取得できない場合は、最初のメニュー項目をクリック
+      const menuItems = page
+        .locator('[role="menuitem"]')
+        .filter({ hasNotText: 'すべてのウィジェットが追加済みです' });
+      await menuItems.first().click();
     }
+
+    // 少し待ってから確認（GridStackの更新を待つ）
+    await page.waitForTimeout(1000);
+
+    // ウィジェットが再度表示されていることを確認
+    await page.waitForSelector('.grid-stack-item', { state: 'visible' });
+    const finalCount = await page.locator('.grid-stack-item').count();
+    expect(finalCount).toBe(5);
   });
 
   test('ウィジェット削除機能', async ({ page }) => {
-    // 最初のウィジェットの削除ボタンを探す
+    // 初期状態のウィジェット数を確認
+    await page.waitForSelector('.grid-stack-item', { state: 'visible' });
+    const initialCount = await page.locator('.grid-stack-item').count();
+    expect(initialCount).toBe(5);
+
+    // 最初のウィジェットのタイトルを取得（削除確認用）
     const firstWidget = page.locator('.grid-stack-item').first();
+    const firstWidgetTitle = await firstWidget.locator('.text-base').textContent();
     await expect(firstWidget).toBeVisible();
 
     // ウィジェットにホバーして削除ボタンを表示
     await firstWidget.hover();
 
     const deleteButton = firstWidget.getByRole('button', { name: /削除/ });
-    if (await deleteButton.isVisible().catch(() => false)) {
-      const widgetCount = await page.locator('.grid-stack-item').count();
+    await expect(deleteButton).toBeVisible();
 
-      // 削除ボタンをクリック
-      await deleteButton.click();
+    // 削除ボタンをクリック
+    await deleteButton.click();
 
-      // ウィジェットが削除されたことを確認
-      await expect(page.locator('.grid-stack-item')).toHaveCount(widgetCount - 1);
+    // 削除処理が完了するまで待つ
+    await page.waitForTimeout(2000); // GridStackとReactの同期を待つ
+
+    // 削除されたウィジェットのタイトルが画面に存在しないことを確認
+    if (firstWidgetTitle) {
+      await expect(page.getByText(firstWidgetTitle)).not.toBeVisible();
+    }
+
+    // ウィジェット数が減っていることを確認
+    await page.waitForFunction(
+      (expectedCount) => {
+        const items = document.querySelectorAll('.grid-stack-item');
+        return items.length === expectedCount;
+      },
+      initialCount - 1,
+      { timeout: 5000 },
+    );
+
+    // 最終的なウィジェット数を確認
+    const finalCount = await page.locator('.grid-stack-item').count();
+    expect(finalCount).toBe(initialCount - 1);
+
+    // 残りのウィジェットが正常に表示されていることを確認
+    const remainingWidgets = await page.locator('.grid-stack-item').all();
+    for (const widget of remainingWidgets) {
+      await expect(widget).toBeVisible();
     }
   });
 
   test('レイアウトリセット機能', async ({ page }) => {
+    // 初期状態を確認
+    await page.waitForSelector('.grid-stack-item', { state: 'visible' });
+    const initialCount = await page.locator('.grid-stack-item').count();
+    expect(initialCount).toBe(5);
+
+    // 最初のウィジェットのタイトルを取得
+    const firstWidget = page.locator('.grid-stack-item').first();
+    const firstWidgetTitle = await firstWidget.locator('.text-base').textContent();
+    await firstWidget.hover();
+
+    const deleteButton = firstWidget.getByRole('button', { name: /削除/ });
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
+
+    // 削除後、少し待つ
+    await page.waitForTimeout(1000);
+
+    // リセットボタンが有効になることを確認
     const resetButton = page.getByRole('button', { name: 'リセット' });
+    await expect(resetButton).toBeEnabled();
 
-    // レイアウトを変更していない場合は無効
-    if (await resetButton.isDisabled()) {
-      // ウィジェットを削除してレイアウトを変更
-      const firstWidget = page.locator('.grid-stack-item').first();
-      await firstWidget.hover();
+    // リセットボタンをクリック
+    await resetButton.click();
 
-      const deleteButton = firstWidget.getByRole('button', { name: /削除/ });
-      if (await deleteButton.isVisible().catch(() => false)) {
-        await deleteButton.click();
+    // 確認ダイアログが表示されるのを待つ
+    await page.waitForSelector('text=レイアウトをリセットしますか？', { timeout: 5000 });
+    await expect(page.getByText('レイアウトをリセットしますか？')).toBeVisible();
 
-        // リセットボタンが有効になることを確認
-        await expect(resetButton).toBeEnabled();
+    // AlertDialogのアクションボタンを見つけてクリック
+    // AlertDialogActionは[role="alertdialog"]内のボタンとして実装される
+    const dialog = page.locator('[role="alertdialog"]');
+    await expect(dialog).toBeVisible();
 
-        // リセットボタンをクリック
-        await resetButton.click();
+    // ダイアログ内のリセットボタンをクリック
+    const confirmResetButton = dialog.locator('button:has-text("リセット")');
+    await expect(confirmResetButton).toBeVisible();
+    await confirmResetButton.click();
 
-        // 確認ダイアログが表示される
-        await expect(page.getByText('レイアウトをリセットしますか？')).toBeVisible();
+    // リセット後、GridStackの再初期化を待つ
+    await page.waitForTimeout(2000);
 
-        // リセットを実行
-        await page.getByRole('button', { name: 'リセット' }).click();
+    // デフォルトレイアウトに戻ったことを確認
+    await page.waitForSelector('.grid-stack-item', { state: 'visible' });
 
-        // デフォルトレイアウトに戻ったことを確認
-        await expect(page.locator('.grid-stack-item')).toHaveCount(5); // デフォルトウィジェット数
-      }
+    // 削除したウィジェットが復元されていることを確認
+    if (firstWidgetTitle) {
+      await expect(page.getByText(firstWidgetTitle)).toBeVisible();
     }
+
+    // ウィジェット数が5つに戻っていることを確認
+    const finalCount = await page.locator('.grid-stack-item').count();
+    expect(finalCount).toBe(5);
   });
 
   test('レスポンシブデザインの確認', async ({ page }) => {

@@ -90,11 +90,14 @@ const MapRenderer: React.FC<MaterialLocationMapProps> = ({
           zIndex: 1,
         }}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        whenReady={(map: any) => {
+        whenReady={(mapInstance: any) => {
           console.log('✅ Leaflet map ready and rendering:', { latitude, longitude });
           setTimeout(() => {
-            map.invalidateSize();
-            console.log('✅ Map size invalidated for proper display');
+            // MapContainerインスタンスのtargetプロパティが実際のLeafletマップインスタンス
+            if (mapInstance && mapInstance.target) {
+              mapInstance.target.invalidateSize();
+              console.log('✅ Map size invalidated for proper display');
+            }
           }, 100);
         }}
       >
