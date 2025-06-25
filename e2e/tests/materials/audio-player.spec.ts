@@ -203,8 +203,10 @@ test.describe('@materials @audio @player Audio Player Functionality', () => {
       await audioHelper.waitForPlaybackStart();
       expect(await audioHelper.isPlaying()).toBe(true);
 
-      // 2. ダウンロードボタンを特定
-      const downloadButton = page.locator('button:has-text("Download"), button[title*="Download"]');
+      // 2. ダウンロードボタンを特定（モーダル内のボタンを確実に取得）
+      const downloadButton = page
+        .locator('[role="dialog"] [data-testid="download-button"]')
+        .or(page.locator('[role="dialog"] button').filter({ hasText: 'Download' }));
       await expect(downloadButton).toBeVisible();
 
       // 3. ダウンロード処理の準備（実際のダウンロードはテストしない）

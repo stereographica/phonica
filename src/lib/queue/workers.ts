@@ -1,9 +1,10 @@
-import { 
+import {
   getFileDeletionWorker,
   getOrphanedFilesCleanupWorker,
   scheduleOrphanedFilesCleanup,
-  shutdownWorkers 
+  shutdownWorkers,
 } from './file-deletion-queue';
+import { getZipGenerationWorker, shutdownZipGenerationWorker } from './zip-generation-queue';
 import path from 'path';
 
 // ワーカーが起動しているかのフラグ
@@ -20,9 +21,10 @@ export async function startWorkers(): Promise<void> {
 
   const fileDeletionWorker = getFileDeletionWorker();
   const orphanedFilesCleanupWorker = getOrphanedFilesCleanupWorker();
+  const zipGenerationWorker = getZipGenerationWorker();
 
   // ワーカーが存在しない場合はスキップ（テスト環境など）
-  if (!fileDeletionWorker || !orphanedFilesCleanupWorker) {
+  if (!fileDeletionWorker || !orphanedFilesCleanupWorker || !zipGenerationWorker) {
     console.log('[Workers] Workers not available - skipping startup');
     return;
   }
@@ -43,6 +45,14 @@ export async function startWorkers(): Promise<void> {
 
     orphanedFilesCleanupWorker.on('completed', (job) => {
       console.log(`[OrphanedFilesCleanupWorker] Job ${job.id} completed successfully`);
+    });
+
+    zipGenerationWorker.on('failed', (job, err) => {
+      console.error(`[ZipGenerationWorker] Job ${job?.id} failed:`, err);
+    });
+
+    zipGenerationWorker.on('completed', (job) => {
+      console.log(`[ZipGenerationWorker] Job ${job.id} completed successfully`);
     });
 
     // 定期的な孤立ファイルクリーンアップをスケジュール
@@ -72,6 +82,7 @@ export async function stopWorkers(): Promise<void> {
 
   try {
     await shutdownWorkers();
+    await shutdownZipGenerationWorker();
     workersStarted = false;
     console.log('[Workers] All queue workers stopped successfully');
   } catch (error) {

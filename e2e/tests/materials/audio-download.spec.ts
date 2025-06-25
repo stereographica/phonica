@@ -46,8 +46,14 @@ test.describe('@materials @audio @download Audio Download Functionality', () => 
       await audioHelper.waitForAudioLoad();
 
       // 1. ダウンロードボタンの存在確認（表示されるまで待機）
-      const downloadButton = page.locator('button:has-text("Download")');
-      await downloadButton.waitFor({ state: 'visible', timeout: 10000 });
+      // Firefox対応: モーダル内のダウンロードボタンを確実に取得
+      const downloadButton = page
+        .locator('[role="dialog"] [data-testid="download-button"]')
+        .or(page.locator('[role="dialog"] button').filter({ hasText: 'Download' }));
+      // Firefoxでは追加の待機時間が必要
+      const isFirefox = test.info().project.name.toLowerCase().includes('firefox');
+      const buttonTimeout = isFirefox ? 20000 : 10000;
+      await downloadButton.waitFor({ state: 'visible', timeout: buttonTimeout });
       await expect(downloadButton).toBeEnabled();
 
       // 2. ダウンロード監視設定
@@ -177,8 +183,12 @@ test.describe('@materials @audio @download Audio Download Functionality', () => 
       });
 
       // 3. ダウンロードボタンをクリック
-      const downloadButton = page.locator('button:has-text("Download")');
-      await downloadButton.waitFor({ state: 'visible', timeout: 10000 });
+      const downloadButton = page
+        .locator('[role="dialog"] [data-testid="download-button"]')
+        .or(page.locator('[role="dialog"] button').filter({ hasText: 'Download' }));
+      const isFirefox = test.info().project.name.toLowerCase().includes('firefox');
+      const buttonTimeout = isFirefox ? 20000 : 10000;
+      await downloadButton.waitFor({ state: 'visible', timeout: buttonTimeout });
       await downloadButton.click();
 
       // 4. ダウンロードが正常に開始されることを確認
@@ -205,8 +215,12 @@ test.describe('@materials @audio @download Audio Download Functionality', () => 
       const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
 
       // 2. ダウンロードボタンをクリック
-      const downloadButton = page.locator('button:has-text("Download")');
-      await downloadButton.waitFor({ state: 'visible', timeout: 10000 });
+      const downloadButton = page
+        .locator('[role="dialog"] [data-testid="download-button"]')
+        .or(page.locator('[role="dialog"] button').filter({ hasText: 'Download' }));
+      const isFirefox = test.info().project.name.toLowerCase().includes('firefox');
+      const buttonTimeout = isFirefox ? 20000 : 10000;
+      await downloadButton.waitFor({ state: 'visible', timeout: buttonTimeout });
       await downloadButton.click();
 
       // 3. ダウンロードイベントを確認
@@ -271,8 +285,12 @@ test.describe('@materials @audio @download Audio Download Functionality', () => 
       });
 
       // 2. ダウンロードボタンをクリック
-      const downloadButton = page.locator('button:has-text("Download")');
-      await downloadButton.waitFor({ state: 'visible', timeout: 10000 });
+      const downloadButton = page
+        .locator('[role="dialog"] [data-testid="download-button"]')
+        .or(page.locator('[role="dialog"] button').filter({ hasText: 'Download' }));
+      const isFirefox = test.info().project.name.toLowerCase().includes('firefox');
+      const buttonTimeout = isFirefox ? 20000 : 10000;
+      await downloadButton.waitFor({ state: 'visible', timeout: buttonTimeout });
       await downloadButton.click();
 
       // 3. エラーが適切に処理されることを確認（具体的な実装に依存）
@@ -403,7 +421,9 @@ test.describe('@materials @audio @download Audio Download Functionality', () => 
         await download.cancel();
       });
 
-      const downloadButton = page.locator('button:has-text("Download")');
+      const downloadButton = page
+        .locator('[role="dialog"] [data-testid="download-button"]')
+        .or(page.locator('[role="dialog"] button').filter({ hasText: 'Download' }));
 
       // 3回連続でダウンロード
       for (let i = 0; i < 3; i++) {

@@ -433,7 +433,7 @@ export function MaterialDetailModal({
         <DialogFooter className="mt-4 pt-4 border-t" data-testid="dialog-footer">
           {detailedMaterial && !isFetching && !fetchError && (
             <>
-              <Button variant="outline" onClick={handleDownload}>
+              <Button variant="outline" onClick={handleDownload} data-testid="download-button">
                 <Download className="mr-2 h-4 w-4" />
                 Download
               </Button>
