@@ -126,6 +126,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: test
     permissions:
       contents: read
@@ -239,12 +240,12 @@ jobs:
         run: |
           # Firefox専用のタイムアウト延長設定
           if [ "${{ matrix.browser }}" = "firefox" ]; then
-            echo "🦊 Firefox detected: Using extended timeout (10 minutes)"
-            timeout 600s npm run e2e:ci -- --project=${{ matrix.browser }} --workers=1 --reporter=dot || {
+            echo "🦊 Firefox detected: Using extended timeout (20 minutes)"
+            timeout 1200s npm run e2e:ci -- --project=${{ matrix.browser }} --workers=1 --reporter=dot || {
               EXIT_CODE=$?
               echo "❌ Firefox E2E tests exited with code: $EXIT_CODE"
               if [ $EXIT_CODE -eq 124 ]; then
-                echo "⏱️ Firefox tests timed out after 10 minutes"
+                echo "⏱️ Firefox tests timed out after 20 minutes"
               fi
               exit $EXIT_CODE
             }

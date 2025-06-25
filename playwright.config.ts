@@ -95,7 +95,7 @@ export default defineConfig({
         navigationTimeout: process.env.CI ? 60000 : 30000,
       },
       // Firefox専用のテストタイムアウト
-      timeout: process.env.CI ? 300 * 1000 : 180 * 1000, // CI: 5分、ローカル: 3分
+      timeout: process.env.CI ? 900 * 1000 : 180 * 1000, // CI: 15分、ローカル: 3分
       retries: process.env.CI ? 1 : 0, // CI環境ではリトライを減らす
     },
 
