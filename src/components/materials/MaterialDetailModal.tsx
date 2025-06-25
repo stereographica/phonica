@@ -142,14 +142,26 @@ export function MaterialDetailModal({
   }, []);
 
   useEffect(() => {
-    // console.log(`[Modal DEBUG] useEffect - isOpen: ${isOpen}, materialSlug: ${materialSlug}`);
+    // CI環境では常にデバッグログを有効化
+    const shouldLog = process.env.NODE_ENV === 'test' || process.env.CI;
+    if (shouldLog) {
+      console.log(`[Modal DEBUG] useEffect - isOpen: ${isOpen}, materialSlug: ${materialSlug}`);
+    }
     if (isOpen && materialSlug) {
-      // console.log(`[Modal DEBUG] useEffect - CALLING fetchMaterialDetails for slug: ${materialSlug}`);
+      if (shouldLog) {
+        console.log(
+          `[Modal DEBUG] useEffect - CALLING fetchMaterialDetails for slug: ${materialSlug}`,
+        );
+      }
       fetchMaterialDetails(materialSlug);
     } else if (!isOpen) {
-      // console.log('[Modal DEBUG] useEffect - Modal closed, resetting states (indirectly via handleClose or onOpenChange)');
+      if (shouldLog) {
+        console.log('[Modal DEBUG] useEffect - Modal closed, resetting states');
+      }
     } else if (!materialSlug) {
-      // console.log('[Modal DEBUG] useEffect - materialSlug is null, not fetching.');
+      if (shouldLog) {
+        console.log('[Modal DEBUG] useEffect - materialSlug is null, not fetching.');
+      }
       setDetailedMaterial(null);
       setFetchError(null);
       setIsFetching(false);
@@ -222,11 +234,19 @@ export function MaterialDetailModal({
 
   // Remove manual IDs to let Radix handle accessibility automatically
 
+  // CI環境でのデバッグ
+  if ((process.env.NODE_ENV === 'test' || process.env.CI) && isOpen) {
+    console.log('[Modal DEBUG] Rendering Dialog with isOpen=true');
+  }
+
   return (
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        // console.log(`[Modal DEBUG] Dialog onOpenChange - open: ${open}`);
+        const shouldLog = process.env.NODE_ENV === 'test' || process.env.CI;
+        if (shouldLog) {
+          console.log(`[Modal DEBUG] Dialog onOpenChange - open: ${open}`);
+        }
         if (!open) handleClose();
       }}
     >

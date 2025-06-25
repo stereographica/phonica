@@ -98,6 +98,14 @@ function MaterialsPageContent() {
       const data: ApiResponse = await response.json();
       setMaterials(data.data);
       setPagination(data.pagination);
+
+      // CI環境でのデバッグ情報
+      if (process.env.NODE_ENV === 'test' || process.env.CI) {
+        console.log('[Materials Page] Fetched materials count:', data.data.length);
+        if (data.data.length > 0) {
+          console.log('[Materials Page] First material:', data.data[0].title);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       setMaterials([]);
@@ -108,11 +116,22 @@ function MaterialsPageContent() {
 
   // Fetch materials when component mounts or searchParams change
   useEffect(() => {
+    // CI環境でのデバッグ情報
+    if (process.env.NODE_ENV === 'test' || process.env.CI) {
+      console.log(
+        '[Materials Page] Fetching materials with params:',
+        Object.fromEntries(searchParams),
+      );
+    }
     fetchMaterials();
-  }, [fetchMaterials]);
+  }, [fetchMaterials, searchParams]);
 
   // Handlers
   const handleMaterialClick = (slug: string) => {
+    // CI環境でのデバッグ情報
+    if (process.env.NODE_ENV === 'test' || process.env.CI) {
+      console.log('[Materials Page] Material clicked:', slug);
+    }
     setSelectedMaterialSlug(slug);
     setIsDetailModalOpen(true);
   };

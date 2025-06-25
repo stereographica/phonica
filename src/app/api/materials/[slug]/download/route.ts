@@ -131,9 +131,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Material or file path not found' }, { status: 404 });
     }
 
-    // material.filePath は /uploads/materials/filename.ext のような相対パスを想定
-    // これを public ディレクトリからの絶対パスに変換する
-    const absoluteFilePath = path.join(BASE_PUBLIC_DIR, material.filePath);
+    // material.filePath は uploads/materials/filename.ext のような相対パス、
+    // または /uploads/materials/filename.ext のような絶対パスの可能性がある
+    // 先頭のスラッシュを削除してから結合
+    const cleanPath = material.filePath.startsWith('/')
+      ? material.filePath.substring(1)
+      : material.filePath;
+    const absoluteFilePath = path.join(BASE_PUBLIC_DIR, cleanPath);
+
+    // CI環境でのデバッグ情報
+    if (process.env.CI === 'true' || process.env.NODE_ENV === 'test') {
+      console.log(`[Download API] Material: ${material.title}`);
+      console.log(`[Download API] Original path: ${material.filePath}`);
+      console.log(`[Download API] Clean path: ${cleanPath}`);
+      console.log(`[Download API] Absolute path: ${absoluteFilePath}`);
+    }
     let fileStats: Stats; // 外で宣言
 
     try {

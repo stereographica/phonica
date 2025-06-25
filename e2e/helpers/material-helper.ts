@@ -139,15 +139,20 @@ export class MaterialHelper {
     // より具体的なセレクターを試行し、フォールバック戦略を使用
     let modalOpened = false;
 
+    // CI環境では追加の待機時間を設定
+    if (process.env.CI) {
+      console.log('CI環境検出: 追加の待機時間を設定');
+      await this.page.waitForTimeout(2000);
+    }
+
     try {
-      // 方法1: テーブル内の素材タイトルリンクを探す
-      const materialInTable = this.page
-        .locator(`tbody tr:has-text("${title}") td a, tbody tr:has-text("${title}") button`)
-        .first();
-      if (await materialInTable.isVisible({ timeout: 5000 })) {
-        console.log(`方法1: テーブル内の素材リンクをクリック`);
-        await materialInTable.click();
-        await this.modalHelper.waitForOpen(3000);
+      // 方法1: テーブル内の素材タイトルボタンを探す（最も具体的）
+      const materialButton = this.page.locator('button.text-blue-600').filter({ hasText: title });
+
+      if ((await materialButton.count()) > 0) {
+        console.log(`方法1: テーブル内の素材ボタンをクリック（"${title}"）`);
+        await materialButton.first().click();
+        await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
         modalOpened = true;
       }
     } catch (error) {
@@ -156,13 +161,16 @@ export class MaterialHelper {
 
     if (!modalOpened) {
       try {
-        // 方法2: テキストによる素材リンクを探す
-        const materialLink = this.page.locator(`text="${title}"`).first();
-        await materialLink.waitFor({ state: 'visible', timeout: 10000 });
-        console.log(`方法2: テキストリンクをクリック`);
-        await materialLink.click();
-        await this.modalHelper.waitForOpen(3000);
-        modalOpened = true;
+        // 方法2: テーブル行内のリンクまたはボタンを探す
+        const materialInTable = this.page
+          .locator(`tbody tr:has-text("${title}") td a, tbody tr:has-text("${title}") button`)
+          .first();
+        if (await materialInTable.isVisible({ timeout: 5000 })) {
+          console.log(`方法2: テーブル内の素材リンクをクリック`);
+          await materialInTable.click();
+          await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
+          modalOpened = true;
+        }
       } catch (error) {
         console.log('方法2失敗:', error);
       }
@@ -170,16 +178,30 @@ export class MaterialHelper {
 
     if (!modalOpened) {
       try {
-        // 方法3: より柔軟な検索（部分一致）
-        const partialTitle = title.split(' ')[0]; // タイトルの最初の単語で検索
-        const partialLink = this.page.locator(`*:has-text("${partialTitle}")`).first();
-        await partialLink.waitFor({ state: 'visible', timeout: 10000 });
-        console.log(`方法3: 部分一致でクリック`);
-        await partialLink.click();
-        await this.modalHelper.waitForOpen(3000);
+        // 方法3: テキストによる素材リンクを探す
+        const materialLink = this.page.locator(`text="${title}"`).first();
+        await materialLink.waitFor({ state: 'visible', timeout: 10000 });
+        console.log(`方法3: テキストリンクをクリック`);
+        await materialLink.click();
+        await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
         modalOpened = true;
       } catch (error) {
         console.log('方法3失敗:', error);
+      }
+    }
+
+    if (!modalOpened) {
+      try {
+        // 方法4: より柔軟な検索（部分一致）
+        const partialTitle = title.split(' ')[0]; // タイトルの最初の単語で検索
+        const partialLink = this.page.locator(`button:has-text("${partialTitle}")`).first();
+        await partialLink.waitFor({ state: 'visible', timeout: 10000 });
+        console.log(`方法4: 部分一致でクリック（"${partialTitle}"）`);
+        await partialLink.click();
+        await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
+        modalOpened = true;
+      } catch (error) {
+        console.log('方法4失敗:', error);
       }
     }
 

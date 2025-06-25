@@ -168,7 +168,7 @@ async function seedTestData() {
     {
       title: '🌄 森の朝',
       slug: 'forest-morning',
-      filePath: '/uploads/forest-morning.wav',
+      filePath: 'uploads/forest-morning.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -185,7 +185,7 @@ async function seedTestData() {
     {
       title: '🏞️ 渓流の音',
       slug: 'mountain-stream',
-      filePath: '/uploads/mountain-stream.wav',
+      filePath: 'uploads/mountain-stream.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
@@ -202,7 +202,7 @@ async function seedTestData() {
     {
       title: '🚉 新宿駅の喧騒',
       slug: 'shinjuku-station',
-      filePath: '/uploads/shinjuku-station.wav',
+      filePath: 'uploads/shinjuku-station.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -219,7 +219,7 @@ async function seedTestData() {
     {
       title: '☔ 雨の日の街角',
       slug: 'rainy-street',
-      filePath: '/uploads/rainy-street.wav',
+      filePath: 'uploads/rainy-street.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -236,7 +236,7 @@ async function seedTestData() {
     {
       title: 'Ocean Waves at Dawn',
       slug: 'ocean-waves-dawn',
-      filePath: '/uploads/ocean-waves-dawn.wav',
+      filePath: 'uploads/ocean-waves-dawn.wav',
       fileFormat: 'WAV',
       sampleRate: 192000,
       bitDepth: 32,
@@ -253,7 +253,7 @@ async function seedTestData() {
     {
       title: 'London Underground Ambience',
       slug: 'london-underground',
-      filePath: '/uploads/london-underground.wav',
+      filePath: 'uploads/london-underground.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -270,7 +270,7 @@ async function seedTestData() {
     {
       title: 'Tropical Rainforest 🦜',
       slug: 'tropical-rainforest',
-      filePath: '/uploads/tropical-rainforest.wav',
+      filePath: 'uploads/tropical-rainforest.wav',
       fileFormat: 'FLAC',
       sampleRate: 96000,
       bitDepth: 24,
@@ -287,7 +287,7 @@ async function seedTestData() {
     {
       title: 'カフェの午後 ☕',
       slug: 'cafe-afternoon',
-      filePath: '/uploads/cafe-afternoon.wav',
+      filePath: 'uploads/cafe-afternoon.wav',
       fileFormat: 'WAV',
       sampleRate: 44100,
       bitDepth: 16,
@@ -304,7 +304,7 @@ async function seedTestData() {
     {
       title: 'Arctic Wind ❄️',
       slug: 'arctic-wind',
-      filePath: '/uploads/arctic-wind.wav',
+      filePath: 'uploads/arctic-wind.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
@@ -321,7 +321,7 @@ async function seedTestData() {
     {
       title: '春の桜吹雪 🌸',
       slug: 'sakura-blizzard',
-      filePath: '/uploads/sakura-blizzard.wav',
+      filePath: 'uploads/sakura-blizzard.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -338,7 +338,7 @@ async function seedTestData() {
     {
       title: 'Desert Night Sounds',
       slug: 'desert-night',
-      filePath: '/uploads/desert-night.wav',
+      filePath: 'uploads/desert-night.wav',
       fileFormat: 'FLAC',
       sampleRate: 192000,
       bitDepth: 32,
@@ -355,7 +355,7 @@ async function seedTestData() {
     {
       title: '京都の寺院 🔔',
       slug: 'kyoto-temple',
-      filePath: '/uploads/kyoto-temple.wav',
+      filePath: 'uploads/kyoto-temple.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -372,7 +372,7 @@ async function seedTestData() {
     {
       title: 'Mumbai Market Chaos',
       slug: 'mumbai-market',
-      filePath: '/uploads/mumbai-market.wav',
+      filePath: 'uploads/mumbai-market.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -389,7 +389,7 @@ async function seedTestData() {
     {
       title: 'Thunderstorm ⛈️',
       slug: 'thunderstorm',
-      filePath: '/uploads/thunderstorm.wav',
+      filePath: 'uploads/thunderstorm.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
@@ -411,7 +411,7 @@ async function seedTestData() {
     {
       title: '秋葉の足音 🍂',
       slug: 'autumn-leaves-footsteps',
-      filePath: '/uploads/autumn-leaves.wav',
+      filePath: 'uploads/autumn-leaves.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -428,7 +428,7 @@ async function seedTestData() {
     {
       title: 'New York Subway',
       slug: 'nyc-subway',
-      filePath: '/uploads/nyc-subway.wav',
+      filePath: 'uploads/nyc-subway.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -445,7 +445,7 @@ async function seedTestData() {
     {
       title: 'Whale Songs 🐋',
       slug: 'whale-songs',
-      filePath: '/uploads/whale-songs.wav',
+      filePath: 'uploads/whale-songs.wav',
       fileFormat: 'WAV',
       sampleRate: 192000,
       bitDepth: 32,
@@ -467,7 +467,7 @@ async function seedTestData() {
     {
       title: '夏祭りの夜 🎆',
       slug: 'summer-festival',
-      filePath: '/uploads/summer-festival.wav',
+      filePath: 'uploads/summer-festival.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -484,7 +484,7 @@ async function seedTestData() {
     {
       title: 'Ice Cave Echoes',
       slug: 'ice-cave',
-      filePath: '/uploads/ice-cave.wav',
+      filePath: 'uploads/ice-cave.wav',
       fileFormat: 'FLAC',
       sampleRate: 96000,
       bitDepth: 24,
@@ -506,7 +506,7 @@ async function seedTestData() {
     {
       title: '温泉の音 ♨️',
       slug: 'hot-spring',
-      filePath: '/uploads/hot-spring.wav',
+      filePath: 'uploads/hot-spring.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -523,7 +523,7 @@ async function seedTestData() {
     {
       title: 'Savanna Dawn Chorus',
       slug: 'savanna-dawn',
-      filePath: '/uploads/savanna-dawn.wav',
+      filePath: 'uploads/savanna-dawn.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,

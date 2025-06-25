@@ -219,6 +219,12 @@ jobs:
           
           echo "✅ Generated test audio files:"
           ls -la public/uploads/
+          
+          # ファイルサイズの確認（0バイトでないことを確認）
+          for file in public/uploads/*.wav; do
+            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+            echo "  - $(basename "$file"): ${size} bytes"
+          done
 
       - name: Run E2E tests - ${{ matrix.browser }}
         env:
