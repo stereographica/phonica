@@ -400,8 +400,11 @@ export function MaterialDetailModal({
               </div>
             )}
             {detailedMaterial.filePath && (
-              <div className="my-4">
-                <AudioPlayer audioUrl={`/api/materials/${detailedMaterial.slug}/download`} />
+              <div className="md:col-span-2 mt-4" data-testid="audio-player-section">
+                <h3 className="font-semibold mb-2 text-sm">Audio Player:</h3>
+                <AudioPlayer
+                  audioUrl={`/api/materials/${detailedMaterial.slug}/download?play=true`}
+                />
               </div>
             )}
           </div>

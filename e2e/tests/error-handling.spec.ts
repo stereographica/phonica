@@ -3,10 +3,19 @@ import { ToastHelper, WaitHelper } from '../helpers';
 import * as path from 'path';
 
 test.describe('エラーハンドリング機能', () => {
+  let toastHelper: ToastHelper;
+
   // テストごとに一意のIDを生成（ブラウザ名とタイムスタンプ）
   const getUniqueId = (browserName: string) => {
     return `${browserName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   };
+
+  test.beforeEach(async ({ page }) => {
+    toastHelper = new ToastHelper(page);
+
+    // 前のテストのToast通知をクリア
+    await toastHelper.clearOldToasts();
+  });
   test.describe('Toast通知', () => {
     test('素材削除成功時にToast通知が表示される', async ({ page, browserName }) => {
       // Server Actionsに移行したため、全ブラウザで動作
@@ -139,12 +148,7 @@ test.describe('エラーハンドリング機能', () => {
       await page.fill('[role="dialog"] input[name="manufacturer"]', 'テストメーカー');
       await page.click('[role="dialog"] button[type="submit"]');
 
-      // 一覧が更新されるのを待つ（APIレスポンスを待つ）
-      await page.waitForResponse(
-        (response) => response.url().includes('/api/master/equipment') && response.status() === 200,
-      );
-
-      // 作成した機材の削除ボタンをクリック
+      // 作成した機材が表示されるのを待つ
       const equipmentRow = page.locator(`tr:has-text("${equipmentName}")`);
       await expect(equipmentRow).toBeVisible({ timeout: 10000 });
 

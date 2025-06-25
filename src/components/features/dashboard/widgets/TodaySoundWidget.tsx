@@ -12,13 +12,15 @@ export function TodaySoundWidget() {
   const [isLoading, setIsLoading] = useState(false);
 
   // プレースホルダーデータ（実際のAPIからデータを取得するまでの仮データ）
+  // E2E環境では実際に存在するシードデータを使用
   const todayMaterial = {
-    id: 'sample-1',
-    title: '朝の鳥のさえずり',
-    filePath: '', // 実際のファイルが見つからない場合は空文字に
+    id: 'hot-spring-id',
+    slug: 'hot-spring', // シードデータに存在するslug
+    title: '温泉の音 ♨️',
+    filePath: '/uploads/hot-spring.wav',
     recordedAt: new Date('2024-01-15T06:30:00'),
-    locationName: '代々木公園',
-    tags: ['鳥', '朝', '公園'],
+    locationName: '箱根温泉',
+    tags: ['水音', '環境音', 'ASMR'],
   };
 
   const handleRefresh = async () => {
@@ -58,8 +60,8 @@ export function TodaySoundWidget() {
           </div>
 
           <div className="w-full">
-            {todayMaterial.filePath ? (
-              <AudioPlayer audioUrl={todayMaterial.filePath} />
+            {todayMaterial.slug ? (
+              <AudioPlayer audioUrl={`/api/materials/${todayMaterial.slug}/download?play=true`} />
             ) : (
               <div className="text-xs text-muted-foreground p-2 bg-muted rounded text-center">
                 音声ファイルが利用できません

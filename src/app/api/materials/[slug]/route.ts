@@ -64,7 +64,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       id: material.id,
       slug: material.slug,
       title: material.title,
-      memo: material.memo, // フロントエンド側でmemoを期待しているため
+      description: material.memo, // MaterialDetailModalが期待するフィールド名
+      notes: material.memo, // MaterialDetailModalが期待するフィールド名
       recordedDate: material.recordedAt.toISOString(),
       categoryName: null, // スキーマにCategoryがないためnull
       tags: material.tags.map((tag) => ({

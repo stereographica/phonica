@@ -4,14 +4,28 @@ import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer, { WaveSurferOptions } from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Volume2, VolumeX, Rewind, FastForward, RotateCcw } from 'lucide-react';
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider';
 
 interface AudioPlayerProps {
   audioUrl: string;
-  // TODO: WaveSurferのオプションをpropsで受け取れるようにする (色、高さなど)
+  // WaveSurfer customization options
+  waveColor?: string;
+  progressColor?: string;
+  cursorColor?: string;
+  barWidth?: number;
+  barRadius?: number;
+  height?: number;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  audioUrl,
+  waveColor = '#A8A8A8',
+  progressColor = '#3B82F6',
+  cursorColor = '#1E40AF',
+  barWidth = 2,
+  barRadius = 3,
+  height = 100,
+}) => {
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -33,7 +47,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
   useEffect(() => {
     if (!waveformRef.current || !audioUrl) {
       setIsLoading(false);
-      setError(audioUrl ? null : 'No audio URL provided'); 
+      setError(audioUrl ? null : 'No audio URL provided');
       return;
     }
 
@@ -49,13 +63,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
     setIsPlaying(false);
 
     const wsOptions: Omit<WaveSurferOptions, 'container'> = {
-      waveColor: '#A8A8A8',
-      progressColor: '#3B82F6', 
-      cursorColor: '#1E40AF', 
-      barWidth: 2,
-      barRadius: 3,
-      height: 100,
+      waveColor,
+      progressColor,
+      cursorColor,
+      barWidth,
+      barRadius,
+      height,
       normalize: true,
+      // MediaElementバックエンドを使用（WebAudioよりも互換性が高い）
+      backend: 'MediaElement',
+      // MediaElementのためのオプション
+      mediaControls: false,
+      interact: true,
     };
 
     const ws = WaveSurfer.create({
@@ -68,7 +87,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
     const handleReady = () => {
       if (!isMounted.current || wavesurferRef.current !== ws) return;
       setIsLoading(false);
-      setDuration(ws.getDuration() || 0); 
+      setDuration(ws.getDuration() || 0);
     };
 
     const handleAudioprocess = (time: number) => {
@@ -76,8 +95,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
       setCurrentTime(time);
     };
 
-    const handlePlay = () => { if (!isMounted.current || wavesurferRef.current !== ws) return; setIsPlaying(true); };
-    const handlePause = () => { if (!isMounted.current || wavesurferRef.current !== ws) return; setIsPlaying(false); };
+    const handlePlay = () => {
+      if (!isMounted.current || wavesurferRef.current !== ws) return;
+      setIsPlaying(true);
+    };
+    const handlePause = () => {
+      if (!isMounted.current || wavesurferRef.current !== ws) return;
+      setIsPlaying(false);
+    };
     const handleFinish = () => {
       if (!isMounted.current || wavesurferRef.current !== ws) return;
       setIsPlaying(false);
@@ -90,14 +115,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
       // Update current time when seeking
       setCurrentTime(ws.getCurrentTime());
     };
-    
-    const handleError = (err: Error | string) => { 
+
+    const handleError = (err: Error | string) => {
       if (!isMounted.current || wavesurferRef.current !== ws) return;
       console.error('WaveSurfer error:', err);
       const message = typeof err === 'string' ? err : err.message;
       if (err instanceof Error && err.name === 'AbortError') {
-        setError(null); 
-        console.warn("Audio loading aborted, possibly due to component lifecycle.");
+        setError(null);
+        console.warn('Audio loading aborted, possibly due to component lifecycle.');
+      } else if (message?.includes('MEDIA_ELEMENT_ERROR')) {
+        // メディア要素エラーの場合、より具体的なメッセージを表示
+        setError('音声ファイルの読み込みに失敗しました。');
       } else {
         setError(message || 'Failed to load audio file.');
       }
@@ -115,17 +143,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
     return () => {
       ws.destroy();
       if (wavesurferRef.current === ws) {
-          wavesurferRef.current = null;
+        wavesurferRef.current = null;
       }
     };
-  }, [audioUrl]);
+  }, [audioUrl, waveColor, progressColor, cursorColor, barWidth, barRadius, height]);
 
   useEffect(() => {
     if (wavesurferRef.current) {
       wavesurferRef.current.setVolume(isMuted ? 0 : volume);
     }
   }, [volume, isMuted]);
-  
+
   const togglePlayPause = () => {
     if (wavesurferRef.current && !isLoading && !error) {
       wavesurferRef.current.playPause();
@@ -137,22 +165,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
   };
 
   const toggleMute = () => {
-    setIsMuted(prevMuted => !prevMuted);
+    setIsMuted((prevMuted) => !prevMuted);
   };
-  
+
   const seek = (amount: number) => {
     if (wavesurferRef.current && !isLoading && !error && duration > 0) {
-        const currentProgress = wavesurferRef.current.getCurrentTime() / duration;
-        const seekAmount = amount / duration;
-        const newProgress = Math.max(0, Math.min(1, currentProgress + seekAmount));
-        wavesurferRef.current.seekTo(newProgress);
+      const currentProgress = wavesurferRef.current.getCurrentTime() / duration;
+      const seekAmount = amount / duration;
+      const newProgress = Math.max(0, Math.min(1, currentProgress + seekAmount));
+      wavesurferRef.current.seekTo(newProgress);
+      // シーク後の時間を即座に更新
+      const newTime = newProgress * duration;
+      setCurrentTime(newTime);
     }
   };
 
   const restart = () => {
     if (wavesurferRef.current && !isLoading && !error) {
-        wavesurferRef.current.seekTo(0);
-        wavesurferRef.current.play();
+      wavesurferRef.current.seekTo(0);
+      wavesurferRef.current.play();
     }
   };
 
@@ -163,24 +194,35 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  if (error && isLoading) { 
-    return <div className="p-4 border rounded-md bg-destructive/10 text-destructive">Error: {error}</div>;
+  if (error) {
+    return (
+      <div className="p-4 border rounded-md bg-destructive/10 text-destructive">Error: {error}</div>
+    );
   }
-  if (!audioUrl && !isLoading) { 
-    return <div className="p-4 border rounded-md bg-muted/50 text-muted-foreground">No audio to play.</div>;
+  if (!audioUrl) {
+    return (
+      <div className="p-4 border rounded-md bg-muted/50 text-muted-foreground">
+        No audio to play.
+      </div>
+    );
   }
 
   return (
-    <div className="p-2 border rounded-md bg-card">
-      <div ref={waveformRef} className={`w-full h-[100px] transition-opacity duration-300 ${isLoading ? 'opacity-50 animate-pulse bg-muted' : 'opacity-100'}`} />
-      
+    <div
+      className="p-2 border rounded-md bg-card"
+      data-testid="audio-player"
+      data-playing={isPlaying}
+    >
+      <div
+        ref={waveformRef}
+        className={`w-full h-[100px] transition-opacity duration-300 ${isLoading ? 'opacity-50 animate-pulse bg-muted' : 'opacity-100'}`}
+      />
+
       {isLoading && !error && (
         <p className="text-sm text-center text-muted-foreground py-2">Loading audio waveform...</p>
       )}
-      
-      {error && (
-         <div className="p-2 text-sm text-center text-destructive py-2">Error: {error}</div>
-      )}
+
+      {error && <div className="p-2 text-sm text-center text-destructive py-2">Error: {error}</div>}
 
       {!isLoading && !error && (
         <>
@@ -189,24 +231,59 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
             <span>{formatTime(duration)}</span>
           </div>
           <div className="flex items-center justify-center gap-1 sm:gap-2 mt-2 flex-wrap">
-            <Button variant="ghost" size="icon" onClick={restart} title="Restart" disabled={isLoading || !!error || duration === 0}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={restart}
+              title="Restart"
+              disabled={isLoading || !!error || duration === 0}
+            >
               <RotateCcw className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => seek(-5)} title="Rewind 5s" disabled={isLoading || !!error || duration === 0}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => seek(-5)}
+              title="Rewind 5s"
+              disabled={isLoading || !!error || duration === 0}
+            >
               <Rewind className="h-5 w-5" />
             </Button>
-            <Button variant="outline" size="icon" onClick={togglePlayPause} className="w-12 h-12 rounded-full" disabled={isLoading || !!error || duration === 0}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={togglePlayPause}
+              title={isPlaying ? 'Pause' : 'Play'}
+              className="w-12 h-12 rounded-full"
+              disabled={isLoading || !!error || duration === 0}
+            >
               {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => seek(5)} title="Forward 5s" disabled={isLoading || !!error || duration === 0}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => seek(5)}
+              title="Forward 5s"
+              disabled={isLoading || !!error || duration === 0}
+            >
               <FastForward className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-1 ml-auto">
-              <Button variant="ghost" size="icon" onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"} disabled={isLoading || !!error || duration === 0}>
-                {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMute}
+                title={isMuted ? 'Unmute' : 'Mute'}
+                disabled={isLoading || !!error || duration === 0}
+              >
+                {isMuted || volume === 0 ? (
+                  <VolumeX className="h-5 w-5" />
+                ) : (
+                  <Volume2 className="h-5 w-5" />
+                )}
               </Button>
               <Slider
-                defaultValue={[volume]}
+                value={[volume]}
                 max={1}
                 step={0.05}
                 onValueChange={handleVolumeChange}
@@ -222,4 +299,5 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl }) => {
   );
 };
 
-export default AudioPlayer; 
+export { AudioPlayer };
+export default AudioPlayer;
