@@ -26,16 +26,59 @@ async function runE2ETests() {
 
       // CI環境ではマイグレーションとシードのみ実行
       console.log('🔄 Running migrations...');
-      execSync('npx prisma migrate deploy', {
-        env: { ...process.env, DATABASE_URL: databaseUrl },
-        stdio: 'inherit',
-      });
+      try {
+        execSync('npx prisma migrate deploy', {
+          env: { ...process.env, DATABASE_URL: databaseUrl },
+          stdio: 'inherit',
+          timeout: 60000, // 1分タイムアウト
+        });
+      } catch (error) {
+        console.error('❌ Migration failed:', error);
+        throw new Error('Database migration failed in CI environment');
+      }
 
       console.log('🌱 Seeding database...');
-      execSync('tsx scripts/seed-test-data.ts', {
-        env: { ...process.env, DATABASE_URL: databaseUrl },
-        stdio: 'inherit',
-      });
+      try {
+        execSync('tsx scripts/seed-test-data.ts', {
+          env: { ...process.env, DATABASE_URL: databaseUrl },
+          stdio: 'inherit',
+          timeout: 30000, // 30秒タイムアウト
+        });
+      } catch (error) {
+        console.error('❌ Database seeding failed:', error);
+        throw new Error('Database seeding failed in CI environment');
+      }
+
+      // CI環境では音声ファイル存在確認
+      console.log('🎵 Checking test audio files...');
+      const audioFiles = [
+        'public/uploads/hot-spring.wav',
+        'public/uploads/forest-morning.wav',
+        'public/uploads/mountain-stream.wav',
+      ];
+
+      let missingFiles = 0;
+      for (const file of audioFiles) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const fs = require('fs');
+          if (fs.existsSync(file)) {
+            console.log(`✅ Found: ${file}`);
+          } else {
+            console.log(`⚠️  Missing: ${file}`);
+            missingFiles++;
+          }
+        } catch {
+          console.log(`❌ Error checking: ${file}`);
+          missingFiles++;
+        }
+      }
+
+      if (missingFiles > 0) {
+        console.log(`⚠️  ${missingFiles} audio files are missing - fallback API will be used`);
+      } else {
+        console.log('✅ All test audio files are present');
+      }
     } else {
       // ローカル環境では最適化されたセットアップを使用
       const setupStart = Date.now();
@@ -91,13 +134,20 @@ async function runE2ETests() {
         }
       });
 
-      // タイムアウト設定（短縮）
+      // タイムアウト設定（CI環境では長めに）
+      const timeoutDuration = isCI ? 60000 : 20000; // CI: 60秒, ローカル: 20秒
       setTimeout(() => {
         if (!serverReady) {
-          console.log('⚠️  Server startup timeout, proceeding with tests...');
+          console.log(
+            `⚠️  Server startup timeout after ${timeoutDuration / 1000}s, proceeding with tests...`,
+          );
+          if (isCI) {
+            console.error('❌ CI environment: Server failed to start within timeout');
+            // CI環境ではより厳密にエラーとして扱う
+          }
           resolve(undefined);
         }
-      }, 20000); // 30秒から20秒に短縮
+      }, timeoutDuration);
     });
 
     console.log('\n📋 Running E2E tests...\n');

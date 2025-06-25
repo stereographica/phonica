@@ -45,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "npm"
 
       - name: Install dependencies
@@ -168,7 +168,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "npm"
 
       - name: Install dependencies
@@ -188,6 +188,37 @@ jobs:
         run: |
           npx prisma migrate deploy
           npx prisma generate
+
+      - name: Generate test audio files
+        run: |
+          # Create uploads directory
+          mkdir -p public/uploads
+          
+          # Generate silent audio files for testing (5 second duration each)
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/hot-spring.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/forest-morning.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/mountain-stream.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/shinjuku-station.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/rainy-street.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/ocean-waves-dawn.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/london-underground.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/tropical-rainforest.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/cafe-afternoon.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/arctic-wind.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/sakura-blizzard.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/desert-night.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/kyoto-temple.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/mumbai-market.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/thunderstorm.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/autumn-leaves.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/nyc-subway.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/whale-songs.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/summer-festival.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/ice-cave.wav
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/savanna-dawn.wav
+          
+          echo "✅ Generated test audio files:"
+          ls -la public/uploads/
 
       - name: Run E2E tests - ${{ matrix.browser }}
         env:
@@ -269,7 +300,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "npm"
 
       - name: Install dependencies

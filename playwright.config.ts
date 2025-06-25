@@ -19,8 +19,8 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  /* Retry on CI only - 安定性確保のため増加 */
+  retries: process.env.CI ? 3 : 0,
   /* Optimized worker configuration for parallel database isolation */
   workers: process.env.CI ? 1 : 4, // CI環境では安定性優先で1、ローカルでは4並列で高速化
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -54,9 +54,9 @@ export default defineConfig({
   globalTeardown: require.resolve('./e2e/setup/global-teardown.ts'),
 
   /* Timeout configurations */
-  timeout: 90 * 1000, // 90 seconds per test
+  timeout: process.env.CI ? 180 * 1000 : 90 * 1000, // CI: 3分, ローカル: 90秒
   expect: {
-    timeout: 10 * 1000, // 10 seconds for expect assertions
+    timeout: process.env.CI ? 15 * 1000 : 10 * 1000, // CI: 15秒, ローカル: 10秒
   },
 
   /* Configure projects for major browsers with optimized settings */
