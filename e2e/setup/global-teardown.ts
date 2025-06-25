@@ -7,6 +7,12 @@ import { cleanupAllWorkerDatabases } from '../../scripts/e2e-db-optimized';
 async function globalTeardown() {
   console.log('🌍 Global Teardown: Cleaning up E2E test environment...');
 
+  // CI環境では認証情報を設定
+  if (process.env.CI === 'true') {
+    process.env.POSTGRES_USER = process.env.POSTGRES_USER || 'postgres';
+    process.env.POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD || 'postgres';
+  }
+
   try {
     // 全Workerのデータベースをクリーンアップ
     console.log('🧹 Cleaning up all worker databases...');

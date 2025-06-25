@@ -45,7 +45,7 @@ test.describe('@smoke @workflow Global Search', () => {
     // 結果をクリック
     await searchResults.getByRole('button', { name: /Ocean Waves at Dawn/ }).click();
 
-    // 詳細ページにナビゲートすることを確認
+    // 詳細ページにナビゲートすることを確認（固定slugを使用）
     await expect(page).toHaveURL(/\/materials\/ocean-waves-dawn/);
     await expect(page.getByRole('heading', { name: 'Ocean Waves at Dawn' })).toBeVisible();
   });
