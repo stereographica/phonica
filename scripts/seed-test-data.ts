@@ -1,9 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
-// コマンドライン引数からデータベースURLを取得
-const databaseUrl =
-  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/phonica_test';
+// CI環境とローカル環境で適切なデータベースURLを使用
+const isCI = process.env.CI === 'true';
+const defaultDatabaseUrl = isCI
+  ? 'postgresql://postgres:postgres@localhost:5432/test_db' // CI環境用
+  : 'postgresql://phonica_user:phonica_password@localhost:5432/phonica_test'; // ローカル環境用
+
+const databaseUrl = process.env.DATABASE_URL || defaultDatabaseUrl;
 
 console.log(`🌱 Seeding test data to database: ${databaseUrl}`);
 
@@ -29,6 +33,9 @@ async function cleanDatabase() {
 
 async function seedTestData() {
   console.log('🌱 Creating test data...');
+
+  // 素材タイトルのユニーク性を確保するためのタイムスタンプサフィックス
+  const timestamp = Date.now().toString(36); // 36進数でコンパクト化
 
   // タグの作成
   const tags = await Promise.all([
@@ -166,8 +173,8 @@ async function seedTestData() {
   // 素材の作成
   const materials = [
     {
-      title: '🌄 森の朝',
-      slug: 'forest-morning',
+      title: `🌄 森の朝_${timestamp}`,
+      slug: `forest-morning-${timestamp}`,
       filePath: 'uploads/forest-morning.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
@@ -504,8 +511,8 @@ async function seedTestData() {
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
-      title: '温泉の音 ♨️',
-      slug: 'hot-spring',
+      title: `温泉の音 ♨️_${timestamp}`,
+      slug: `hot-spring-${timestamp}`,
       filePath: 'uploads/hot-spring.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
