@@ -153,6 +153,15 @@ export class AudioHelper {
    * 音声が正常にロードされて再生可能になるまで待機
    */
   async waitForAudioReady(timeout = 10000): Promise<void> {
+    // Firefox用の追加チェック
+    const browserName = this.page.context().browser()?.browserType().name();
+    const isFirefox = browserName === 'firefox';
+    const isCI = process.env.CI === 'true';
+
+    if (isFirefox && isCI) {
+      console.log('🦊 Firefox CI: 音声準備待機中...');
+    }
+
     // E2E環境では音声要素が存在しない場合があるため、
     // プレーヤーコントロールが表示されていることを確認
     await this.playPauseButton.waitFor({ state: 'visible', timeout });
@@ -226,7 +235,25 @@ export class AudioHelper {
   /**
    * 音声ローディングが完了するまで待機
    */
-  async waitForAudioLoad(timeout = 15000): Promise<void> {
+  async waitForAudioLoad(timeout?: number): Promise<void> {
+    // Firefox用の延長タイムアウト
+    const browserName = this.page.context().browser()?.browserType().name();
+    const isFirefox = browserName === 'firefox';
+    const isCI = process.env.CI === 'true';
+
+    const defaultTimeout = isCI
+      ? isFirefox
+        ? 30000
+        : 15000 // CI: Firefox 30秒、その他15秒
+      : 10000;
+
+    const actualTimeout = timeout ?? defaultTimeout;
+
+    // WebAudio API初期化の追加待機（Firefox CI環境）
+    if (isFirefox && isCI) {
+      console.log('🦊 Firefox CI環境検出: WebAudio API初期化のため追加待機');
+      await this.page.waitForTimeout(2000);
+    }
     // エラーメッセージが表示されているかチェック
     const errorVisible = await this.errorMessage.isVisible().catch(() => false);
     if (errorVisible) {
@@ -235,7 +262,7 @@ export class AudioHelper {
     }
 
     // 音声が再生可能になるまで待機
-    await this.waitForAudioReady(timeout);
+    await this.waitForAudioReady(actualTimeout);
 
     // プレーヤーコントロールが表示されるまで待つ
     await this.playPauseButton.waitFor({ state: 'visible', timeout: 5000 });

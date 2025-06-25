@@ -152,6 +152,16 @@ async function runE2ETests() {
 
     console.log('\n📋 Running E2E tests...\n');
 
+    // Firefox専用の環境検出
+    const isFirefoxTest = process.argv.some(
+      (arg) => arg.includes('firefox') || arg.includes('--project=firefox'),
+    );
+
+    if (isFirefoxTest && isCI) {
+      console.log('🦊 Firefox CI環境検出: テスト実行前に追加の初期化待機...');
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // 5秒待機
+    }
+
     // 3. E2Eテストを実行
     // プロセスの引数を取得（--grep など）
     const args: string[] = process.argv.slice(2);

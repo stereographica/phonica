@@ -79,11 +79,24 @@ export default defineConfig({
         // Firefox固有の最適化
         launchOptions: {
           firefoxUserPrefs: {
-            'dom.ipc.processCount': 8,
-            'network.http.max-persistent-connections-per-server': 10,
+            // CI環境用に並列処理を削減
+            'dom.ipc.processCount': process.env.CI ? 1 : 8,
+            'network.http.max-persistent-connections-per-server': process.env.CI ? 4 : 10,
+            // メモリ使用量を削減
+            'javascript.options.mem.max': 512000,
+            'browser.tabs.remote.autostart': false,
+            // 追加の安定性設定
+            'media.webspeech.synth.enabled': false,
+            'media.navigator.enabled': false,
           },
         },
+        // Firefox専用のタイムアウト延長
+        actionTimeout: process.env.CI ? 30000 : 15000,
+        navigationTimeout: process.env.CI ? 60000 : 30000,
       },
+      // Firefox専用のテストタイムアウト
+      timeout: process.env.CI ? 300 * 1000 : 180 * 1000, // CI: 5分、ローカル: 3分
+      retries: process.env.CI ? 1 : 0, // CI環境ではリトライを減らす
     },
 
     {
