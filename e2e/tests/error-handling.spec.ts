@@ -139,7 +139,8 @@ test.describe('エラーハンドリング機能', () => {
       await page.waitForLoadState('networkidle');
 
       // 新しい機材を作成（削除テスト用）
-      await page.click('button:has-text("Add Equipment")');
+      // Equipmentテキストまたはアイコンを含むボタンをクリック
+      await page.click('button:has-text("Equipment"), button:has([data-lucide="plus-circle"])');
       await page.waitForSelector('[role="dialog"]', { state: 'visible' });
 
       // フォームフィールドを入力（一意の名前を使用）

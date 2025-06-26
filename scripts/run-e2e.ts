@@ -1,5 +1,10 @@
 import { spawn, ChildProcess, execSync } from 'child_process';
-import { setupOptimizedE2EEnvironment, cleanupE2EDatabase } from './e2e-db-optimized';
+import {
+  generateSessionID,
+  setupSessionE2EEnvironment,
+  cleanupSessionDatabase,
+} from './e2e-db-optimized';
+import { cleanupE2EFiles } from './cleanup-e2e-files';
 
 /**
  * 統合E2Eテスト実行スクリプト
@@ -9,6 +14,7 @@ import { setupOptimizedE2EEnvironment, cleanupE2EDatabase } from './e2e-db-optim
 async function runE2ETests() {
   let testProcess: ChildProcess | undefined;
   let serverProcess: ChildProcess | undefined;
+  let sessionId: string | undefined;
 
   try {
     console.log('🚀 Starting E2E test suite...\n');
@@ -52,9 +58,14 @@ async function runE2ETests() {
         throw new Error('Database seeding failed in CI environment');
       }
     } else {
-      // ローカル環境では最適化されたセットアップを使用
-      console.log('🗄️  Setting up optimized E2E database...');
-      databaseUrl = await setupOptimizedE2EEnvironment('0');
+      // ローカル環境では実行ごとに一意のセッションIDを生成
+      sessionId = generateSessionID();
+      console.log(`🆔 Generated session ID: ${sessionId}`);
+
+      // セッション用のデータベースをセットアップ
+      console.log('🗄️  Setting up E2E session database...');
+      databaseUrl = await setupSessionE2EEnvironment(sessionId);
+      console.log(`📊 Session database URL: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}\n`);
     }
 
     // 2. E2Eテストファイルのセットアップ
@@ -68,9 +79,11 @@ async function runE2ETests() {
       console.log('⚠️  E2E file setup failed or not found, continuing...');
     }
 
-    // 3. 開発サーバーを起動
+    // 3. 開発サーバーの起動
+    let serverPort = 3000;
+
     console.log('🌐 Starting development server...');
-    console.log(`📊 Using database: ${databaseUrl}\n`);
+    console.log(`📊 Using database: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}\n`);
 
     serverProcess = spawn(
       'npx',
@@ -95,7 +108,6 @@ async function runE2ETests() {
     );
 
     // サーバーの起動を待つ
-    let serverPort = 3000;
     await new Promise((resolve) => {
       let serverReady = false;
 
@@ -125,7 +137,7 @@ async function runE2ETests() {
       });
 
       // タイムアウト設定
-      const timeoutDuration = isCI ? 60000 : 20000;
+      const timeoutDuration = 60000;
       setTimeout(() => {
         if (!serverReady) {
           console.log(`⚠️  Server startup timeout after ${timeoutDuration / 1000}s, proceeding...`);
@@ -143,11 +155,14 @@ async function runE2ETests() {
     // CI環境でのワーカー数設定
     if (isCI && !args.some((arg) => arg.includes('--workers'))) {
       args.push('--workers=1');
+    } else if (!isCI && !args.some((arg) => arg.includes('--workers'))) {
+      // ローカル環境では4ワーカーを明示的に設定
+      args.push('--workers=4');
     }
 
-    // ローカル環境でプロジェクトが指定されていない場合は全ブラウザを並列実行
+    // 全ブラウザを並列実行（CI・ローカル問わず）
     const hasProjectArg = args.some((arg) => arg.includes('--project'));
-    if (!hasProjectArg && !isCI) {
+    if (!hasProjectArg) {
       console.log('🌐 Running tests on all browsers in parallel...');
       args.push('--project=chromium', '--project=firefox', '--project=webkit');
     }
@@ -158,6 +173,7 @@ async function runE2ETests() {
         ...process.env,
         PLAYWRIGHT_BASE_URL: `http://localhost:${serverPort}`,
         DATABASE_URL: databaseUrl,
+        E2E_SESSION_ID: sessionId, // セッションIDを渡す
         NODE_ENV: 'test',
         CI: isCI ? 'true' : 'false',
       },
@@ -198,10 +214,17 @@ async function runE2ETests() {
       testProcess.kill('SIGTERM');
     }
 
+    // E2Eテストファイルのクリーンアップ
+    try {
+      cleanupE2EFiles();
+    } catch (error) {
+      console.warn('⚠️  Failed to cleanup E2E files:', error);
+    }
+
     // データベースのクリーンアップ（ローカル環境のみ）
-    if (process.env.CI !== 'true') {
-      console.log('Cleaning up E2E database...');
-      await cleanupE2EDatabase();
+    if (process.env.CI !== 'true' && sessionId) {
+      console.log('Cleaning up E2E session database...');
+      await cleanupSessionDatabase(sessionId);
     }
 
     console.log('✅ Cleanup completed');
@@ -210,8 +233,19 @@ async function runE2ETests() {
 
 // メイン処理
 if (require.main === module) {
+  let isCleanupDone = false;
+
   // プロセス終了ハンドラー
-  const exitHandler = (code: number = 0) => {
+  const exitHandler = async (code: number = 0) => {
+    if (!isCleanupDone) {
+      console.log('\n🚨 Process interrupted, performing cleanup...');
+      try {
+        cleanupE2EFiles();
+        isCleanupDone = true;
+      } catch (error) {
+        console.warn('⚠️  Cleanup during exit failed:', error);
+      }
+    }
     console.log(`\nExiting with code ${code}`);
     process.exit(code);
   };
@@ -222,10 +256,12 @@ if (require.main === module) {
 
   runE2ETests()
     .then(() => {
+      isCleanupDone = true; // 正常終了時はfinally句でクリーンアップ済み
       console.log('\n🎉 E2E test suite completed successfully!');
       exitHandler(0);
     })
     .catch((error) => {
+      isCleanupDone = true; // エラー時もfinally句でクリーンアップ済み
       console.error('\n💥 E2E test suite failed:', error);
       exitHandler(1);
     });

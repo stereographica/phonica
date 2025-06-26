@@ -13,6 +13,12 @@ async function globalSetup() {
     return;
   }
 
+  // ローカル環境でもセッションIDが設定されている場合はスキップ（run-e2e.tsが管理）
+  if (process.env.E2E_SESSION_ID) {
+    console.log('🔧 Session-based testing detected - database setup handled by run-e2e.ts');
+    return;
+  }
+
   try {
     // 既存のWorkerデータベースをクリーンアップ
     console.log('🧹 Cleaning up any existing worker databases...');

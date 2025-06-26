@@ -35,6 +35,7 @@
     "e2e:db:cleanup-all": "tsx scripts/e2e-db-optimized.ts cleanup-all",
     "e2e:db:full-cleanup": "tsx scripts/e2e-db-optimized.ts full-cleanup",
     "e2e:db:template-setup": "tsx scripts/e2e-db-optimized.ts template-setup",
+    "e2e:cleanup-files": "tsx scripts/cleanup-e2e-files.ts",
     "seed:test": "tsx scripts/seed-test-data.ts",
     "prepare": "husky"
   },
