@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: *.tile.openstreetmap.org unpkg.com",
               "connect-src 'self' *.tile.openstreetmap.org",
               "font-src 'self' data:",
+              "media-src 'self' blob:",
             ].join('; '),
           },
         ],

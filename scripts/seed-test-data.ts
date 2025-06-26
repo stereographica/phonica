@@ -1,9 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
-// コマンドライン引数からデータベースURLを取得
-const databaseUrl =
-  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/phonica_test';
+// CI環境とローカル環境で適切なデータベースURLを使用
+const isCI = process.env.CI === 'true';
+const defaultDatabaseUrl = isCI
+  ? 'postgresql://postgres:postgres@localhost:5432/test_db' // CI環境用
+  : 'postgresql://phonica_user:phonica_password@localhost:5432/phonica_test'; // ローカル環境用
+
+const databaseUrl = process.env.DATABASE_URL || defaultDatabaseUrl;
 
 console.log(`🌱 Seeding test data to database: ${databaseUrl}`);
 
@@ -29,6 +33,9 @@ async function cleanDatabase() {
 
 async function seedTestData() {
   console.log('🌱 Creating test data...');
+
+  // 素材タイトルのユニーク性を確保するためのタイムスタンプサフィックス
+  const timestamp = Date.now().toString(36); // 36進数でコンパクト化
 
   // タグの作成
   const tags = await Promise.all([
@@ -164,11 +171,12 @@ async function seedTestData() {
   console.log(`✅ Created ${projects.length} projects`);
 
   // 素材の作成
-  const materials = [
+  // E2Eテスト用の固定slug素材（タイムスタンプなし）
+  const testMaterials = [
     {
-      title: '🌄 森の朝',
+      title: '🌄 森の朝', // E2Eテスト用：固定slug
       slug: 'forest-morning',
-      filePath: '/uploads/forest-morning.wav',
+      filePath: 'uploads/forest-morning.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -183,60 +191,26 @@ async function seedTestData() {
       projects: [projects[0]], // 森林環境音プロジェクト
     },
     {
-      title: '🏞️ 渓流の音',
-      slug: 'mountain-stream',
-      filePath: '/uploads/mountain-stream.wav',
-      fileFormat: 'WAV',
-      sampleRate: 96000,
-      bitDepth: 24,
-      recordedAt: new Date('2024-05-20T10:00:00Z'),
-      latitude: 35.3606,
-      longitude: 138.7274,
-      locationName: '富士山麓',
-      memo: '🏔️ 山間部の渓流の水音。🗾 富士山麓の清流',
-      rating: 4,
-      tags: [tags[0], tags[2], tags[3]], // 自然音, 環境音, 水音
-      equipments: [equipment[1]], // Sony PCM-D100
-      projects: [projects[0]], // 森林環境音プロジェクト
-    },
-    {
-      title: '🚉 新宿駅の喧騒',
-      slug: 'shinjuku-station',
-      filePath: '/uploads/shinjuku-station.wav',
+      title: '温泉の音 ♨️', // E2Eテスト用：固定slug
+      slug: 'hot-spring',
+      filePath: 'uploads/hot-spring.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
-      recordedAt: new Date('2024-06-01T18:00:00Z'),
-      latitude: 35.6896,
-      longitude: 139.7006,
-      locationName: '新宿駅',
-      memo: '🕰️ ラッシュアワーの新宿駅構内。👥 平日夕方のラッシュアワー',
-      rating: 3,
-      tags: [tags[1], tags[2]], // 都市音, 環境音
-      equipments: [equipment[0], equipment[2]], // Zoom H6, Rode NTG3
-      projects: [projects[1]], // 都市サウンドスケープ
+      recordedAt: new Date('2024-12-01T07:00:00Z'),
+      latitude: 36.2048,
+      longitude: 138.2529,
+      locationName: '草津温泉、群馬',
+      memo: 'Bubbling hot springs and bamboo water features. コポコポと湧く温泉の音。Relaxing!',
+      rating: 5,
+      tags: tags.length > 6 ? [tags[3], tags[6], tags[2]] : tags.length > 3 ? [tags[3]] : [tags[0]], // 水音, ASMR, 環境音
+      equipments: [equipment[0]], // Zoom H6
+      projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
-      title: '☔ 雨の日の街角',
-      slug: 'rainy-street',
-      filePath: '/uploads/rainy-street.wav',
-      fileFormat: 'WAV',
-      sampleRate: 48000,
-      bitDepth: 24,
-      recordedAt: new Date('2024-06-10T14:30:00Z'),
-      latitude: 35.6812,
-      longitude: 139.7671,
-      locationName: '東京都内',
-      memo: '🌧️ 雨が降る都市の街角の音。🌸 梅雨の午後、中程度の雨',
-      rating: 4,
-      tags: [tags[1], tags[2], tags[3]], // 都市音, 環境音, 水音
-      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
-      projects: [projects[1]], // 都市サウンドスケープ
-    },
-    {
-      title: 'Ocean Waves at Dawn',
+      title: 'Ocean Waves at Dawn', // E2Eテスト用：固定slug
       slug: 'ocean-waves-dawn',
-      filePath: '/uploads/ocean-waves-dawn.wav',
+      filePath: 'uploads/ocean-waves-dawn.wav',
       fileFormat: 'WAV',
       sampleRate: 192000,
       bitDepth: 32,
@@ -251,43 +225,81 @@ async function seedTestData() {
       projects: [projects[2], projects[3]], // Nature Documentary, Meditation
     },
     {
-      title: 'London Underground Ambience',
-      slug: 'london-underground',
-      filePath: '/uploads/london-underground.wav',
+      title: 'New York Subway', // E2Eテスト用：固定slug
+      slug: 'nyc-subway',
+      filePath: 'uploads/nyc-subway.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
-      recordedAt: new Date('2024-07-05T08:30:00Z'),
-      latitude: 51.5031,
-      longitude: -0.1132,
-      locationName: 'Westminster Station, London',
-      memo: 'Morning rush hour at Westminster tube station. Mind the gap! 🚇 Includes announcements and train arrivals.',
-      rating: 4,
-      tags: [tags[1], tags[4]], // 都市音, Field Recording
+      recordedAt: new Date('2024-11-05T17:45:00Z'),
+      latitude: 40.758,
+      longitude: -73.9855,
+      locationName: 'Times Square Station, NYC',
+      memo: 'Rush hour madness at Times Square. "Stand clear of the closing doors!" 🚇',
+      rating: 3,
+      tags: tags.length > 4 ? [tags[1], tags[4]] : tags.length > 1 ? [tags[1]] : [tags[0]], // 都市音, Field Recording
       equipments: [equipment[0]], // Zoom H6
       projects: [projects[1]], // 都市サウンドスケープ
     },
+  ];
+
+  // タイムスタンプサフィックス付きの素材（ユニーク性確保）
+  const timestampedMaterials = [
     {
-      title: 'Tropical Rainforest 🦜',
-      slug: 'tropical-rainforest',
-      filePath: '/uploads/tropical-rainforest.wav',
-      fileFormat: 'FLAC',
+      title: `🏞️ 渓流の音_${timestamp}`,
+      slug: `mountain-stream-${timestamp}`,
+      filePath: 'uploads/mountain-stream.wav',
+      fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
-      recordedAt: new Date('2024-03-22T06:15:00Z'),
-      latitude: -3.4653,
-      longitude: -62.2159,
-      locationName: 'Amazon Rainforest, Brazil',
-      memo: 'Dense rainforest soundscape with exotic birds and insects. 🌴 Recorded during the golden hour. Amazing biodiversity!',
-      rating: 5,
-      tags: [tags[0], tags[7], tags[4]], // 自然音, Wildlife Sounds, Field Recording
-      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
-      projects: [projects[2]], // Nature Documentary
+      recordedAt: new Date('2024-05-20T10:00:00Z'),
+      latitude: 35.3606,
+      longitude: 138.7274,
+      locationName: '富士山麓',
+      memo: '🏔️ 山間部の渓流の水音。🗾 富士山麓の清流',
+      rating: 4,
+      tags: [tags[0], tags[2], tags[3]], // 自然音, 環境音, 水音
+      equipments: [equipment[1]], // Sony PCM-D100
+      projects: [projects[0]], // 森林環境音プロジェクト
     },
     {
-      title: 'カフェの午後 ☕',
-      slug: 'cafe-afternoon',
-      filePath: '/uploads/cafe-afternoon.wav',
+      title: `🚉 新宿駅の喧骒_${timestamp}`,
+      slug: `shinjuku-station-${timestamp}`,
+      filePath: 'uploads/shinjuku-station.wav',
+      fileFormat: 'WAV',
+      sampleRate: 48000,
+      bitDepth: 24,
+      recordedAt: new Date('2024-06-01T18:00:00Z'),
+      latitude: 35.6896,
+      longitude: 139.7006,
+      locationName: '新宿駅',
+      memo: '🕰️ ラッシュアワーの新宿駅構内。👥 平日夕方のラッシュアワー',
+      rating: 3,
+      tags: [tags[1], tags[2]], // 都市音, 環境音
+      equipments: [equipment[0], equipment[2]], // Zoom H6, Rode NTG3
+      projects: [projects[1]], // 都市サウンドスケープ
+    },
+    {
+      title: `☔ 雨の日の街角_${timestamp}`,
+      slug: `rainy-street-${timestamp}`,
+      filePath: 'uploads/rainy-street.wav',
+      fileFormat: 'WAV',
+      sampleRate: 48000,
+      bitDepth: 24,
+      recordedAt: new Date('2024-06-10T14:30:00Z'),
+      latitude: 35.6812,
+      longitude: 139.7671,
+      locationName: '東京都内',
+      memo: '🌧️ 雨が降る都市の街角の音。🌸 梅雨の午後、中程度の雨',
+      rating: 4,
+      tags: [tags[1], tags[2], tags[3]], // 都市音, 環境音, 水音
+      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
+      projects: [projects[1]], // 都市サウンドスケープ
+    },
+    {
+      title: `カフェの午後 ☕_${timestamp}`,
+      slug: `cafe-afternoon-${timestamp}`,
+      filePath: 'uploads/cafe-afternoon.wav',
       fileFormat: 'WAV',
       sampleRate: 44100,
       bitDepth: 16,
@@ -302,9 +314,9 @@ async function seedTestData() {
       projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
-      title: 'Arctic Wind ❄️',
-      slug: 'arctic-wind',
-      filePath: '/uploads/arctic-wind.wav',
+      title: `Arctic Wind ❄️_${timestamp}`,
+      slug: `arctic-wind-${timestamp}`,
+      filePath: 'uploads/arctic-wind.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
@@ -319,9 +331,9 @@ async function seedTestData() {
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
-      title: '春の桜吹雪 🌸',
-      slug: 'sakura-blizzard',
-      filePath: '/uploads/sakura-blizzard.wav',
+      title: `春の桜吹雪 🌸_${timestamp}`,
+      slug: `sakura-blizzard-${timestamp}`,
+      filePath: 'uploads/sakura-blizzard.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -336,9 +348,9 @@ async function seedTestData() {
       projects: [projects[0]], // 森林環境音プロジェクト
     },
     {
-      title: 'Desert Night Sounds',
-      slug: 'desert-night',
-      filePath: '/uploads/desert-night.wav',
+      title: `Desert Night Sounds_${timestamp}`,
+      slug: `desert-night-${timestamp}`,
+      filePath: 'uploads/desert-night.wav',
       fileFormat: 'FLAC',
       sampleRate: 192000,
       bitDepth: 32,
@@ -353,9 +365,9 @@ async function seedTestData() {
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
-      title: '京都の寺院 🔔',
-      slug: 'kyoto-temple',
-      filePath: '/uploads/kyoto-temple.wav',
+      title: `京都の寺院 🔔_${timestamp}`,
+      slug: `kyoto-temple-${timestamp}`,
+      filePath: 'uploads/kyoto-temple.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -370,9 +382,9 @@ async function seedTestData() {
       projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
-      title: 'Mumbai Market Chaos',
-      slug: 'mumbai-market',
-      filePath: '/uploads/mumbai-market.wav',
+      title: `Mumbai Market Chaos_${timestamp}`,
+      slug: `mumbai-market-${timestamp}`,
+      filePath: 'uploads/mumbai-market.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -387,9 +399,9 @@ async function seedTestData() {
       projects: [projects[1]], // 都市サウンドスケープ
     },
     {
-      title: 'Thunderstorm ⛈️',
-      slug: 'thunderstorm',
-      filePath: '/uploads/thunderstorm.wav',
+      title: `Thunderstorm ⛈️_${timestamp}`,
+      slug: `thunderstorm-${timestamp}`,
+      filePath: 'uploads/thunderstorm.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
@@ -409,9 +421,9 @@ async function seedTestData() {
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
-      title: '秋葉の足音 🍂',
-      slug: 'autumn-leaves-footsteps',
-      filePath: '/uploads/autumn-leaves.wav',
+      title: `秋葉の足音 🍂_${timestamp}`,
+      slug: `autumn-leaves-footsteps-${timestamp}`,
+      filePath: 'uploads/autumn-leaves.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -426,26 +438,43 @@ async function seedTestData() {
       projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
     },
     {
-      title: 'New York Subway',
-      slug: 'nyc-subway',
-      filePath: '/uploads/nyc-subway.wav',
+      title: `Tropical Rainforest 🦜_${timestamp}`,
+      slug: `tropical-rainforest-${timestamp}`,
+      filePath: 'uploads/tropical-rainforest.wav',
+      fileFormat: 'FLAC',
+      sampleRate: 96000,
+      bitDepth: 24,
+      recordedAt: new Date('2024-03-22T06:15:00Z'),
+      latitude: -3.4653,
+      longitude: -62.2159,
+      locationName: 'Amazon Rainforest, Brazil',
+      memo: 'Dense rainforest soundscape with exotic birds and insects. 🌴 Recorded during the golden hour. Amazing biodiversity!',
+      rating: 5,
+      tags: [tags[0], tags[7], tags[4]], // 自然音, Wildlife Sounds, Field Recording
+      equipments: [equipment[1], equipment[2]], // Sony PCM-D100, Rode NTG3
+      projects: [projects[2]], // Nature Documentary
+    },
+    {
+      title: `London Underground Ambience_${timestamp}`,
+      slug: `london-underground-${timestamp}`,
+      filePath: 'uploads/london-underground.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
-      recordedAt: new Date('2024-11-05T17:45:00Z'),
-      latitude: 40.758,
-      longitude: -73.9855,
-      locationName: 'Times Square Station, NYC',
-      memo: 'Rush hour madness at Times Square. "Stand clear of the closing doors!" 🚇',
-      rating: 3,
-      tags: tags.length > 4 ? [tags[1], tags[4]] : tags.length > 1 ? [tags[1]] : [tags[0]], // 都市音, Field Recording
+      recordedAt: new Date('2024-07-05T08:30:00Z'),
+      latitude: 51.5031,
+      longitude: -0.1132,
+      locationName: 'Westminster Station, London',
+      memo: 'Morning rush hour at Westminster tube station. Mind the gap! 🚇 Includes announcements and train arrivals.',
+      rating: 4,
+      tags: [tags[1], tags[4]], // 都市音, Field Recording
       equipments: [equipment[0]], // Zoom H6
       projects: [projects[1]], // 都市サウンドスケープ
     },
     {
-      title: 'Whale Songs 🐋',
-      slug: 'whale-songs',
-      filePath: '/uploads/whale-songs.wav',
+      title: `Whale Songs 🐋_${timestamp}`,
+      slug: `whale-songs-${timestamp}`,
+      filePath: 'uploads/whale-songs.wav',
       fileFormat: 'WAV',
       sampleRate: 192000,
       bitDepth: 32,
@@ -465,9 +494,9 @@ async function seedTestData() {
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
-      title: '夏祭りの夜 🎆',
-      slug: 'summer-festival',
-      filePath: '/uploads/summer-festival.wav',
+      title: `夏祭りの夜 🎆_${timestamp}`,
+      slug: `summer-festival-${timestamp}`,
+      filePath: 'uploads/summer-festival.wav',
       fileFormat: 'WAV',
       sampleRate: 48000,
       bitDepth: 24,
@@ -482,9 +511,9 @@ async function seedTestData() {
       projects: [projects[1]], // 都市サウンドスケープ
     },
     {
-      title: 'Ice Cave Echoes',
-      slug: 'ice-cave',
-      filePath: '/uploads/ice-cave.wav',
+      title: `Ice Cave Echoes_${timestamp}`,
+      slug: `ice-cave-${timestamp}`,
+      filePath: 'uploads/ice-cave.wav',
       fileFormat: 'FLAC',
       sampleRate: 96000,
       bitDepth: 24,
@@ -504,26 +533,9 @@ async function seedTestData() {
       projects: projects.length > 2 ? [projects[2]] : [projects[0]], // Nature Documentary
     },
     {
-      title: '温泉の音 ♨️',
-      slug: 'hot-spring',
-      filePath: '/uploads/hot-spring.wav',
-      fileFormat: 'WAV',
-      sampleRate: 48000,
-      bitDepth: 24,
-      recordedAt: new Date('2024-12-01T07:00:00Z'),
-      latitude: 36.2048,
-      longitude: 138.2529,
-      locationName: '草津温泉、群馬',
-      memo: 'Bubbling hot springs and bamboo water features. コポコポと湧く温泉の音。Relaxing!',
-      rating: 5,
-      tags: tags.length > 6 ? [tags[3], tags[6], tags[2]] : tags.length > 3 ? [tags[3]] : [tags[0]], // 水音, ASMR, 環境音
-      equipments: [equipment[0]], // Zoom H6
-      projects: projects.length > 3 ? [projects[3]] : [projects[0]], // Meditation & Relaxation
-    },
-    {
-      title: 'Savanna Dawn Chorus',
-      slug: 'savanna-dawn',
-      filePath: '/uploads/savanna-dawn.wav',
+      title: `Savanna Dawn Chorus_${timestamp}`,
+      slug: `savanna-dawn-${timestamp}`,
+      filePath: 'uploads/savanna-dawn.wav',
       fileFormat: 'WAV',
       sampleRate: 96000,
       bitDepth: 24,
@@ -539,7 +551,10 @@ async function seedTestData() {
     },
   ];
 
-  for (const materialData of materials) {
+  // E2Eテスト用素材とタイムスタンプ付き素材を結合
+  const allMaterials = [...testMaterials, ...timestampedMaterials];
+
+  for (const materialData of allMaterials) {
     const { tags, equipments, projects, ...data } = materialData;
 
     const material = await prisma.material.create({
@@ -561,7 +576,7 @@ async function seedTestData() {
     console.log(`✅ Created material: ${material.title}`);
   }
 
-  console.log(`✅ Created ${materials.length} materials with relationships`);
+  console.log(`✅ Created ${allMaterials.length} materials with relationships`);
 }
 
 async function main() {

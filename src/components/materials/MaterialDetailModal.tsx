@@ -142,14 +142,26 @@ export function MaterialDetailModal({
   }, []);
 
   useEffect(() => {
-    // console.log(`[Modal DEBUG] useEffect - isOpen: ${isOpen}, materialSlug: ${materialSlug}`);
+    // CI環境では常にデバッグログを有効化
+    const shouldLog = process.env.NODE_ENV === 'test' || process.env.CI;
+    if (shouldLog) {
+      console.log(`[Modal DEBUG] useEffect - isOpen: ${isOpen}, materialSlug: ${materialSlug}`);
+    }
     if (isOpen && materialSlug) {
-      // console.log(`[Modal DEBUG] useEffect - CALLING fetchMaterialDetails for slug: ${materialSlug}`);
+      if (shouldLog) {
+        console.log(
+          `[Modal DEBUG] useEffect - CALLING fetchMaterialDetails for slug: ${materialSlug}`,
+        );
+      }
       fetchMaterialDetails(materialSlug);
     } else if (!isOpen) {
-      // console.log('[Modal DEBUG] useEffect - Modal closed, resetting states (indirectly via handleClose or onOpenChange)');
+      if (shouldLog) {
+        console.log('[Modal DEBUG] useEffect - Modal closed, resetting states');
+      }
     } else if (!materialSlug) {
-      // console.log('[Modal DEBUG] useEffect - materialSlug is null, not fetching.');
+      if (shouldLog) {
+        console.log('[Modal DEBUG] useEffect - materialSlug is null, not fetching.');
+      }
       setDetailedMaterial(null);
       setFetchError(null);
       setIsFetching(false);
@@ -222,11 +234,19 @@ export function MaterialDetailModal({
 
   // Remove manual IDs to let Radix handle accessibility automatically
 
+  // CI環境でのデバッグ
+  if ((process.env.NODE_ENV === 'test' || process.env.CI) && isOpen) {
+    console.log('[Modal DEBUG] Rendering Dialog with isOpen=true');
+  }
+
   return (
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        // console.log(`[Modal DEBUG] Dialog onOpenChange - open: ${open}`);
+        const shouldLog = process.env.NODE_ENV === 'test' || process.env.CI;
+        if (shouldLog) {
+          console.log(`[Modal DEBUG] Dialog onOpenChange - open: ${open}`);
+        }
         if (!open) handleClose();
       }}
     >
@@ -400,8 +420,11 @@ export function MaterialDetailModal({
               </div>
             )}
             {detailedMaterial.filePath && (
-              <div className="my-4">
-                <AudioPlayer audioUrl={`/api/materials/${detailedMaterial.slug}/download`} />
+              <div className="md:col-span-2 mt-4" data-testid="audio-player-section">
+                <h3 className="font-semibold mb-2 text-sm">Audio Player:</h3>
+                <AudioPlayer
+                  audioUrl={`/api/materials/${detailedMaterial.slug}/download?play=true`}
+                />
               </div>
             )}
           </div>
@@ -410,7 +433,7 @@ export function MaterialDetailModal({
         <DialogFooter className="mt-4 pt-4 border-t" data-testid="dialog-footer">
           {detailedMaterial && !isFetching && !fetchError && (
             <>
-              <Button variant="outline" onClick={handleDownload}>
+              <Button variant="outline" onClick={handleDownload} data-testid="download-button">
                 <Download className="mr-2 h-4 w-4" />
                 Download
               </Button>

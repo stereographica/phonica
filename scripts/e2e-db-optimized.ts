@@ -9,8 +9,11 @@ const execAsync = promisify(exec);
 // E2E用のデータベース設定
 const E2E_DB_BASE_NAME = 'phonica_e2e_test';
 const E2E_TEMPLATE_DB_NAME = 'phonica_e2e_template';
-const E2E_DB_USER = process.env.POSTGRES_USER || 'phonica_user';
-const E2E_DB_PASSWORD = process.env.POSTGRES_PASSWORD || 'phonica_password';
+
+// CI環境では標準的なPostgreSQL認証情報を使用、ローカル環境では専用認証情報を使用
+const isCI = process.env.CI === 'true';
+const E2E_DB_USER = process.env.POSTGRES_USER || (isCI ? 'postgres' : 'phonica_user');
+const E2E_DB_PASSWORD = process.env.POSTGRES_PASSWORD || (isCI ? 'postgres' : 'phonica_password');
 const E2E_DB_HOST = process.env.POSTGRES_HOST || 'localhost';
 const E2E_DB_PORT = process.env.POSTGRES_PORT || '5432';
 

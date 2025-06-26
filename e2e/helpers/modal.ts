@@ -89,11 +89,28 @@ export class ModalHelper {
   /**
    * モーダルが開くまで待機
    */
-  async waitForOpen(timeout: number = 5000) {
-    await this.page.waitForSelector('[role="dialog"]', {
-      state: 'visible',
-      timeout,
-    });
+  async waitForOpen(timeout?: number) {
+    // CI環境では長めのタイムアウトを設定
+    const defaultTimeout = process.env.CI ? 15000 : 5000;
+    const actualTimeout = timeout ?? defaultTimeout;
+
+    console.log(
+      `⏳ Waiting for modal to open (timeout: ${actualTimeout}ms, CI: ${process.env.CI || 'false'})`,
+    );
+
+    try {
+      await this.page.waitForSelector('[role="dialog"]', {
+        state: 'visible',
+        timeout: actualTimeout,
+      });
+      console.log('✅ Modal opened successfully');
+    } catch (error) {
+      console.error(`❌ Modal failed to open within ${actualTimeout}ms`);
+      // デバッグ情報を追加
+      const hasDialog = await this.page.locator('[role="dialog"]').count();
+      console.log(`Dialog elements found: ${hasDialog}`);
+      throw error;
+    }
   }
 
   /**

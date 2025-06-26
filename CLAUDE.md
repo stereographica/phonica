@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **ALWAYS follow TDD** - Write tests before implementation
 5. **ALWAYS run E2E tests locally** before pushing to avoid CI failures
 
+## 🎯 E2E Test Execution Rules
+
+1. **ALWAYS use maximum timeout** for E2E tests (including pre-commit hook execution) - Set timeout to 10 minutes (600000ms) to avoid unnecessary retries
+2. **Run only necessary test cases** after fixing E2E tests - Use grep patterns to filter specific tests and reduce execution time
+3. **NEVER use `e2e:with-report`** in CLI context - This command opens browser-based reports which is not useful for automated testing
+
 ## Project Overview
 
 Phonica is a field recording material management tool built with Next.js 15, React 19, and TypeScript. It efficiently manages audio recordings with metadata including location, equipment, tags, and technical specifications using modern web technologies including TanStack Query, Prisma ORM, and BullMQ for background processing.
@@ -56,7 +62,7 @@ This documentation is organized into focused sections. Import relevant sections 
 ## Quick Start
 
 1. Always check relevant documentation sections before starting work
-2. Follow the development process strictly  
+2. Follow the development process strictly
 3. Use modern architecture patterns from @docs/claude/modern-architecture-patterns.md
 4. Apply state management guidelines from @docs/claude/state-management-guide.md
 5. Run quality checks before every commit and push

@@ -138,7 +138,7 @@ export function getZipGenerationWorker(): Worker<ZipGenerationJobData> | null {
             resolve(result);
           });
 
-          archive.on('error', (err) => {
+          archive.on('error', (err: Error) => {
             console.error('[ZipGenerationWorker] Archive error:', err);
             reject(err);
           });

@@ -36,6 +36,7 @@
     "e2e:workflows": "npm run e2e -- --grep @workflow --project=chromium",
     "e2e:chrome": "npm run e2e -- --project=chromium",
     "e2e:firefox": "npm run e2e -- --project=firefox",
+    "e2e:firefox:ci": "CI=true FIREFOX_CI=true timeout 600s npm run e2e -- --project=firefox --workers=1 --retries=1",
     "e2e:webkit": "npm run e2e -- --project=webkit",
     "e2e:cross-browser": "npm run e2e -- --project=chromium --project=firefox",
     "e2e:repeat": "tsx scripts/test-e2e-repeatedly.ts",
