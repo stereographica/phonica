@@ -48,7 +48,7 @@ async function runE2ETests() {
 
       console.log('🌱 Seeding database...');
       try {
-        execSync('tsx scripts/seed-test-data.ts', {
+        execSync('npx tsx scripts/seed-test-data.ts', {
           env: { ...process.env, DATABASE_URL: databaseUrl },
           stdio: 'inherit',
           timeout: 30000,
@@ -71,7 +71,7 @@ async function runE2ETests() {
     // 2. E2Eテストファイルのセットアップ
     console.log('📁 Setting up E2E test files...');
     try {
-      execSync('tsx scripts/setup-e2e-files.ts', {
+      execSync('npx tsx scripts/setup-e2e-files.ts', {
         env: { ...process.env, CI: isCI ? 'true' : 'false' },
         stdio: 'inherit',
       });

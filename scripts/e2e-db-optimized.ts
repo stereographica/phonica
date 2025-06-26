@@ -230,7 +230,7 @@ export async function seedTemplateDatabase() {
 
   try {
     const { stdout, stderr } = await execAsync(
-      `DATABASE_URL="${TEMPLATE_DATABASE_URL}" tsx scripts/seed-test-data.ts`,
+      `DATABASE_URL="${TEMPLATE_DATABASE_URL}" npx tsx scripts/seed-test-data.ts`,
       { cwd: process.cwd() },
     );
 

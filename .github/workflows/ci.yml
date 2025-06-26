@@ -195,7 +195,7 @@ jobs:
           CI: true
         run: |
           # E2Eテストに必要なファイルをセットアップ（CI環境ではシードデータ用音声ファイルも生成）
-          tsx scripts/setup-e2e-files.ts
+          npx tsx scripts/setup-e2e-files.ts
           
           echo "✅ E2E test files setup completed"
           
