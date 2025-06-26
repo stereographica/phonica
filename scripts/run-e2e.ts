@@ -167,6 +167,20 @@ async function runE2ETests() {
       args.push('--project=chromium', '--project=firefox', '--project=webkit');
     }
 
+    console.log(`📋 Executing Playwright command: npx playwright test ${args.join(' ')}`);
+    console.log(`📁 Working directory: ${process.cwd()}`);
+    console.log(`🎯 Test directory: ./e2e/tests`);
+
+    // テストファイルの存在確認
+    try {
+      const testFiles = execSync('find ./e2e/tests -name "*.spec.ts" | head -5', {
+        encoding: 'utf-8',
+      });
+      console.log(`📄 Found test files: \n${testFiles.trim()}`);
+    } catch (error) {
+      console.log('⚠️ Failed to list test files:', error);
+    }
+
     testProcess = spawn('npx', ['playwright', 'test', ...args], {
       stdio: 'inherit',
       env: {
