@@ -350,7 +350,7 @@ export async function setupTemplate() {
 /**
  * 最適化されたE2E環境のセットアップ
  */
-export async function setupOptimizedE2EEnvironment(workerId?: string) {
+export async function setupOptimizedE2EEnvironment(workerId?: string): Promise<string> {
   const startTime = Date.now();
   const workerDbName = getWorkerDbName(workerId);
 
@@ -372,6 +372,10 @@ export async function setupOptimizedE2EEnvironment(workerId?: string) {
     console.log(
       `✅ E2E environment setup completed for ${workerDbName} in ${(duration / 1000).toFixed(2)}s`,
     );
+
+    // データベースURLを返す
+    const dbUrl = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${workerDbName}`;
+    return dbUrl;
   } catch (error) {
     console.error(`❌ E2E environment setup failed for ${workerDbName}:`, error);
     throw error;
