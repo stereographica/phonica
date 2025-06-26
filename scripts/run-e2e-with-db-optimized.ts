@@ -86,18 +86,46 @@ async function runE2ETests() {
       const setupDuration = Date.now() - setupStart;
       console.log(`⚡ Database setup completed in ${(setupDuration / 1000).toFixed(2)}s\n`);
       databaseUrl = E2E_DATABASE_URL;
+
+      // E2Eテストファイルのセットアップ
+      console.log('📁 Setting up E2E test files...');
+      try {
+        execSync('tsx scripts/setup-e2e-files.ts', {
+          stdio: 'inherit',
+          timeout: 30000, // 30秒タイムアウト
+        });
+      } catch (error) {
+        console.error('❌ Failed to setup E2E test files:', error);
+        throw new Error('E2E test files setup failed');
+      }
     }
 
     // 2. 開発サーバーを起動（E2E用データベースを使用）
     console.log('🌐 Starting development server with E2E database...');
-    serverProcess = spawn('npm', ['run', 'dev'], {
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        NODE_ENV: 'test',
+    console.log(`📊 Using database: ${databaseUrl}`);
+
+    // concurrentlyが環境変数を正しく渡すように、個別にプロセスを起動
+    serverProcess = spawn(
+      'npx',
+      [
+        'concurrently',
+        '-n',
+        'next,worker',
+        '-c',
+        'blue,green',
+        `"DATABASE_URL=${databaseUrl} NODE_ENV=test npm run dev:next"`,
+        `"DATABASE_URL=${databaseUrl} NODE_ENV=test npm run dev:worker"`,
+      ],
+      {
+        env: {
+          ...process.env,
+          DATABASE_URL: databaseUrl,
+          NODE_ENV: 'test',
+        },
+        stdio: 'pipe',
+        shell: true, // シェルを使用して環境変数を確実に渡す
       },
-      stdio: 'pipe',
-    });
+    );
 
     // サーバーの起動を待つ
     let serverPort = 3000;

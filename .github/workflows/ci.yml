@@ -190,42 +190,22 @@ jobs:
           npx prisma migrate deploy
           npx prisma generate
 
-      - name: Generate test audio files
+      - name: Setup E2E test files
+        env:
+          CI: true
         run: |
-          # Create uploads directory
-          mkdir -p public/uploads
+          # E2Eテストに必要なファイルをセットアップ（CI環境ではシードデータ用音声ファイルも生成）
+          tsx scripts/setup-e2e-files.ts
           
-          # Generate silent audio files for testing (5 second duration each)
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/hot-spring.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/forest-morning.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/mountain-stream.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/shinjuku-station.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/rainy-street.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/ocean-waves-dawn.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/london-underground.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/tropical-rainforest.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/cafe-afternoon.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/arctic-wind.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/sakura-blizzard.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/desert-night.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/kyoto-temple.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/mumbai-market.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/thunderstorm.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/autumn-leaves.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/nyc-subway.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/whale-songs.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/summer-festival.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/ice-cave.wav
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -ar 44100 -ac 1 -y public/uploads/savanna-dawn.wav
+          echo "✅ E2E test files setup completed"
           
-          echo "✅ Generated test audio files:"
-          ls -la public/uploads/
+          # Verify fixtures
+          echo "📁 E2E fixtures:"
+          ls -la e2e/fixtures/ || echo "No fixtures directory yet"
           
-          # ファイルサイズの確認（0バイトでないことを確認）
-          for file in public/uploads/*.wav; do
-            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
-            echo "  - $(basename "$file"): ${size} bytes"
-          done
+          # Verify uploads
+          echo "📁 Uploads directory:"
+          ls -la public/uploads/ || echo "No uploads directory yet"
 
       - name: Run E2E tests - ${{ matrix.browser }}
         env:
