@@ -38,6 +38,25 @@ export function getWorkerID(): string {
 }
 
 /**
+ * E2Eテストセッション用の一意のIDを生成
+ * 各テスト実行（ターミナル）ごとに一意のデータベースを作成するため
+ */
+export function generateSessionID(): string {
+  const pid = process.pid;
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `s${pid.toString(36)}_${timestamp}_${random}`;
+}
+
+/**
+ * セッションIDを取得（環境変数から）
+ * 環境変数に設定されていない場合はnullを返す
+ */
+export function getSessionID(): string | null {
+  return process.env.E2E_SESSION_ID || null;
+}
+
+/**
  * Worker固有のデータベース名を生成
  * PostgreSQLの命名規則に従って安全な名前を生成
  */
@@ -48,6 +67,17 @@ export function getWorkerDbName(workerId?: string): string {
   return `${E2E_DB_BASE_NAME}_${sanitizedWid}`;
 }
 
+/**
+ * セッション固有のデータベース名を生成
+ * PostgreSQLの命名規則に従って安全な名前を生成
+ */
+export function getSessionDbName(sessionId?: string): string {
+  const sid = sessionId || getSessionID() || generateSessionID();
+  // ハイフンをアンダースコアに変換、英数字とアンダースコアのみを許可
+  const sanitizedSid = sid.replace(/[^a-zA-Z0-9_]/g, '_');
+  return `${E2E_DB_BASE_NAME}_${sanitizedSid}`;
+}
+
 // 管理用のデータベースURL（postgres データベースに接続）
 const ADMIN_DATABASE_URL = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/postgres`;
 
@@ -55,6 +85,12 @@ const ADMIN_DATABASE_URL = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E
 export function getE2EDatabaseURL(workerId?: string): string {
   const workerDbName = getWorkerDbName(workerId);
   return `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${workerDbName}`;
+}
+
+// E2E用のデータベースURL（セッション固有）
+export function getSessionDatabaseURL(sessionId?: string): string {
+  const sessionDbName = getSessionDbName(sessionId);
+  return `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${sessionDbName}`;
 }
 
 // 後方互換性のためのエクスポート（デフォルトWorker用）
@@ -194,7 +230,7 @@ export async function seedTemplateDatabase() {
 
   try {
     const { stdout, stderr } = await execAsync(
-      `DATABASE_URL="${TEMPLATE_DATABASE_URL}" tsx scripts/seed-test-data.ts`,
+      `DATABASE_URL="${TEMPLATE_DATABASE_URL}" npx tsx scripts/seed-test-data.ts`,
       { cwd: process.cwd() },
     );
 
@@ -350,7 +386,7 @@ export async function setupTemplate() {
 /**
  * 最適化されたE2E環境のセットアップ
  */
-export async function setupOptimizedE2EEnvironment(workerId?: string) {
+export async function setupOptimizedE2EEnvironment(workerId?: string): Promise<string> {
   const startTime = Date.now();
   const workerDbName = getWorkerDbName(workerId);
 
@@ -372,9 +408,174 @@ export async function setupOptimizedE2EEnvironment(workerId?: string) {
     console.log(
       `✅ E2E environment setup completed for ${workerDbName} in ${(duration / 1000).toFixed(2)}s`,
     );
+
+    // データベースURLを返す
+    const dbUrl = `postgresql://${E2E_DB_USER}:${E2E_DB_PASSWORD}@${E2E_DB_HOST}:${E2E_DB_PORT}/${workerDbName}`;
+    return dbUrl;
   } catch (error) {
     console.error(`❌ E2E environment setup failed for ${workerDbName}:`, error);
     throw error;
+  }
+}
+
+/**
+ * セッション用のE2Eデータベースを作成
+ */
+export async function createSessionDatabase(sessionId?: string) {
+  const sessionDbName = getSessionDbName(sessionId);
+  console.log(`⚡ Creating E2E session database from template: ${sessionDbName}...`);
+
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: ADMIN_DATABASE_URL,
+      },
+    },
+  });
+
+  try {
+    // 既存の接続を切断
+    const terminateResult = await prisma.$executeRawUnsafe(`
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE datname = '${sessionDbName}' AND pid <> pg_backend_pid()
+    `);
+
+    console.log(
+      `🔌 Terminated ${Array.isArray(terminateResult) ? terminateResult.length : 0} connections for ${sessionDbName}`,
+    );
+
+    // 接続切断の完了を待つ
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // E2Eデータベースを削除（リトライ機構付き）
+    let dropRetries = 3;
+    while (dropRetries > 0) {
+      try {
+        await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${sessionDbName}`);
+        console.log(`🗑️ Successfully dropped database: ${sessionDbName}`);
+        break;
+      } catch (dropError) {
+        dropRetries--;
+        if (dropRetries === 0) {
+          console.error(`❌ Failed to drop database after retries: ${sessionDbName}`, dropError);
+          throw dropError;
+        }
+        console.log(`⏳ Retrying database drop (${3 - dropRetries}/3): ${sessionDbName}`);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    // テンプレートからE2Eデータベースを作成（超高速）
+    await prisma.$executeRawUnsafe(`
+      CREATE DATABASE ${sessionDbName} 
+      WITH TEMPLATE ${E2E_TEMPLATE_DB_NAME}
+    `);
+
+    console.log(`✅ E2E session database created from template successfully: ${sessionDbName}`);
+  } catch (error) {
+    console.error(
+      `❌ Failed to create E2E session database from template: ${sessionDbName}`,
+      error,
+    );
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
+ * セッション用のE2E環境セットアップ
+ */
+export async function setupSessionE2EEnvironment(sessionId?: string): Promise<string> {
+  const startTime = Date.now();
+  const actualSessionId = sessionId || generateSessionID();
+  const sessionDbName = getSessionDbName(actualSessionId);
+
+  try {
+    // テンプレートが最新かチェック
+    const templateUpToDate = await isTemplateUpToDate();
+
+    if (!templateUpToDate) {
+      console.log('📋 Template is outdated or missing. Creating new template...');
+      await setupTemplate();
+    } else {
+      console.log('✅ Template is up to date');
+    }
+
+    // セッション用のデータベースを作成
+    await createSessionDatabase(actualSessionId);
+
+    const duration = Date.now() - startTime;
+    console.log(
+      `✅ E2E session environment setup completed for ${sessionDbName} in ${(duration / 1000).toFixed(2)}s`,
+    );
+
+    // データベースURLを返す
+    const dbUrl = getSessionDatabaseURL(actualSessionId);
+    return dbUrl;
+  } catch (error) {
+    console.error(`❌ E2E session environment setup failed for ${sessionDbName}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * セッション用のE2Eデータベースクリーンアップ
+ */
+export async function cleanupSessionDatabase(sessionId?: string) {
+  const sessionDbName = getSessionDbName(sessionId);
+  console.log(`🧹 Cleaning up E2E session database: ${sessionDbName}...`);
+
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: ADMIN_DATABASE_URL,
+      },
+    },
+  });
+
+  try {
+    // 接続を切断
+    const terminateResult = await prisma.$executeRawUnsafe(`
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE datname = '${sessionDbName}' AND pid <> pg_backend_pid()
+    `);
+
+    console.log(
+      `🔌 Terminated ${Array.isArray(terminateResult) ? terminateResult.length : 0} connections for cleanup: ${sessionDbName}`,
+    );
+
+    // 接続切断の完了を待つ
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // データベースを削除（リトライ機構付き）
+    let dropRetries = 3;
+    while (dropRetries > 0) {
+      try {
+        await prisma.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${sessionDbName}`);
+        console.log(`✅ E2E session database cleaned up successfully: ${sessionDbName}`);
+        break;
+      } catch (dropError) {
+        dropRetries--;
+        if (dropRetries === 0) {
+          console.error(
+            `❌ Failed to cleanup session database after retries: ${sessionDbName}`,
+            dropError,
+          );
+          throw dropError;
+        }
+        console.log(`⏳ Retrying cleanup (${3 - dropRetries}/3): ${sessionDbName}`);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+  } catch (error) {
+    console.error(`❌ Failed to cleanup E2E session database: ${sessionDbName}`, error);
+    // クリーンアップ時はエラーを投げずに警告のみ
+    console.warn(`⚠️ Cleanup may have failed, but continuing: ${sessionDbName}`);
+  } finally {
+    await prisma.$disconnect();
   }
 }
 

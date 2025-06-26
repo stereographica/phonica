@@ -2,12 +2,7 @@
 import { test as base, expect, BrowserContext, Page } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
-import {
-  setupOptimizedE2EEnvironment,
-  cleanupE2EDatabase,
-  getE2EDatabaseURL,
-  getWorkerID,
-} from '../../scripts/e2e-db-optimized';
+import { getSessionID, getSessionDatabaseURL } from '../../scripts/e2e-db-optimized';
 
 // キャッシュディレクトリ
 const CACHE_DIR = path.join(process.cwd(), '.e2e-cache');
@@ -32,81 +27,54 @@ type TestFixtures = {
 
 // Worker scopeフィクスチャの型定義
 type WorkerFixtures = {
-  // Worker固有のデータベース
-  workerDatabase: {
+  // セッション共有のデータベース
+  sessionDatabase: {
     databaseUrl: string;
-    workerId: string;
+    sessionId: string;
   };
 };
 
 // カスタムテストインスタンスを作成
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  // すべてのテストでWorker固有のデータベースを自動使用
+  // すべてのテストでセッション共有のデータベースを自動使用
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  page: async ({ page, workerDatabase: _workerDatabase }, use) => {
-    // workerDatabaseが自動的に初期化されることを保証
+  page: async ({ page, sessionDatabase: _sessionDatabase }, use) => {
+    // sessionDatabaseが自動的に初期化されることを保証
     await use(page);
   },
 
-  // API直接テストでもWorker固有のデータベースを自動使用
+  // API直接テストでもセッション共有のデータベースを自動使用
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  request: async ({ request, workerDatabase: _workerDatabase }, use) => {
-    // workerDatabaseが自動的に初期化されることを保証
+  request: async ({ request, sessionDatabase: _sessionDatabase }, use) => {
+    // sessionDatabaseが自動的に初期化されることを保証
     await use(request);
   },
-  // Worker固有のデータベース設定
-  workerDatabase: [
+  // セッション共有のデータベース設定
+  sessionDatabase: [
     async ({}, use) => {
       const isCI = process.env.CI === 'true';
-      const workerId = getWorkerID();
 
       if (isCI) {
         // CI環境では既存のデータベースを使用
-        console.log(
-          `🔧 CI environment detected - using existing test database for worker: ${workerId}`,
-        );
+        console.log('🔧 CI environment detected - using existing test database');
         const databaseUrl =
           process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/test_db';
 
-        await use({ databaseUrl, workerId });
+        await use({ databaseUrl, sessionId: 'ci' });
       } else {
-        // ローカル環境ではWorker固有のデータベースを使用
-        console.log(`🔧 Setting up database for worker: ${workerId}`);
-
-        // 元の環境変数を保存
-        const originalDatabaseUrl = process.env.DATABASE_URL;
-
-        try {
-          // Worker固有のデータベースをセットアップ
-          await setupOptimizedE2EEnvironment(workerId);
-          const databaseUrl = getE2EDatabaseURL(workerId);
-
-          // 環境変数を動的に設定してAPIリクエストでWorker固有のDBを使用
-          process.env.DATABASE_URL = databaseUrl;
-          console.log(
-            `🔗 Worker ${workerId} using database: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}`,
-          );
-
-          await use({ databaseUrl, workerId });
-        } catch (error) {
-          console.error(`❌ Failed to setup database for worker ${workerId}:`, error);
-          throw error;
-        } finally {
-          // 環境変数を元に戻す
-          if (originalDatabaseUrl) {
-            process.env.DATABASE_URL = originalDatabaseUrl;
-          } else {
-            delete process.env.DATABASE_URL;
-          }
-
-          // テスト完了後にクリーンアップ
-          try {
-            await cleanupE2EDatabase(workerId);
-            console.log(`✅ Cleaned up database for worker: ${workerId}`);
-          } catch (error) {
-            console.error(`⚠️  Failed to cleanup database for worker ${workerId}:`, error);
-          }
+        // ローカル環境ではセッション共有のデータベースを使用
+        const sessionId = getSessionID();
+        if (!sessionId) {
+          throw new Error('E2E_SESSION_ID is not set. Please run tests through npm run e2e');
         }
+
+        const databaseUrl = getSessionDatabaseURL(sessionId);
+        console.log(`🔗 Using session database: ${databaseUrl.replace(/:[^:@]*@/, ':***@')}`);
+
+        // 環境変数をセッションデータベースに設定
+        process.env.DATABASE_URL = databaseUrl;
+
+        await use({ databaseUrl, sessionId });
       }
     },
     { scope: 'worker' },
@@ -114,7 +82,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
   // 認証状態をキャッシュするコンテキスト
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  authenticatedContext: async ({ browser, workerDatabase: _workerDatabase }, use) => {
+  authenticatedContext: async ({ browser, sessionDatabase: _sessionDatabase }, use) => {
     let context: BrowserContext;
 
     // 認証状態のキャッシュが存在するか確認
@@ -141,8 +109,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // 静的リソースをキャッシュするページ（現在は通常のpageと同じ）
   // 将来的により安全なキャッシュ実装を追加予定
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  cachedPage: async ({ page, workerDatabase: _workerDatabase }, use) => {
-    // workerDatabaseが自動的に初期化されることを保証
+  cachedPage: async ({ page, sessionDatabase: _sessionDatabase }, use) => {
+    // sessionDatabaseが自動的に初期化されることを保証
     await use(page);
   },
 });

@@ -154,11 +154,5 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  // webServer設定はコメントアウト - run-e2e-with-db.tsが独自にサーバーを管理
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  //   timeout: 120 * 1000,
-  // },
+  // 開発サーバーはrun-e2e.tsで管理するため、ここでは設定しない
 });

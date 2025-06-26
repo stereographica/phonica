@@ -1,4 +1,5 @@
 import { cleanupAllWorkerDatabases } from '../../scripts/e2e-db-optimized';
+import { cleanupE2EFiles } from '../../scripts/cleanup-e2e-files';
 
 /**
  * Playwright グローバルテアダウン
@@ -14,6 +15,10 @@ async function globalTeardown() {
   }
 
   try {
+    // E2Eテストファイルのクリーンアップ
+    console.log('🧹 Cleaning up E2E test files...');
+    cleanupE2EFiles();
+
     // 全Workerのデータベースをクリーンアップ
     console.log('🧹 Cleaning up all worker databases...');
     await cleanupAllWorkerDatabases();
