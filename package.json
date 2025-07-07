@@ -73,7 +73,7 @@
     "next": "^15.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-hook-form": "^7.58.0",
+    "react-hook-form": "^7.60.0",
     "react-leaflet": "^5.0.0",
     "recharts": "^2.15.4",
     "tailwind-merge": "^3.3.1",
