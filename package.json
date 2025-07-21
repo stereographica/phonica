@@ -97,7 +97,7 @@
     "@babel/preset-typescript": "^7.27.1",
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.52.0",
-    "@swc/jest": "^0.2.38",
+    "@swc/jest": "^0.2.39",
     "@tanstack/react-query-devtools": "^5.80.7",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
