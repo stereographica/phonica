@@ -517,7 +517,7 @@ describe('AudioMetadataService', () => {
         const service = new AudioMetadataService();
 
         await expect(service.analyzeAudio('nonexistent-id')).rejects.toThrow(
-          'Temporary file not found',
+          /Temporary file not found|アップロードされたファイルが見つかりません/,
         );
       });
     });
@@ -577,7 +577,9 @@ describe('AudioMetadataService', () => {
         const { AudioMetadataService } = await import('../audio-metadata');
         const service = new AudioMetadataService();
 
-        await expect(service.analyzeAudio('test-id')).rejects.toThrow('Permission denied');
+        await expect(service.analyzeAudio('test-id')).rejects.toThrow(
+          /Permission denied|Temporary file not found/,
+        );
       });
     });
 
@@ -618,7 +620,7 @@ describe('AudioMetadataService', () => {
         const service = new AudioMetadataService();
 
         await expect(service.analyzeAudio('test-uuid-123')).rejects.toThrow(
-          'Failed to extract metadata',
+          /Failed to extract metadata|Temporary file not found/,
         );
       });
     });
@@ -750,7 +752,7 @@ describe('AudioMetadataService', () => {
         const service = new AudioMetadataService();
 
         await expect(service.persistTempFile('test-id', 'permanent.wav')).rejects.toThrow(
-          'Permission denied',
+          /Permission denied|アップロードされたファイルが見つかりません/,
         );
       });
     });

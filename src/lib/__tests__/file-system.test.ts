@@ -396,6 +396,9 @@ describe('file-system', () => {
 
         await deleteFile(testPath, { skipValidation: true });
 
+        // Wait for any pending async operations
+        await new Promise((resolve) => setImmediate(resolve));
+
         expect(mockUnlink).toHaveBeenCalledWith(testPath);
         expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"success":true'));
       });
