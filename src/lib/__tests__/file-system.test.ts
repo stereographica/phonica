@@ -487,16 +487,24 @@ describe('file-system', () => {
         const mockUnlink = jest.fn().mockRejectedValue(error);
         const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
 
+        // Ensure clean module state
+        jest.resetModules();
+
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
-          access: jest.fn(),
-          rename: jest.fn(),
-          readdir: jest.fn(),
+          access: jest.fn().mockResolvedValue(undefined),
+          rename: jest.fn().mockResolvedValue(undefined),
+          readdir: jest.fn().mockResolvedValue([]),
         }));
 
         const { deleteFile } = await import('../file-system');
 
         await expect(deleteFile(testPath, { skipValidation: true })).resolves.not.toThrow();
+
+        // Wait for async operations
+        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
         expect(consoleInfoSpy).toHaveBeenCalledWith(
           expect.stringContaining('File already deleted or not found'),
         );
@@ -511,11 +519,14 @@ describe('file-system', () => {
         const mockUnlink = jest.fn().mockRejectedValue(error);
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
+        // Ensure clean module state
+        jest.resetModules();
+
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
-          access: jest.fn(),
-          rename: jest.fn(),
-          readdir: jest.fn(),
+          access: jest.fn().mockResolvedValue(undefined),
+          rename: jest.fn().mockResolvedValue(undefined),
+          readdir: jest.fn().mockResolvedValue([]),
         }));
 
         const { deleteFile } = await import('../file-system');
@@ -523,6 +534,11 @@ describe('file-system', () => {
         await expect(deleteFile(testPath, { skipValidation: true })).rejects.toThrow(
           'Permission denied',
         );
+
+        // Wait for async operations
+        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
         expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"success":false'));
 
         consoleSpy.mockRestore();
@@ -534,16 +550,23 @@ describe('file-system', () => {
         const mockUnlink = jest.fn().mockResolvedValue(undefined);
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
+        // Ensure clean module state
+        jest.resetModules();
+
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
-          access: jest.fn(),
-          rename: jest.fn(),
-          readdir: jest.fn(),
+          access: jest.fn().mockResolvedValue(undefined),
+          rename: jest.fn().mockResolvedValue(undefined),
+          readdir: jest.fn().mockResolvedValue([]),
         }));
 
         const { deleteFile } = await import('../file-system');
 
         await deleteFile(testPath, { skipValidation: true, materialId: 'mat-123' });
+
+        // Wait for async operations
+        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"materialId":"mat-123"'));
 
