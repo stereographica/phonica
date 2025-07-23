@@ -563,14 +563,18 @@ describe('zip-generation-queue', () => {
           updateProgress: jest.fn().mockResolvedValue(undefined),
         };
 
-        // Simulate successful completion
+        // Simulate successful completion - wait for async operations
         mockOutput.on.mockImplementation((event: string, callback: () => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(), 5);
+            // Wait for all Promise.all operations to complete before triggering close
+            setTimeout(() => callback(), 50);
           }
         });
 
         const result = await workerProcessFn(mockJob);
+
+        // Wait for all async operations to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Note: In isolateModules environment, assertion on mocked Prisma calls is complex
         // The test verifies the core functionality - ZIP generation completes successfully
@@ -754,14 +758,18 @@ describe('zip-generation-queue', () => {
           updateProgress: jest.fn(),
         };
 
-        // Simulate successful completion
+        // Simulate successful completion - wait for async operations
         mockOutput.on.mockImplementation((event: string, callback: () => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(), 5);
+            // Wait for all Promise.all operations to complete before triggering close
+            setTimeout(() => callback(), 50);
           }
         });
 
         await workerProcessFn(mockJob);
+
+        // Wait for all async operations to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify file.append was called instead of file.file for missing file
         expect(mockArchive.append).toHaveBeenCalledWith('File not found: Missing File Material', {
