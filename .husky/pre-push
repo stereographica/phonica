@@ -7,7 +7,7 @@ echo "🚀 Pre-push checks starting..."
 echo "🌐 Running E2E tests..."
 echo "⏱️  This may take several minutes..."
 
-npm run e2e:chromium
+npm run e2e
 if [ $? -ne 0 ]; then
   echo "❌ E2E tests failed! Please fix failing E2E tests before pushing."
   echo "💡 Tip: You can run 'npm run e2e:ui' to debug failing tests visually."
