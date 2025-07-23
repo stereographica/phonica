@@ -137,7 +137,7 @@ export class WaitHelper {
 
   /**
    * フォームの入力値が反映されるまで待機
-   * Firefox/WebKitでの入力遅延に対応
+   * ブラウザでの入力遅延に対応
    */
   async waitForInputValue(
     selector: string,
@@ -270,22 +270,18 @@ export class WaitHelper {
   }
 
   /**
-   * ブラウザ固有の安定性待機
-   * Firefox/WebKitで発生する特有の問題に対処
+   * ブラウザの安定性待機
+   * DOM更新の反映を待つ
    */
   async waitForBrowserStability() {
-    const browserName = this.page.context().browser()?.browserType().name() || 'unknown';
-
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      // DOM更新の反映を待つ
-      await this.page.evaluate(() => {
-        return new Promise((resolve) => {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(resolve);
-          });
+    // DOM更新の反映を待つ
+    await this.page.evaluate(() => {
+      return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve);
         });
       });
-    }
+    });
   }
 
   /**

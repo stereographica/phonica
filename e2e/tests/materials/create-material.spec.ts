@@ -39,7 +39,7 @@ test.describe('@materials Create Material', () => {
   });
 
   test('shows errors when required fields are empty', async ({ page }) => {
-    // Server Actionsに移行したため、WebKitでも動作するはず
+    // Server Actionsに移行したため、安定して動作する
 
     // ファイル選択問題修正により再有効化
     // test.skip();

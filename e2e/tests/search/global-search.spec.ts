@@ -159,16 +159,64 @@ test.describe('@smoke @workflow Global Search', () => {
     // 検索を実行
     const searchInput = page.getByPlaceholder('Search materials...');
     await searchInput.click();
-    await searchInput.fill('test');
+    await searchInput.fill('森');
 
-    // 結果が表示されるのを待つ
-    await page.waitForTimeout(500);
+    // 検索結果のポップオーバーが表示されるのを待つ
+    const searchResults = page.getByTestId('global-search-results');
+    await expect(searchResults).toBeVisible({ timeout: 5000 });
 
-    // Tab キーで結果間を移動できることを確認
-    await page.keyboard.press('Tab');
+    // 結果が存在することを確認
+    await expect(searchResults.getByRole('button', { name: /森の朝/ })).toBeVisible();
 
-    // フォーカスされた要素が存在することを確認
+    // ArrowDown キーで下に移動
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(200);
+
+    // ArrowUp キーで上に移動
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(200);
+
+    // フォーカスが適切に管理されていることを確認
     const focusedElement = await page.evaluate(() => document.activeElement?.tagName);
     expect(focusedElement).toBeTruthy();
+
+    // Enterキーで選択機能のテスト
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+
+    // 検索結果が閉じることを確認
+    await expect(searchResults).not.toBeVisible();
+  });
+
+  test('search result selection with Enter key navigates correctly', async ({ page }) => {
+    // 検索を実行（必ず存在するシードデータの一部）
+    const searchInput = page.getByPlaceholder('Search materials...');
+    await searchInput.click();
+    await searchInput.fill('e2e'); // E2E Test Materialは必ず存在する
+
+    // 検索結果のポップオーバーが表示されるのを待つ
+    const searchResults = page.getByTestId('global-search-results');
+    await expect(searchResults).toBeVisible({ timeout: 5000 });
+
+    // 検索結果があることを確認（E2E Test Materialが存在するはず）
+    await expect(searchResults.getByText('E2E Test Material')).toBeVisible({ timeout: 3000 });
+
+    // ArrowDownで最初の結果を選択し、Enterで決定
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Enter');
+
+    // ページが遷移することを確認（素材詳細ページまたはモーダル）
+    await page.waitForTimeout(1000);
+
+    // URLが変わるかモーダルが開くかを確認
+    const currentUrl = page.url();
+    const hasModal = await page
+      .locator('[role="dialog"]')
+      .isVisible()
+      .catch(() => false);
+
+    // どちらかの状態になっていることを確認
+    expect(currentUrl.includes('/materials/') || hasModal).toBe(true);
   });
 });

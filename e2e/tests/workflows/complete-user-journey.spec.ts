@@ -1,12 +1,5 @@
 import { test, expect } from '../../fixtures/test-fixtures';
-import {
-  NavigationHelper,
-  FormHelper,
-  ModalHelper,
-  TableHelper,
-  CrossBrowserHelper,
-  WaitHelper,
-} from '../../helpers';
+import { NavigationHelper, FormHelper, ModalHelper, TableHelper, WaitHelper } from '../../helpers';
 import * as path from 'path';
 
 test.describe.configure({ mode: 'serial' }); // データベースの状態を共有するため順次実行
@@ -15,7 +8,6 @@ test.describe('@workflow Complete User Journey', () => {
   let form: FormHelper;
   let modal: ModalHelper;
   let table: TableHelper;
-  let crossBrowser: CrossBrowserHelper;
   let wait: WaitHelper;
 
   test.beforeEach(async ({ page }) => {
@@ -23,11 +15,10 @@ test.describe('@workflow Complete User Journey', () => {
     form = new FormHelper(page);
     modal = new ModalHelper(page);
     table = new TableHelper(page);
-    crossBrowser = new CrossBrowserHelper(page);
     wait = new WaitHelper(page);
   });
 
-  test('新規ユーザーの素材管理完全フロー', async ({ page, browserName }) => {
+  test('新規ユーザーの素材管理完全フロー', async ({ page }) => {
     // WebKitではFormDataのboundaryエラーがあるため、このテストをスキップ
     // Server Actionsに移行したため、全ブラウザで動作
 
@@ -96,9 +87,7 @@ test.describe('@workflow Complete User Journey', () => {
       await wait.waitForText('p:has-text("Selected file:")', 'test-audio.wav', { timeout: 5000 });
     } catch {
       // ファイル選択の確認ができない場合でも、アップロードは成功している可能性があるため続行
-      console.warn(
-        `File selection confirmation timeout. Browser: ${crossBrowser.getBrowserName()}`,
-      );
+      console.warn('File selection confirmation timeout. Browser: Chrome');
     }
 
     // メタデータ抽出が完了するまで待つ
@@ -161,7 +150,7 @@ test.describe('@workflow Complete User Journey', () => {
         .textContent()
         .catch(() => 'No error message');
       console.error(`POST request to /api/materials was not sent. Error: ${errorText}`);
-      console.error(`Browser: ${crossBrowser.getBrowserName()}`);
+      console.error('Browser: Chrome');
 
       // フォームの状態を確認
       const isSubmitting = await page
@@ -181,54 +170,28 @@ test.describe('@workflow Complete User Journey', () => {
     // ページが完全に読み込まれるまで待機
     await wait.waitForNetworkStable();
 
-    // WebKitとFirefoxで特別な待機処理
-    // browserNameはすでにパラメータとして受け取っている
-
-    // Firefox/WebKitでは追加の待機が必要
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      try {
-        // API応答を待つか、データが表示されるかのいずれか早い方
-        await Promise.race([
-          wait.waitForApiResponse('/api/materials', 'GET'),
-          wait.waitForDataLoad({ minRows: 1 }),
-        ]);
-      } catch {
-        // タイムアウトの場合はページをリロードして再試行
-        console.log('Initial data load timeout, reloading page...');
-        await page.reload();
-        await wait.waitForNetworkStable();
-      }
-    }
+    // データがロードされるまで待機
 
     // データが読み込まれるまで待機
     await wait.waitForDataLoad({ minRows: 1, timeout: 10000 });
 
     // 新しく作成した素材が表示されることを確認
     // まず素材テーブルが存在することを確認
-    await crossBrowser.waitForElementVisible('tbody', { timeout: 15000 });
+    await wait.waitForElementVisible('tbody', 15000);
 
-    // WebKit/Firefoxでは追加の待機が必要
-    if (browserName === 'webkit' || browserName === 'firefox') {
-      // テーブルにデータが表示されるまで待機
-      await wait.waitForDataLoad({
-        selector: 'tbody td',
-        minRows: 1,
-        timeout: 15000,
-      });
-
-      // ブラウザの安定性を確保
-      await wait.waitForBrowserStability();
-    }
+    // テーブルにデータが表示されるまで待機
+    await wait.waitForDataLoad({
+      selector: 'tbody td',
+      minRows: 1,
+      timeout: 15000,
+    });
 
     // 素材が表示されるまで待機（完全なタイトルで検索し、first()を使用）
     console.log(`Waiting for material: ${uniqueMaterialTitle}`);
 
-    // Firefox/WebKitでは追加の待機が必要な場合がある
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      // データが完全に読み込まれるまで待機
-      await wait.waitForBrowserStability();
-      await wait.waitForNetworkStable({ timeout: 3000 });
-    }
+    // データが完全に読み込まれるまで待機
+    await wait.waitForBrowserStability();
+    await wait.waitForNetworkStable({ timeout: 3000 });
 
     // 作成した素材を検索して確実に見つける
     // 素材が多い場合、ページネーションで見つからない可能性があるため、
@@ -250,17 +213,13 @@ test.describe('@workflow Complete User Journey', () => {
     const titleSearchInput = page.locator('input#titleFilter');
     await titleSearchInput.fill('forest');
 
-    // Firefox/WebKitでは入力値が確実に反映されるまで待機
-    if (crossBrowser.getBrowserName() === 'firefox' || crossBrowser.getBrowserName() === 'webkit') {
-      await wait.waitForInputValue('input#titleFilter', 'forest');
-    }
+    // 入力値が確実に反映されるまで待機
+    await wait.waitForInputValue('input#titleFilter', 'forest');
 
     // 検索を実行前に入力値を確認（デバッグ用）
     const inputValue = await titleSearchInput.inputValue();
     if (inputValue !== 'forest') {
-      console.error(
-        `Input value is '${inputValue}' instead of 'forest'. Browser: ${crossBrowser.getBrowserName()}`,
-      );
+      console.error(`Input value is '${inputValue}' instead of 'forest'. Browser: Chrome`);
     }
 
     // 検索を実行
@@ -276,7 +235,7 @@ test.describe('@workflow Complete User Journey', () => {
 
     // 5. 素材詳細確認（検索フィルターを維持したまま）
     // 作成した素材のタイトルボタンをクリックして詳細モーダルを開く
-    await crossBrowser.waitForStability();
+    await wait.waitForBrowserStability();
 
     const materialButtonForDetail = page
       .locator(`button:has-text("${uniqueMaterialTitle}")`)
@@ -285,7 +244,7 @@ test.describe('@workflow Complete User Journey', () => {
     await materialButtonForDetail.click();
 
     // 詳細モーダルが開くことを確認
-    await crossBrowser.waitForModalOpen();
+    await modal.waitForOpen();
 
     // 詳細情報が正しく表示されることを確認
     await expect(page.locator('[role="dialog"]')).toContainText(uniqueMaterialTitle);
@@ -297,7 +256,7 @@ test.describe('@workflow Complete User Journey', () => {
 
     // モーダルを閉じる
     await page.keyboard.press('Escape');
-    await crossBrowser.waitForModalClose();
+    await modal.waitForClose();
 
     // 検索をクリア
     await titleSearchInput.clear();
@@ -317,7 +276,7 @@ test.describe('@workflow Complete User Journey', () => {
       await page.click('button:has-text("Apply Filters")');
 
       // URLの更新を待機（ブラウザによって遅延がある可能性）
-      await crossBrowser.waitForStability();
+      await wait.waitForBrowserStability();
 
       // URLにクエリパラメータが含まれることを確認
       const currentUrl = page.url();
@@ -341,51 +300,11 @@ test.describe('@workflow Complete User Journey', () => {
     // 6. ワークフロー完了確認
     // 作成した素材が一覧にあることを確認するため、再度タイトルフィルターを使用
 
-    // Firefoxでは前のフィルター操作の影響が残ることがあるため、
-    // ページをリロードしてから検索する
-    const currentBrowserName = crossBrowser.getBrowserName();
-    if (currentBrowserName === 'firefox') {
-      console.log('Reloading page for Firefox before final check...');
-      await page.reload();
-      await wait.waitForNetworkStable();
-      await wait.waitForBrowserStability();
-
-      // titleSearchInputを再取得
-      const freshTitleSearchInput = page.locator('input#titleFilter');
-      await freshTitleSearchInput.fill(uniqueMaterialTitle);
-      await page.click('button:has-text("Apply Filters")');
-      await wait.waitForNetworkStable();
-
-      // Firefoxでは追加の待機
-      await wait.waitForBrowserStability();
-      await wait.waitForNetworkStable({ timeout: 3000 });
-    } else {
-      await titleSearchInput.fill(uniqueMaterialTitle);
-      await page.click('button:has-text("Apply Filters")');
-      await wait.waitForNetworkStable();
-
-      // WebKitでは追加の待機とリロードが必要な場合がある
-      const browserName = page.context().browser()?.browserType().name() || 'unknown';
-      if (browserName === 'webkit') {
-        await wait.waitForBrowserStability();
-        await wait.waitForNetworkStable({ timeout: 3000 });
-
-        // 素材が見つからない場合は、ページをリロードしてもう一度検索
-        const materialVisible = await page
-          .locator(`td:has-text("${uniqueMaterialTitle}")`)
-          .first()
-          .isVisible();
-        if (!materialVisible) {
-          console.log('WebKit: Material not visible, reloading page and searching again...');
-          await page.reload();
-          await wait.waitForNetworkStable();
-          await titleSearchInput.fill(uniqueMaterialTitle);
-          await page.click('button:has-text("Apply Filters")');
-          await wait.waitForNetworkStable();
-          await wait.waitForBrowserStability();
-        }
-      }
-    }
+    // 最終確認のためのフィルター検索
+    await titleSearchInput.fill(uniqueMaterialTitle);
+    await page.click('button:has-text("Apply Filters")');
+    await wait.waitForNetworkStable();
+    await wait.waitForBrowserStability();
 
     // 素材が表示されることを最終確認（タイムアウトを延長）
     await expect(page.locator(`td:has-text("${uniqueMaterialTitle}")`).first()).toBeVisible({
@@ -412,7 +331,7 @@ test.describe('@workflow Complete User Journey', () => {
       await titleButton.click();
 
       // 詳細モーダルが開くことを確認
-      await crossBrowser.waitForModalOpen();
+      await modal.waitForOpen();
 
       // モーダル内で素材タイトルが表示されることを確認
       if (materialTitle) {
@@ -441,7 +360,7 @@ test.describe('@workflow Complete User Journey', () => {
 
       // モーダルを閉じる
       await page.keyboard.press('Escape');
-      await crossBrowser.waitForModalClose();
+      await modal.waitForClose();
 
       // 検索フィルタリングのテスト
       const titleSearchInput = page.locator('input#titleFilter');

@@ -1,15 +1,15 @@
 import { test, expect } from '../fixtures/test-fixtures';
-import { MaterialHelper } from '../helpers/material-helper';
+// import { MaterialHelper } from '../helpers/material-helper';
 import { WaitHelper } from '../helpers/wait';
 import { ModalHelper } from '../helpers/modal';
 
 test.describe('Audio Player Debug', () => {
-  let materialHelper: MaterialHelper;
+  // let materialHelper: MaterialHelper;
   let waitHelper: WaitHelper;
   let modalHelper: ModalHelper;
 
   test.beforeEach(async ({ page }) => {
-    materialHelper = new MaterialHelper(page);
+    // materialHelper = new MaterialHelper(page);
     waitHelper = new WaitHelper(page);
     modalHelper = new ModalHelper(page);
 
@@ -19,17 +19,23 @@ test.describe('Audio Player Debug', () => {
 
   test('Debug: Audio要素の存在確認', async ({ page }) => {
     // 1. 素材詳細モーダルを開く
-    await materialHelper.navigateToExistingMaterial('温泉の音 ♨️');
+    // 素材一覧ページに移動
+    await page.goto('/materials');
+    await page.waitForSelector('table tbody tr', { timeout: 5000 });
+
+    // 最初の素材をクリックしてモーダルを開く
+    const firstMaterialButton = page.locator('tbody tr').first().locator('button.text-blue-600');
+    await firstMaterialButton.click();
     await modalHelper.waitForOpen();
 
     // 2. AudioPlayerコンテナの存在確認
     const audioPlayerContainer = page.locator('[data-testid="audio-player"]');
-    await expect(audioPlayerContainer).toBeVisible({ timeout: 10000 });
+    await expect(audioPlayerContainer).toBeVisible({ timeout: 5000 });
     console.log('✅ AudioPlayerコンテナが表示されました');
 
     // 3. Playボタンの存在確認
     const playButton = page.locator('button[title="Play"]');
-    await expect(playButton).toBeVisible({ timeout: 10000 });
+    await expect(playButton).toBeVisible({ timeout: 5000 });
     console.log('✅ Playボタンが表示されました');
 
     // 4. audio要素の存在確認
@@ -91,12 +97,18 @@ test.describe('Audio Player Debug', () => {
     );
 
     // 素材詳細モーダルを開く
-    await materialHelper.navigateToExistingMaterial('温泉の音 ♨️');
+    // 素材一覧ページに移動
+    await page.goto('/materials');
+    await page.waitForSelector('table tbody tr', { timeout: 5000 });
+
+    // 最初の素材をクリックしてモーダルを開く
+    const firstMaterialButton = page.locator('tbody tr').first().locator('button.text-blue-600');
+    await firstMaterialButton.click();
     await modalHelper.waitForOpen();
 
     // AudioPlayerコンテナを待つ
     const audioPlayerContainer = page.locator('[data-testid="audio-player"]');
-    await expect(audioPlayerContainer).toBeVisible({ timeout: 10000 });
+    await expect(audioPlayerContainer).toBeVisible({ timeout: 5000 });
 
     // Playボタンをクリック
     const playButton = page.locator('button[title="Play"]');

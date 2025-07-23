@@ -1,0 +1,1725 @@
+/**
+ * @jest-environment node
+ */
+
+// Mock all dependencies
+jest.mock('fs/promises');
+jest.mock('fs');
+jest.mock('bullmq');
+jest.mock('ioredis');
+jest.mock('@/lib/prisma');
+jest.mock('archiver');
+jest.mock('uuid');
+
+// Import types only, functions will be imported in each test
+import type {
+  ZipGenerationJobData,
+  ZipGenerationResult,
+} from '../zip-generation-queue';
+import { prisma } from '@/lib/prisma';
+import fs from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { Queue, Worker } from 'bullmq';
+import Redis from 'ioredis';
+import archiver from 'archiver';
+import { v4 as uuidv4 } from 'uuid';
+
+describe('zip-generation-queue', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    
+    jest.mocked(uuidv4).mockReturnValue('test-uuid-1234');
+    jest.mocked(prisma.material.findMany).mockResolvedValue([]);
+    
+    // デフォルトでテスト環境に設定
+    process.env = { ...originalEnv, NODE_ENV: 'test' };
+    
+    // Clear module cache to ensure fresh imports
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  describe('getZipGenerationQueue', () => {
+    it('should return null in test environment', async () => {
+      process.env.NODE_ENV = 'test';
+      const { getZipGenerationQueue } = await import('../zip-generation-queue');
+      const queue = getZipGenerationQueue();
+      expect(queue).toBeNull();
+    });
+
+    it('should create queue in non-test environment', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Create mock functions
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockGetJobs = jest.fn().mockResolvedValue([]);
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+        
+        const { getZipGenerationQueue } = await import('../zip-generation-queue');
+        const { Queue } = await import('bullmq');
+        const Redis = await import('ioredis');
+        
+        const queue = getZipGenerationQueue();
+        
+        // Queue should be created (not null)
+        expect(queue).not.toBeNull();
+        expect(Queue).toHaveBeenCalledWith('zip-generation', expect.any(Object));
+        expect(Redis.default).toHaveBeenCalledWith(expect.any(Object));
+      });
+    });
+  });
+
+  describe('getZipGenerationWorker', () => {
+    it('should return null in test environment', async () => {
+      process.env.NODE_ENV = 'test';
+      const { getZipGenerationWorker } = await import('../zip-generation-queue');
+      const worker = getZipGenerationWorker();
+      expect(worker).toBeNull();
+    });
+
+    it('should create worker in non-test environment', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockWorkerClose = jest.fn().mockResolvedValue(undefined);
+        const mockDisconnect = jest.fn();
+        
+        // Mock Redis and Worker before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: mockWorkerClose,
+          })),
+        }));
+        
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+        const { Worker } = await import('bullmq');
+        
+        const worker = getZipGenerationWorker();
+        
+        // Worker should be created (not null)
+        expect(worker).not.toBeNull();
+        expect(Worker).toHaveBeenCalledWith(
+          'zip-generation',
+          expect.any(Function),
+          expect.any(Object)
+        );
+      });
+    });
+  });
+
+  describe('scheduleZipGeneration', () => {
+    it('should return null when queue is not available', async () => {
+      process.env.NODE_ENV = 'test';
+      
+      const { scheduleZipGeneration } = await import('../zip-generation-queue');
+      const result = await scheduleZipGeneration(['material-1', 'material-2']);
+      
+      expect(result).toBeNull();
+      expect(console.warn).toHaveBeenCalledWith(
+        '[ZipGeneration] Queue not available - skipping ZIP generation'
+      );
+    });
+
+    it('should schedule ZIP generation when queue is available', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Create mock functions with proper structure
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockGetJobs = jest.fn().mockResolvedValue([]);
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        // Import functions after mocks are set up
+        const { getZipGenerationQueue, scheduleZipGeneration } = await import('../zip-generation-queue');
+
+        // Call getZipGenerationQueue first to initialize with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await scheduleZipGeneration(['material-1', 'material-2']);
+        
+        expect(result).toBe('test-uuid-1234');
+        expect(mockAdd).toHaveBeenCalledWith('generate-zip', {
+          materialIds: ['material-1', 'material-2'],
+          requestId: 'test-uuid-1234',
+          requestedAt: expect.any(String),
+        });
+        expect(console.log).toHaveBeenCalledWith(
+          expect.stringContaining('Scheduled ZIP generation job job-123')
+        );
+      });
+    });
+  });
+
+  describe('getZipGenerationStatus', () => {
+    it('should return null when queue is not available', async () => {
+      process.env.NODE_ENV = 'test';
+      
+      const { getZipGenerationStatus } = await import('../zip-generation-queue');
+      const result = await getZipGenerationStatus('test-request-id');
+      
+      expect(result).toBeNull();
+    });
+
+    it('should return pending status for waiting job', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockGetJobs = jest.fn().mockResolvedValue([
+          {
+            data: { requestId: 'test-request-id' },
+            getState: jest.fn().mockResolvedValue('waiting'),
+          },
+        ]);
+        
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        const { getZipGenerationQueue, getZipGenerationStatus } = await import('../zip-generation-queue');
+
+        // Initialize queue with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await getZipGenerationStatus('test-request-id');
+        
+        expect(result).toEqual({ status: 'pending' });
+        expect(mockGetJobs).toHaveBeenCalledWith(['waiting', 'active', 'completed', 'failed']);
+      });
+    });
+
+    it('should return processing status for active job', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockGetJobs = jest.fn().mockResolvedValue([
+          {
+            data: { requestId: 'test-request-id' },
+            getState: jest.fn().mockResolvedValue('active'),
+            progress: 50,
+          },
+        ]);
+        
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        const { getZipGenerationQueue, getZipGenerationStatus } = await import('../zip-generation-queue');
+
+        // Initialize queue with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await getZipGenerationStatus('test-request-id');
+        
+        expect(result).toEqual({ 
+          status: 'processing',
+          progress: 50,
+        });
+      });
+    });
+
+    it('should return completed status for completed job', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockResult: ZipGenerationResult = {
+          requestId: 'test-request-id',
+          filePath: '/test/path.zip',
+          fileName: 'test.zip',
+          fileSize: 1024,
+          materialCount: 2,
+          completedAt: '2024-01-01T00:00:00.000Z',
+          downloadUrl: '/downloads/test.zip',
+        };
+
+        const mockGetJobs = jest.fn().mockResolvedValue([
+          {
+            data: { requestId: 'test-request-id' },
+            getState: jest.fn().mockResolvedValue('completed'),
+            returnvalue: mockResult,
+          },
+        ]);
+        
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        const { getZipGenerationQueue, getZipGenerationStatus } = await import('../zip-generation-queue');
+
+        // Initialize queue with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await getZipGenerationStatus('test-request-id');
+        
+        expect(result).toEqual({ 
+          status: 'completed',
+          result: mockResult,
+        });
+      });
+    });
+
+    it('should return failed status for failed job', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockGetJobs = jest.fn().mockResolvedValue([
+          {
+            data: { requestId: 'test-request-id' },
+            getState: jest.fn().mockResolvedValue('failed'),
+            failedReason: 'Processing error',
+          },
+        ]);
+        
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        const { getZipGenerationQueue, getZipGenerationStatus } = await import('../zip-generation-queue');
+
+        // Initialize queue with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await getZipGenerationStatus('test-request-id');
+        
+        expect(result).toEqual({ 
+          status: 'failed',
+          error: 'Processing error',
+        });
+      });
+    });
+
+    it('should return null when request ID is not found', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockGetJobs = jest.fn().mockResolvedValue([
+          {
+            data: { requestId: 'different-request-id' },
+            getState: jest.fn().mockResolvedValue('waiting'),
+          },
+        ]);
+        
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        const { getZipGenerationQueue, getZipGenerationStatus } = await import('../zip-generation-queue');
+
+        // Initialize queue with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await getZipGenerationStatus('test-request-id');
+        
+        expect(result).toBeNull();
+      });
+    });
+
+    it('should handle unknown job state', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockGetJobs = jest.fn().mockResolvedValue([
+          {
+            data: { requestId: 'test-request-id' },
+            getState: jest.fn().mockResolvedValue('unknown-state'),
+          },
+        ]);
+        
+        const mockDisconnect = jest.fn();
+        const mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+        const mockClose = jest.fn().mockResolvedValue(undefined);
+        
+        // Mock Redis and Queue before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: mockAdd,
+            getJobs: mockGetJobs,
+            close: mockClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+
+        const { getZipGenerationQueue, getZipGenerationStatus } = await import('../zip-generation-queue');
+
+        // Initialize queue with our mocks
+        const queue = getZipGenerationQueue();
+        expect(queue).not.toBeNull();
+
+        const result = await getZipGenerationStatus('test-request-id');
+        
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe('shutdownZipGenerationWorker', () => {
+    it('should shutdown all components gracefully', async () => {
+      process.env.NODE_ENV = 'production';
+
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockWorkerClose = jest.fn().mockResolvedValue(undefined);
+        const mockQueueClose = jest.fn().mockResolvedValue(undefined);
+        const mockRedisDisconnect = jest.fn();
+        
+        // Mock Redis and BullMQ before importing
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockRedisDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: mockQueueClose,
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: mockWorkerClose,
+          })),
+        }));
+
+        const { getZipGenerationWorker, getZipGenerationQueue, shutdownZipGenerationWorker } = await import('../zip-generation-queue');
+
+        // Initialize components first to ensure they exist
+        const worker = getZipGenerationWorker();
+        const queue = getZipGenerationQueue();
+        
+        // Verify components were created
+        expect(worker).not.toBeNull();
+        expect(queue).not.toBeNull();
+
+        await shutdownZipGenerationWorker();
+        
+        expect(mockWorkerClose).toHaveBeenCalled();
+        expect(mockQueueClose).toHaveBeenCalled();
+        expect(mockRedisDisconnect).toHaveBeenCalled();
+      });
+    });
+
+    it('should handle shutdown when components are not initialized', async () => {
+      // Import shutdownZipGenerationWorker for this test
+      const { shutdownZipGenerationWorker } = await import('../zip-generation-queue');
+      
+      // Should not throw error when components are null
+      await expect(shutdownZipGenerationWorker()).resolves.not.toThrow();
+    });
+  });
+
+  describe('Worker job processing', () => {
+    it('should process job with valid materials', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'test1.wav',
+            slug: 'test-material-1',
+          },
+          {
+            id: 'material-2',
+            title: 'Test Material 2',
+            filePath: 'test2.wav',
+            slug: 'test-material-2',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions for this test
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        const mockAccess = jest.fn().mockResolvedValue(undefined);
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(2048000),
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockReturnValue(mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        // Initialize worker to get the process function
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1', 'material-2'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Simulate successful completion
+        mockOutput.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'close') {
+            setTimeout(() => callback(), 0);
+          }
+        });
+
+        const result = await workerProcessFn(mockJob);
+
+        expect(mockPrismaFindMany).toHaveBeenCalledWith({
+          where: { id: { in: ['material-1', 'material-2'] } },
+          select: {
+            id: true,
+            title: true,
+            filePath: true,
+            slug: true,
+          },
+        });
+
+        expect(mockMkdir).toHaveBeenCalledWith(
+          expect.stringContaining('public/downloads/zips'),
+          { recursive: true }
+        );
+
+        expect(mockArchive.file).toHaveBeenCalledTimes(2);
+        expect(mockJob.updateProgress).toHaveBeenCalledTimes(2);
+        expect(result.requestId).toBe('test-request-id');
+        expect(result.materialCount).toBe(2);
+      });
+    });
+
+    it('should handle missing materials error', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma to return empty array
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['nonexistent-material'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        await expect(workerProcessFn(mockJob)).rejects.toThrow(
+          'No materials found for the given IDs'
+        );
+      });
+    });
+
+    it('should handle missing files gracefully', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Set up console spies within isolateModules
+        const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        
+        // Mock prisma
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'missing.wav',
+            slug: 'test-material-1',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions for this test
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        const mockAccess = jest.fn().mockRejectedValue(new Error('File not found'));
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(1024),
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockReturnValue(mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Simulate successful completion, but wait for file processing first
+        mockOutput.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'close') {
+            // Add small delay to ensure all async operations complete
+            setTimeout(() => callback(), 10);
+          }
+        });
+
+        const result = await workerProcessFn(mockJob);
+
+        // The append method should be called when file is not found
+        expect(mockArchive.append).toHaveBeenCalledWith(
+          'File not found: Test Material 1',
+          { name: 'test-material-1_NOT_FOUND.txt' }
+        );
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('File not found:'),
+          expect.any(Error)
+        );
+        expect(result.materialCount).toBe(1);
+        
+        consoleWarnSpy.mockRestore();
+        consoleLogSpy.mockRestore();
+      });
+    });
+
+    it('should handle archive errors', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'test1.wav',
+            slug: 'test-material-1',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions for this test
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        const mockAccess = jest.fn().mockResolvedValue(undefined);
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(1024),
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockReturnValue(mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Simulate archive error
+        mockArchive.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'error') {
+            setTimeout(() => callback(new Error('Archive failed')), 0);
+          }
+        });
+
+        // Set up console.error spy within isolateModules
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        await expect(workerProcessFn(mockJob)).rejects.toThrow('Archive failed');
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[ZipGenerationWorker] Archive error:',
+          expect.any(Error)
+        );
+
+        consoleErrorSpy.mockRestore();
+      });
+    });
+
+    it('should handle directory creation failure', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'test1.wav',
+            slug: 'test-material-1',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions - directory creation fails
+        const mockMkdir = jest.fn().mockRejectedValue(new Error('Permission denied'));
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: jest.fn().mockResolvedValue(undefined),
+        }));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        await expect(workerProcessFn(mockJob)).rejects.toThrow('Permission denied');
+        expect(mockMkdir).toHaveBeenCalledWith(
+          expect.stringContaining('public/downloads/zips'),
+          { recursive: true }
+        );
+      });
+    });
+
+    it('should handle zip file creation with different archive states', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'test1.wav',
+            slug: 'test-material-1',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        const mockAccess = jest.fn().mockResolvedValue(undefined);
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        // Mock archive with warning event
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(1024),
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockReturnValue(mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Set up console spies within isolateModules
+        const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+        // Simulate successful completion with warning handling
+        mockOutput.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'close') {
+            setTimeout(() => callback(), 0);
+          }
+        });
+
+        // Test archive warning handling
+        mockArchive.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'warning') {
+            setTimeout(() => callback(new Error('Archive warning')), 0);
+          }
+        });
+
+        const result = await workerProcessFn(mockJob);
+
+        expect(mockArchive.file).toHaveBeenCalledWith(
+          expect.stringContaining('test1.wav'),
+          { name: 'test-material-1_test1.wav' }
+        );
+        expect(result.requestId).toBe('test-request-id');
+        expect(result.materialCount).toBe(1);
+
+        consoleLogSpy.mockRestore();
+      });
+    });
+
+    it('should handle complex progress updates and file processing', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma with multiple materials
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'folder/test1.wav',
+            slug: 'test-material-1',
+          },
+          {
+            id: 'material-2',
+            title: 'Test Material 2',
+            filePath: 'subfolder/test2.wav',
+            slug: 'test-material-2',
+          },
+          {
+            id: 'material-3',
+            title: 'Test Material 3',
+            filePath: 'missing.wav',
+            slug: 'test-material-3',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions with mixed success/failure
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        let accessCallCount = 0;
+        const mockAccess = jest.fn().mockImplementation(() => {
+          accessCallCount++;
+          if (accessCallCount === 3) {
+            // Third call (missing.wav) fails
+            return Promise.reject(new Error('File not found'));
+          }
+          return Promise.resolve();
+        });
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(2048),
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockReturnValue(mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1', 'material-2', 'material-3'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Set up console spies
+        const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        // Simulate successful completion
+        mockOutput.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'close') {
+            setTimeout(() => callback(), 0);
+          }
+        });
+
+        const result = await workerProcessFn(mockJob);
+
+        // Verify progress updates for each material
+        expect(mockJob.updateProgress).toHaveBeenCalledTimes(3);
+        expect(mockJob.updateProgress).toHaveBeenNthCalledWith(1, expect.closeTo(33.33, 1));
+        expect(mockJob.updateProgress).toHaveBeenNthCalledWith(2, expect.closeTo(66.67, 1));
+        expect(mockJob.updateProgress).toHaveBeenNthCalledWith(3, 100);
+
+        // Verify file handling
+        expect(mockArchive.file).toHaveBeenCalledTimes(2); // Only successful files
+        expect(mockArchive.append).toHaveBeenCalledTimes(1); // One missing file
+
+        expect(mockArchive.file).toHaveBeenCalledWith(
+          expect.stringContaining('folder/test1.wav'),
+          { name: 'test-material-1_test1.wav' }
+        );
+        expect(mockArchive.file).toHaveBeenCalledWith(
+          expect.stringContaining('subfolder/test2.wav'),
+          { name: 'test-material-2_test2.wav' }
+        );
+
+        expect(mockArchive.append).toHaveBeenCalledWith(
+          'File not found: Test Material 3',
+          { name: 'test-material-3_NOT_FOUND.txt' }
+        );
+
+        expect(result.materialCount).toBe(3);
+        expect(result.fileSize).toBe(2048);
+
+        consoleWarnSpy.mockRestore();
+      });
+    });
+  });
+
+  describe('Redis connection', () => {
+    it('should use environment variables for Redis configuration', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.REDIS_HOST = 'test-redis-host';
+      process.env.REDIS_PORT = '6380';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockDisconnect = jest.fn();
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+        
+        const { getZipGenerationQueue } = await import('../zip-generation-queue');
+        const Redis = await import('ioredis');
+        
+        getZipGenerationQueue();
+        
+        expect(Redis.default).toHaveBeenCalledWith({
+          host: 'test-redis-host',
+          port: 6380,
+          maxRetriesPerRequest: null,
+        });
+      });
+    });
+
+    it('should use default Redis configuration', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.REDIS_HOST;
+      delete process.env.REDIS_PORT;
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockDisconnect = jest.fn();
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+        
+        const { getZipGenerationQueue } = await import('../zip-generation-queue');
+        const Redis = await import('ioredis');
+        
+        getZipGenerationQueue();
+        
+        expect(Redis.default).toHaveBeenCalledWith({
+          host: 'localhost',
+          port: 6379,
+          maxRetriesPerRequest: null,
+        });
+      });
+    });
+  });
+});
+        const mockDateNow = jest.spyOn(Date, 'now').mockReturnValue(1640995200000); // Fixed timestamp
+        const mockDateToISOString = jest.spyOn(Date.prototype, 'toISOString').mockReturnValue('2022-01-01T00:00:00.000Z');
+        
+        // Mock process.cwd for consistent paths
+        const originalCwd = process.cwd;
+        jest.spyOn(process, 'cwd').mockReturnValue('/test-working-directory');
+        
+        // Mock path functions  
+        const mockPath = {
+          join: jest.fn().mockImplementation((...args) => args.join('/')),
+          basename: jest.fn().mockImplementation((filePath) => filePath.split('/').pop() || filePath),
+        };
+        
+        jest.doMock('path', () => mockPath);
+        
+        // Mock prisma with mixed results
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Valid Audio File',
+            filePath: 'recordings/nature_sounds.wav',
+            slug: 'valid-audio-file',
+          },
+          {
+            id: 'material-2',
+            title: 'Another Valid File',
+            filePath: 'music/song.mp3',
+            slug: 'another-valid-file',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions with success scenarios
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        const mockAccess = jest.fn().mockResolvedValue(undefined); // All files exist
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(1048576), // 1MB
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockImplementation(() => mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1', 'material-2'],
+            requestId: 'detailed-test-request',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Simulate successful completion
+        mockOutput.on.mockImplementation((event: string, callback: Function) => {
+          if (event === 'close') {
+            setTimeout(() => callback(), 5);
+          }
+        });
+
+        const result = await workerProcessFn(mockJob);
+
+        // Verify directory creation with expected path
+        expect(mockMkdir).toHaveBeenCalledWith(
+          '/test-working-directory/public/downloads/zips',
+          { recursive: true }
+        );
+
+        // Verify archiver setup
+        expect(mockArchive.pipe).toHaveBeenCalledWith(mockOutput);
+        
+        // Verify file additions
+        expect(mockArchive.file).toHaveBeenCalledTimes(2);
+        expect(mockArchive.file).toHaveBeenCalledWith(
+          '/test-working-directory/public/uploads/materials/recordings/nature_sounds.wav',
+          { name: 'valid-audio-file_nature_sounds.wav' }
+        );
+        expect(mockArchive.file).toHaveBeenCalledWith(
+          '/test-working-directory/public/uploads/materials/music/song.mp3',
+          { name: 'another-valid-file_song.mp3' }
+        );
+
+        // Verify progress updates
+        expect(mockJob.updateProgress).toHaveBeenCalledTimes(2);
+        expect(mockJob.updateProgress).toHaveBeenCalledWith(50); // First material: 1/2 * 100
+        expect(mockJob.updateProgress).toHaveBeenCalledWith(100); // Second material: 2/2 * 100
+
+        // Verify finalization
+        expect(mockArchive.finalize).toHaveBeenCalled();
+
+        // Verify result structure
+        expect(result).toEqual({
+          requestId: 'detailed-test-request',
+          filePath: '/test-working-directory/public/downloads/zips/materials_detailed-test-request_1640995200000.zip',
+          fileName: 'materials_detailed-test-request_1640995200000.zip',
+          fileSize: 1048576,
+          materialCount: 2,
+          completedAt: '2022-01-01T00:00:00.000Z',
+          downloadUrl: '/downloads/zips/materials_detailed-test-request_1640995200000.zip',
+        });
+
+        // Verify logging
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '[ZipGenerationWorker] Starting ZIP generation for request detailed-test-request'
+        );
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '[ZipGenerationWorker] ZIP generation completed: 1048576 bytes'
+        );
+
+        // Cleanup
+        mockDateNow.mockRestore();
+        mockDateToISOString.mockRestore();
+        process.cwd = originalCwd;
+        consoleLogSpy.mockRestore();
+      });
+    });
+
+    it('should test Promise.all rejection in worker processing', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        // Mock prisma
+        const mockPrismaFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'material-1',
+            title: 'Test Material 1',
+            filePath: 'test1.wav',
+            slug: 'test-material-1',
+          },
+        ]);
+        
+        jest.doMock('@/lib/prisma', () => ({
+          prisma: {
+            material: {
+              findMany: mockPrismaFindMany,
+            },
+          },
+        }));
+
+        // Mock fs functions
+        const mockMkdir = jest.fn().mockResolvedValue(undefined);
+        // Mock fs.access to fail with a specific error to trigger Promise.all rejection
+        const mockAccess = jest.fn().mockRejectedValue(new Error('Simulated file processing error'));
+        
+        jest.doMock('fs/promises', () => ({
+          mkdir: mockMkdir,
+          access: mockAccess,
+        }));
+
+        const mockOutput = {
+          on: jest.fn(),
+        };
+        
+        jest.doMock('fs', () => ({
+          createWriteStream: jest.fn().mockReturnValue(mockOutput),
+        }));
+
+        const mockArchive = {
+          file: jest.fn(),
+          append: jest.fn(),
+          pipe: jest.fn(),
+          finalize: jest.fn(),
+          pointer: jest.fn().mockReturnValue(1024),
+          on: jest.fn(),
+        };
+        
+        jest.doMock('archiver', () => jest.fn().mockReturnValue(mockArchive));
+
+        let workerProcessFn: Function;
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: jest.fn(),
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation((queueName: string, processFn: Function) => {
+            workerProcessFn = processFn;
+            return { close: jest.fn() } as any;
+          }),
+        }));
+
+        const { getZipGenerationWorker } = await import('../zip-generation-queue');
+
+        getZipGenerationWorker();
+
+        const mockJob = {
+          data: {
+            materialIds: ['material-1'],
+            requestId: 'test-request-id',
+          },
+          updateProgress: jest.fn(),
+        };
+
+        // Don't trigger output 'close' event to test Promise.all rejection path
+        mockOutput.on.mockImplementation((event: string, callback: Function) => {
+          // Don't call callback to test Promise.all rejection
+        });
+
+        await expect(workerProcessFn(mockJob)).rejects.toThrow('Simulated file processing error');
+        
+        // Verify that the Promise.all rejection path is tested
+        expect(mockAccess).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Redis connection', () => {
+    it('should use environment variables for Redis configuration', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.REDIS_HOST = 'test-redis-host';
+      process.env.REDIS_PORT = '6380';
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockDisconnect = jest.fn();
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+        
+        const { getZipGenerationQueue } = await import('../zip-generation-queue');
+        const Redis = await import('ioredis');
+        
+        getZipGenerationQueue();
+        
+        expect(Redis.default).toHaveBeenCalledWith({
+          host: 'test-redis-host',
+          port: 6380,
+          maxRetriesPerRequest: null,
+        });
+      });
+    });
+
+    it('should use default Redis configuration', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.REDIS_HOST;
+      delete process.env.REDIS_PORT;
+      
+      // Use jest.isolateModules to ensure fresh import with mocks
+      await jest.isolateModules(async () => {
+        const mockDisconnect = jest.fn();
+        
+        jest.doMock('ioredis', () => {
+          return jest.fn().mockImplementation(() => ({
+            disconnect: mockDisconnect,
+          }));
+        });
+        
+        jest.doMock('bullmq', () => ({
+          Queue: jest.fn().mockImplementation(() => ({
+            add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+            getJobs: jest.fn().mockResolvedValue([]),
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+          Worker: jest.fn().mockImplementation(() => ({
+            close: jest.fn().mockResolvedValue(undefined),
+          })),
+        }));
+        
+        const { getZipGenerationQueue } = await import('../zip-generation-queue');
+        const Redis = await import('ioredis');
+        
+        getZipGenerationQueue();
+        
+        expect(Redis.default).toHaveBeenCalledWith({
+          host: 'localhost',
+          port: 6379,
+          maxRetriesPerRequest: null,
+        });
+      });
+    });
+  });
+});

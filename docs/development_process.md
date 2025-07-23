@@ -23,12 +23,10 @@ npx prisma generate      # Prisma Client生成
 # E2Eテスト
 
 ## 🚀 基本実行
-npm run e2e              # 全E2Eテストを最適化されたDB設定で実行（推奨）
-npm run e2e:with-report  # テスト実行後にHTMLレポートを表示
-
-## 🌐 ブラウザ別実行（開発時のみ推奨）
-npm run e2e:chrome       # Chromiumのみで実行（最速）
-npm run e2e:cross-browser # 主要ブラウザで実行
+npm run e2e              # 全E2Eテストを実行（Chrome）
+npm run e2e:ui           # UIモードでデバッグ
+npm run e2e:debug        # デバッグモード
+npm run e2e:report       # 最後のテストレポートを表示
 
 ## 📋 機能別実行（必要な場合のみ）
 npm run e2e:smoke        # スモークテストのみ
@@ -36,16 +34,15 @@ npm run e2e:master       # マスターデータ機能のみ
 npm run e2e:materials    # 素材管理機能のみ
 npm run e2e:workflows    # ワークフローテストのみ
 
-## 🔍 デバッグ・詳細実行
-npm run e2e:ui           # UIモードでデバッグ
-npm run e2e:debug        # デバッグモード
-npm run e2e:report       # 最後のテストレポートを表示
+## 🏭 CI実行
+npm run e2e:ci           # CI環境用（workers=1で安定実行）
 
 # 特定のテストを実行
 npm run e2e -- --grep "Equipment.*validation"
 
 ## ⚠️ 注意事項
-- `npm run e2e` は最適化されたDB設定により10倍高速化されています
+- **E2EテストはChromeブラウザでのみ実行されます**（FirefoxやWebKitテストは廃止）
+- これにより一貫性と信頼性が向上し、CI実行時間が約70%短縮されます
 - CI環境では自動的に同時実行プロセスが1に制限されます
 - 段階的実行は特定の機能のみをテストしたい場合に使用してください
 
@@ -214,9 +211,8 @@ npm run e2e:db:setup     # 完全セットアップ
   # 4. セキュリティ監査
   npm audit --audit-level=moderate
 
-  # 5. E2Eテスト
-  # 全E2Eテストを実行（推奨）
-  npm run e2e
+  # 5. E2Eテスト（Chrome）
+  npm run e2e             # 全E2Eテストを実行（推奨）
 
   # または、変更した機能のみテスト（高速化したい場合）
   npm run e2e:smoke       # 基本動作確認（必須）
@@ -478,13 +474,11 @@ ZIPファイル生成などのバックグラウンドタスクにBullMQを使�
 ### 🔒 必須: Pre-commit フックの実行
 
 1. **Pre-commit フックの存在と成功が必須**:
-
    - リポジトリには全てのテストを実行する pre-commit フックが存在します
    - 全てのテストが成功しない限りコミットできません
    - ユニットテスト、lint、型チェック、E2Eテストが含まれます
 
 2. **Pre-commit フックの変更・回避の禁止**:
-
    - `.husky/pre-commit` ファイルを削除・変更してはいけません
    - pre-commit フックで実行するテストを削減してはいけません
    - ユーザーから明示的に指示されない限り `--no-verify` フラグを使用してはいけません

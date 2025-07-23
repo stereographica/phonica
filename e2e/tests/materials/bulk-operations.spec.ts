@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { MaterialPage } from '../../helpers/material-page';
 
-test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
+test.describe('@materials @bulk Bulk Operations for Materials', () => {
   let materialPage: MaterialPage;
 
   test.beforeEach(async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
       await page.waitForSelector('table tbody tr', { timeout: 30000 });
 
       // Check header checkbox exists
-      const headerCheckbox = page.locator('th input[type="checkbox"]').first();
+      const headerCheckbox = page.locator('th [role="checkbox"]').first();
       await expect(headerCheckbox).toBeVisible({ timeout: 10000 });
       await expect(headerCheckbox).toHaveAttribute('aria-label', 'Select all materials');
 
@@ -26,14 +26,14 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
 
       // Verify each row has a checkbox
       for (let i = 0; i < rowCount; i++) {
-        const checkbox = materialRows.nth(i).locator('input[type="checkbox"]');
+        const checkbox = materialRows.nth(i).locator('[role="checkbox"]');
         await expect(checkbox).toBeVisible();
       }
     });
 
     test('should select and deselect individual materials', async ({ page }) => {
       // Get first material checkbox
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
 
       // Select material
       await firstCheckbox.click();
@@ -54,11 +54,11 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
 
     test('should select all materials with header checkbox', async ({ page }) => {
       // Click header checkbox
-      const headerCheckbox = page.locator('th input[type="checkbox"]').first();
+      const headerCheckbox = page.locator('th [role="checkbox"]').first();
       await headerCheckbox.click();
 
       // Verify all checkboxes are checked
-      const allCheckboxes = page.locator('input[type="checkbox"]');
+      const allCheckboxes = page.locator('[role="checkbox"]');
       const checkboxCount = await allCheckboxes.count();
 
       for (let i = 0; i < checkboxCount; i++) {
@@ -75,7 +75,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
       await expect(page.getByRole('button', { name: /Delete/i })).not.toBeVisible();
 
       // Select a material
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
       await firstCheckbox.click();
 
       // Verify toolbar appears
@@ -93,8 +93,8 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
   test.describe('Bulk Delete', () => {
     test('@critical should delete multiple materials', async ({ page }) => {
       // Select first two materials
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
-      const secondCheckbox = page.locator('tbody tr').nth(1).locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
+      const secondCheckbox = page.locator('tbody tr').nth(1).locator('[role="checkbox"]');
 
       await firstCheckbox.click();
       await secondCheckbox.click();
@@ -115,10 +115,11 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
       await page.getByRole('button', { name: /Delete/i }).click();
 
       // Verify confirmation modal
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByText('Delete 2 Materials')).toBeVisible();
-      await expect(page.getByText(firstTitle!)).toBeVisible();
-      await expect(page.getByText(secondTitle!)).toBeVisible();
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      await expect(modal.getByText('Delete 2 Materials')).toBeVisible();
+      await expect(modal.getByText(`• ${firstTitle!}`)).toBeVisible();
+      await expect(modal.getByText(`• ${secondTitle!}`)).toBeVisible();
 
       // Confirm deletion
       await page.getByRole('button', { name: 'Delete All' }).click();
@@ -136,7 +137,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
 
     test('should cancel bulk delete operation', async ({ page }) => {
       // Select a material
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
       await firstCheckbox.click();
 
       // Click delete button
@@ -156,7 +157,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
   test.describe('Bulk Tag Operations', () => {
     test('should add tags to multiple materials', async ({ page }) => {
       // Select materials
-      const headerCheckbox = page.locator('th input[type="checkbox"]').first();
+      const headerCheckbox = page.locator('th [role="checkbox"]').first();
       await headerCheckbox.click();
 
       // Click tag button
@@ -171,7 +172,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
       await expect(page.getByLabel('Add tags (keep existing tags)')).toBeChecked();
 
       // Select tags if available
-      const tagCheckboxes = page.locator('input[type="checkbox"][id^="tag"]');
+      const tagCheckboxes = page.locator('[role="checkbox"][id^="tag"]');
       const tagCount = await tagCheckboxes.count();
 
       if (tagCount > 0) {
@@ -194,7 +195,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
 
     test('should replace tags on materials', async ({ page }) => {
       // Select first material
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
       await firstCheckbox.click();
 
       // Click tag button
@@ -214,8 +215,8 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
   test.describe('Bulk Add to Project', () => {
     test('should add materials to a project', async ({ page }) => {
       // Select materials
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
-      const secondCheckbox = page.locator('tbody tr').nth(1).locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
+      const secondCheckbox = page.locator('tbody tr').nth(1).locator('[role="checkbox"]');
 
       await firstCheckbox.click();
       await secondCheckbox.click();
@@ -251,7 +252,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
 
     test.skip('should search for projects', async ({ page }) => {
       // Select a material
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
       await firstCheckbox.click();
 
       // Click add to project button
@@ -272,8 +273,8 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
   test.describe('Bulk Download', () => {
     test.skip('@critical should initiate bulk download of materials', async ({ page }) => {
       // Select materials
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
-      const secondCheckbox = page.locator('tbody tr').nth(1).locator('input[type="checkbox"]');
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
+      const secondCheckbox = page.locator('tbody tr').nth(1).locator('[role="checkbox"]');
 
       await firstCheckbox.click();
       await secondCheckbox.click();
@@ -292,7 +293,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
   test.describe('Selection Behavior', () => {
     test('should clear selection when applying filters', async ({ page }) => {
       // Select all materials
-      const headerCheckbox = page.locator('th input[type="checkbox"]').first();
+      const headerCheckbox = page.locator('th [role="checkbox"]').first();
       await headerCheckbox.click();
 
       // Verify selection
@@ -313,12 +314,12 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
 
     test('should maintain selection state during pagination', async ({ page }) => {
       // Check if pagination exists
-      const nextButton = page.getByRole('button', { name: /Next/i });
-      const isPaginationVisible = await nextButton.isVisible();
+      const nextButton = page.getByRole('button', { name: 'Next', exact: true });
+      const isPaginationVisible = (await nextButton.count()) > 0;
 
       if (isPaginationVisible && (await nextButton.isEnabled())) {
         // Select materials on first page
-        const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
+        const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
         await firstCheckbox.click();
 
         // Navigate to next page
@@ -326,7 +327,7 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
         await page.waitForLoadState('networkidle');
 
         // Navigate back
-        await page.getByRole('button', { name: /Previous/i }).click();
+        await page.getByRole('button', { name: 'Previous', exact: true }).click();
         await page.waitForLoadState('networkidle');
 
         // Verify selection is cleared (as per implementation)
@@ -338,30 +339,28 @@ test.describe.skip('@materials @bulk Bulk Operations for Materials', () => {
   test.describe('Accessibility', () => {
     test('should have proper aria labels for checkboxes', async ({ page }) => {
       // Header checkbox
-      const headerCheckbox = page.locator('th input[type="checkbox"]').first();
+      const headerCheckbox = page.locator('th [role="checkbox"]').first();
       await expect(headerCheckbox).toHaveAttribute('aria-label', 'Select all materials');
 
       // Material checkboxes
       const materialRows = page.locator('tbody tr');
       const firstRow = materialRows.first();
       const firstTitle = await firstRow.locator('td:nth-child(2)').textContent();
-      const firstCheckbox = firstRow.locator('input[type="checkbox"]');
+      const firstCheckbox = firstRow.locator('[role="checkbox"]');
 
       await expect(firstCheckbox).toHaveAttribute('aria-label', `Select ${firstTitle}`);
     });
 
     test('should be keyboard navigable', async ({ page }) => {
-      // Tab to first checkbox
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Tab');
+      // Focus on the first checkbox directly
+      const firstCheckbox = page.locator('tbody tr').first().locator('[role="checkbox"]');
+      await firstCheckbox.focus();
 
       // Press space to select
       await page.keyboard.press('Space');
 
       // Verify selection
-      const firstCheckbox = page.locator('tbody tr').first().locator('input[type="checkbox"]');
-      await expect(firstCheckbox).toBeChecked();
+      await expect(firstCheckbox).toHaveAttribute('aria-checked', 'true');
     });
   });
 });

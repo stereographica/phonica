@@ -153,13 +153,10 @@ export class AudioHelper {
    * 音声が正常にロードされて再生可能になるまで待機
    */
   async waitForAudioReady(timeout = 10000): Promise<void> {
-    // Firefox用の追加チェック
-    const browserName = this.page.context().browser()?.browserType().name();
-    const isFirefox = browserName === 'firefox';
     const isCI = process.env.CI === 'true';
 
-    if (isFirefox && isCI) {
-      console.log('🦊 Firefox CI: 音声準備待機中...');
+    if (isCI) {
+      console.log('🎵 CI環境: 音声準備待機中...');
     }
 
     // E2E環境では音声要素が存在しない場合があるため、
@@ -236,22 +233,14 @@ export class AudioHelper {
    * 音声ローディングが完了するまで待機
    */
   async waitForAudioLoad(timeout?: number): Promise<void> {
-    // Firefox用の延長タイムアウト
-    const browserName = this.page.context().browser()?.browserType().name();
-    const isFirefox = browserName === 'firefox';
     const isCI = process.env.CI === 'true';
-
-    const defaultTimeout = isCI
-      ? isFirefox
-        ? 30000
-        : 15000 // CI: Firefox 30秒、その他15秒
-      : 10000;
+    const defaultTimeout = isCI ? 15000 : 10000;
 
     const actualTimeout = timeout ?? defaultTimeout;
 
-    // WebAudio API初期化の追加待機（Firefox CI環境）
-    if (isFirefox && isCI) {
-      console.log('🦊 Firefox CI環境検出: WebAudio API初期化のため追加待機');
+    // WebAudio API初期化の追加待機（CI環境）
+    if (isCI) {
+      console.log('🎵 CI環境検出: WebAudio API初期化のため追加待機');
       await this.page.waitForTimeout(2000);
     }
     // エラーメッセージが表示されているかチェック
@@ -272,17 +261,6 @@ export class AudioHelper {
    * 再生ボタンをクリック
    */
   async clickPlay(): Promise<void> {
-    const browserName = this.page.context().browser()?.browserType().name();
-    const isFirefoxCI = browserName === 'firefox' && process.env.CI === 'true';
-
-    // Firefox CI環境では無限ループを回避
-    if (isFirefoxCI) {
-      console.log('🦊 Firefox CI: 再生ボタンクリックのみ実行（状態確認をスキップ）');
-      await this.playPauseButton.click();
-      await this.page.waitForTimeout(1000);
-      return;
-    }
-
     await this.playPauseButton.click();
 
     // E2E環境での確実な状態待機
@@ -401,17 +379,6 @@ export class AudioHelper {
    */
   async isPlaying(): Promise<boolean> {
     try {
-      const browserName = this.page.context().browser()?.browserType().name();
-      const isFirefoxCI = browserName === 'firefox' && process.env.CI === 'true';
-
-      // Firefox CI環境では無限ループを回避するため簡略化した判定を使用
-      if (isFirefoxCI) {
-        console.log('🦊 Firefox CI: 簡略化した再生状態確認');
-        // ボタンのタイトルのみで判定（最も軽量で確実）
-        const buttonTitle = await this.playPauseButton.getAttribute('title').catch(() => null);
-        return buttonTitle === 'Pause';
-      }
-
       // プレーヤーが存在するかまず確認
       const playerExists = await this.audioPlayerContainer.isVisible().catch(() => false);
       if (!playerExists) {
@@ -470,18 +437,6 @@ export class AudioHelper {
    */
   async waitForPlayingState(expectedState: boolean, timeout: number = 5000): Promise<boolean> {
     try {
-      const browserName = this.page.context().browser()?.browserType().name();
-      const isFirefoxCI = browserName === 'firefox' && process.env.CI === 'true';
-
-      // Firefox CI環境では無限ループを回避するため早期リターン
-      if (isFirefoxCI) {
-        console.log('🦊 Firefox CI: 状態待機をスキップ（無限ループ回避）');
-        // ボタンのタイトルのみで簡易確認
-        const buttonTitle = await this.playPauseButton.getAttribute('title').catch(() => null);
-        const currentState = buttonTitle === 'Pause';
-        return currentState === expectedState;
-      }
-
       // より柔軟な状態待機: 複数の判定基準を使用
       await this.page.waitForFunction(
         (expected) => {

@@ -1,30 +1,83 @@
 'use client';
 
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { format, startOfWeek, addDays, subDays, differenceInWeeks } from 'date-fns';
+import { format, startOfWeek, addDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useRecordingActivity } from '@/hooks/use-recording-activity';
 
-interface RecordingDay {
-  date: Date;
-  count: number;
-}
-
-// TODO: 実際のデータ取得とAPIコールを実装
 export function RecordingCalendarWidget() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 400, height: 300 });
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // コンテナサイズに基づいた3段階表示期間計算
+  const displayMonths = useMemo(() => {
+    const { width } = containerDimensions;
+
+    // 3段階切り替え: 大(12ヶ月), 中(6ヶ月), 小(3ヶ月)
+    if (width >= 600) return 12; // 大: 12ヶ月
+    if (width >= 400) return 6; // 中: 6ヶ月
+    return 3; // 小: 3ヶ月
+  }, [containerDimensions]);
+
+  // カレンダーのグリッドデータを生成（GitHubスタイル: 右端が現在日付）
+  const calendarData = useMemo(() => {
+    const weeks: Date[][] = [];
+    const today = new Date();
+
+    // 今日を含む週の日曜日を取得
+    const todayWeekStart = startOfWeek(today, { weekStartsOn: 0 });
+
+    // 月数ベースで表示範囲を正確に計算
+    const startDate = new Date(today.getFullYear(), today.getMonth() - displayMonths + 1, 1);
+    const startWeek = startOfWeek(startDate, { weekStartsOn: 0 });
+
+    // 開始週から今日の週までの週数を計算
+    const totalDays =
+      Math.ceil((todayWeekStart.getTime() - startWeek.getTime()) / (1000 * 60 * 60 * 24)) + 7;
+    const totalWeeks = Math.ceil(totalDays / 7);
+
+    for (let week = 0; week < totalWeeks; week++) {
+      const weekDays: Date[] = [];
+      const weekStart = addDays(startWeek, week * 7);
+
+      for (let day = 0; day < 7; day++) {
+        const date = addDays(weekStart, day);
+        // 今日以降の日付は追加しない（過去のみ表示）
+        if (date <= today) {
+          weekDays.push(date);
+        }
+      }
+
+      // 週に日付が含まれている場合のみ追加
+      if (weekDays.length > 0) {
+        weeks.push(weekDays);
+      }
+    }
+
+    return weeks;
+  }, [displayMonths]);
+
+  // カレンダーデータから実際の日数を計算
+  const actualDisplayDays = useMemo(() => {
+    let totalDays = 0;
+    calendarData.forEach((week) => {
+      totalDays += week.length;
+    });
+    return totalDays;
+  }, [calendarData]);
+
+  const { data: activityData, isLoading, error, refetch } = useRecordingActivity(actualDisplayDays);
+
   // コンテナサイズを正確に取得
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
         const width = containerRef.current.clientWidth;
         const height = containerRef.current.clientHeight;
 
-        console.log('Calendar container size:', { width, height, rect });
         setContainerDimensions({ width, height });
         setIsInitialized(true);
       }
@@ -36,7 +89,6 @@ export function RecordingCalendarWidget() {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        console.log('ResizeObserver update:', { width, height });
         setContainerDimensions({ width, height });
         setIsInitialized(true);
       }
@@ -52,58 +104,15 @@ export function RecordingCalendarWidget() {
     };
   }, []);
 
-  // コンテナサイズに基づいた動的表示日数計算
-  const displayDays = useMemo(() => {
-    const { width, height } = containerDimensions;
-    console.log('Calculating display days for size:', { width, height });
-
-    // 利用可能な高さを計算（ヘッダーと余白を除く）
-    const availableHeight = Math.max(height - 80, 100); // ヘッダー、凡例、余白を除く
-    const availableWidth = Math.max(width - 50, 200); // 曜日ラベルと余白を除く
-
-    // セルサイズを適応的に計算
-    const cellSize = Math.min(Math.floor(availableHeight / 8), 12); // 最大8行、最大12px
-    const weeksVisible = Math.floor(availableWidth / (cellSize + 2)); // 表示可能な週数
-
-    // 表示日数 = 週数 * 7
-    const calculatedDays = Math.max(weeksVisible * 7, 84); // 最低12週間
-
-    console.log('Calendar calculation:', {
-      availableHeight,
-      availableWidth,
-      cellSize,
-      weeksVisible,
-      calculatedDays,
-    });
-
-    return Math.min(calculatedDays, 365); // 最大1年間
-  }, [containerDimensions]);
-  // プレースホルダーデータ生成（決定論的にしてSSRハイドレーションエラーを回避）
+  // 実データから録音活動データを作成
   const recordingData = useMemo(() => {
-    const data: RecordingDay[] = [];
-    const today = new Date();
+    if (!activityData?.activities) return [];
 
-    // 動的日数分のダミーデータを生成（シード値ベースで決定論的に）
-    for (let i = 0; i < displayDays; i++) {
-      const date = subDays(today, i);
-      // 日付をシード値として使用し、決定論的にデータを生成
-      const seed = date.getTime();
-      const pseudoRandom = (seed * 9301 + 49297) % 233280;
-      const normalizedRandom = pseudoRandom / 233280;
-
-      // 30%の確率で録音あり
-      if (normalizedRandom > 0.7) {
-        const countSeed = (seed * 16807) % 2147483647;
-        const countRandom = countSeed / 2147483647;
-        data.push({
-          date,
-          count: Math.floor(countRandom * 5) + 1,
-        });
-      }
-    }
-
-    return data;
-  }, [displayDays]);
+    return activityData.activities.map((activity) => ({
+      date: new Date(activity.date),
+      count: activity.count,
+    }));
+  }, [activityData]);
 
   // 日付ごとのカウントマップを作成
   const dateCountMap = useMemo(() => {
@@ -114,36 +123,6 @@ export function RecordingCalendarWidget() {
     return map;
   }, [recordingData]);
 
-  // カレンダーのグリッドデータを生成（過去のみ表示）
-  const calendarData = useMemo(() => {
-    const weeks: Date[][] = [];
-    const today = new Date();
-    // 過去のみ表示するため、今日から過去に遡る
-    const endDate = today;
-    const startDate = subDays(endDate, displayDays - 1);
-    const adjustedStartDate = startOfWeek(startDate, { weekStartsOn: 0 }); // 日曜始まり
-    const adjustedEndDate = startOfWeek(endDate, { weekStartsOn: 0 }); // 今日を含む週の日曜日
-
-    const totalWeeks = differenceInWeeks(adjustedEndDate, adjustedStartDate) + 1;
-
-    for (let week = 0; week < totalWeeks; week++) {
-      const weekDays: Date[] = [];
-      for (let day = 0; day < 7; day++) {
-        const date = addDays(adjustedStartDate, week * 7 + day);
-        // 今日以降の日付は追加しない（過去のみ表示）
-        if (date <= today) {
-          weekDays.push(date);
-        }
-      }
-      // 週に日付が含まれている場合のみ追加
-      if (weekDays.length > 0) {
-        weeks.push(weekDays);
-      }
-    }
-
-    return weeks;
-  }, [displayDays]);
-
   // 録音数に応じた色の強度を取得
   const getIntensityClass = (count: number) => {
     if (count === 0) return 'bg-secondary';
@@ -153,10 +132,8 @@ export function RecordingCalendarWidget() {
     return 'bg-green-600 dark:bg-green-500';
   };
 
-  // 表示期間に応じた月ラベルを生成
-  const monthLabels = useMemo(() => {
-    const today = new Date();
-    const startDate = subDays(today, displayDays - 1);
+  // カレンダーデータから月ラベルと位置を抽出（完全同期）
+  const monthInfo = useMemo(() => {
     const monthsJa = [
       '1月',
       '2月',
@@ -172,42 +149,106 @@ export function RecordingCalendarWidget() {
       '12月',
     ];
 
-    // 表示期間の月を収集
-    const monthsInRange = new Set<number>();
-    for (let i = 0; i < displayDays; i += 30) {
-      // 約30日ごとにサンプリング
-      const date = addDays(startDate, i);
-      monthsInRange.add(date.getMonth());
+    const monthsData: Array<{ label: string; weekIndex: number }> = [];
+    const seenMonths = new Set<string>();
+
+    // カレンダーグリッドの週順序に従って月と位置を抽出
+    for (let weekIndex = 0; weekIndex < calendarData.length; weekIndex++) {
+      const week = calendarData[weekIndex];
+
+      // 週の最初の日付を使用して月を特定
+      if (week.length > 0) {
+        const firstDateOfWeek = week[0];
+        const monthKey = `${firstDateOfWeek.getFullYear()}-${firstDateOfWeek.getMonth()}`;
+        const monthLabel = monthsJa[firstDateOfWeek.getMonth()];
+
+        if (!seenMonths.has(monthKey)) {
+          seenMonths.add(monthKey);
+          monthsData.push({ label: monthLabel, weekIndex });
+        }
+      }
     }
 
-    // 月順に並べて返す
-    return Array.from(monthsInRange)
-      .sort()
-      .map((month) => monthsJa[month]);
-  }, [displayDays]);
+    return monthsData;
+  }, [calendarData]);
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+  // ローディング状態
+  if (isLoading) {
+    return (
+      <div ref={containerRef} className="space-y-1 h-full flex flex-col">
+        <div className="flex items-center justify-between text-xs text-muted-foreground flex-shrink-0 mb-1">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-3 w-3" />
+            <span>録音活動を読み込み中...</span>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="h-20 w-full bg-gray-200 animate-pulse rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (error) {
+    return (
+      <div ref={containerRef} className="space-y-1 h-full flex flex-col">
+        <div className="flex items-center justify-between text-xs text-muted-foreground flex-shrink-0 mb-1">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-3 w-3" />
+            <span>録音活動</span>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => refetch()}>
+            <RefreshCw className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+          <p className="text-sm text-muted-foreground mb-2">データの読み込みに失敗しました</p>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>
+            再試行
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="space-y-1 h-full flex flex-col">
       <div className="flex items-center justify-between text-xs text-muted-foreground flex-shrink-0 mb-1">
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-3 w-3" />
-          <span>過去{displayDays}日間の録音活動</span>
+          <span>過去{displayMonths}ヶ月間の録音活動</span>
+          {activityData && (
+            <span className="text-xs opacity-75">
+              （総録音数: {activityData.totalRecordings}件）
+            </span>
+          )}
         </div>
-        <span className="text-xs opacity-75">
-          {containerDimensions.width}x{containerDimensions.height}
-        </span>
+        <Button size="sm" variant="ghost" onClick={() => refetch()}>
+          <RefreshCw className="h-3 w-3" />
+        </Button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="h-full flex flex-col justify-center">
-          {/* 月ラベル - より均等に配置 */}
-          <div className="flex gap-[3px] mb-1 ml-7">
-            {monthLabels.map((month) => (
-              <div key={month} className="text-xs text-muted-foreground flex-1 text-center">
-                {month}
-              </div>
-            ))}
+        {/* カレンダーコンテンツを最大幅で制限し、センタリング */}
+        <div className="h-full flex flex-col justify-center mx-auto" style={{ maxWidth: '800px' }}>
+          {/* 月ラベル - カレンダーグリッドと正確に同期 */}
+          <div className="relative mb-1 ml-7">
+            {monthInfo.map((month) => {
+              // 週の位置に応じて月ラベルを配置
+              const leftPosition = month.weekIndex * (11 + 1); // cellSize + gap
+              return (
+                <div
+                  key={`${month.label}-${month.weekIndex}`}
+                  className="absolute text-xs text-muted-foreground"
+                  style={{ left: `${leftPosition}px` }}
+                >
+                  {month.label}
+                </div>
+              );
+            })}
           </div>
 
           <div className="flex gap-1">

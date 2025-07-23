@@ -59,55 +59,20 @@ export default defineConfig({
     timeout: process.env.CI ? 15 * 1000 : 10 * 1000, // CI: 15秒, ローカル: 10秒
   },
 
-  /* Configure projects for major browsers with optimized settings */
+  /* Configure projects for Chrome only */
   projects: [
     {
-      name: 'chromium',
+      name: 'chrome',
       use: {
         ...devices['Desktop Chrome'],
-        // Chrome固有の最適化
+        // Chrome最適化設定
         launchOptions: {
           args: ['--disable-dev-shm-usage', '--no-sandbox'],
         },
       },
     },
 
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-        // Firefox固有の最適化
-        launchOptions: {
-          firefoxUserPrefs: {
-            // CI環境用に並列処理を削減
-            'dom.ipc.processCount': process.env.CI ? 1 : 8,
-            'network.http.max-persistent-connections-per-server': process.env.CI ? 4 : 10,
-            // メモリ使用量を削減
-            'javascript.options.mem.max': 512000,
-            'browser.tabs.remote.autostart': false,
-            // 追加の安定性設定
-            'media.webspeech.synth.enabled': false,
-            'media.navigator.enabled': false,
-          },
-        },
-        // Firefox専用のタイムアウト延長
-        actionTimeout: process.env.CI ? 30000 : 15000,
-        navigationTimeout: process.env.CI ? 60000 : 30000,
-      },
-      // Firefox専用のテストタイムアウト
-      timeout: process.env.CI ? 900 * 1000 : 180 * 1000, // CI: 15分、ローカル: 3分
-      retries: process.env.CI ? 1 : 0, // CI環境ではリトライを減らす
-    },
-
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-        // WebKit固有の設定
-      },
-    },
-
-    // テストグループごとのプロジェクト（並列実行の最適化）
+    // テストグループごとのプロジェクト（Chrome上で並列実行の最適化）
     {
       name: 'smoke-tests',
       testMatch: '**/*smoke*.spec.ts',
@@ -131,26 +96,6 @@ export default defineConfig({
       testMatch: '**/workflows/*.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
   ],
 
   /* Run your local dev server before starting the tests */

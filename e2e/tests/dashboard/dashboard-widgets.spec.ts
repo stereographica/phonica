@@ -88,7 +88,7 @@ test.describe('@smoke @dashboard Dashboard Widgets', () => {
 
     // タブの切り替えが動作する
     await monthlyTab.click();
-    await expect(widget.getByText('前月比')).toBeVisible();
+    await expect(widget.getByText('過去6ヶ月の録音活動')).toBeVisible();
 
     await equipmentTab.click();
     // 機材タブのコンテンツが表示される（具体的なチェックは素材データに依存）
@@ -98,8 +98,8 @@ test.describe('@smoke @dashboard Dashboard Widgets', () => {
     const widget = page.locator('[data-widget-type="recordingCalendar"]');
     await expect(widget).toBeVisible();
 
-    // カレンダーのヘッダー情報
-    await expect(widget.getByText('過去365日間の録音活動')).toBeVisible();
+    // カレンダーのヘッダー情報（動的な表示期間に対応）
+    await expect(widget.getByText(/過去\d+ヶ月間の録音活動/)).toBeVisible();
 
     // 月ラベルが表示される
     await expect(widget.getByText('1月', { exact: true })).toBeVisible();

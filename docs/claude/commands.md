@@ -29,7 +29,7 @@ npx prisma generate      # Generate Prisma Client
 ### 🚀 Basic Execution
 
 ```bash
-npm run e2e              # Run all E2E tests (all browsers in parallel)
+npm run e2e              # Run all E2E tests (Chrome)
 npm run e2e:ui           # UI mode for debugging
 npm run e2e:debug        # Debug mode
 npm run e2e:report       # Show last test report
@@ -44,20 +44,10 @@ npm run e2e:materials    # Material management features
 npm run e2e:workflows    # Workflow tests
 ```
 
-### 🌐 Browser-specific Execution
-
-```bash
-npm run e2e:chromium     # Chromium only
-npm run e2e:firefox      # Firefox only
-npm run e2e:webkit       # WebKit only
-```
-
 ### 🏭 CI Execution
 
 ```bash
-npm run e2e:ci:chromium  # CI mode for Chromium (workers=1)
-npm run e2e:ci:firefox   # CI mode for Firefox (workers=1)
-npm run e2e:ci:webkit    # CI mode for WebKit (workers=1)
+npm run e2e:ci           # CI mode for Chrome (workers=1)
 ```
 
 ### 🔍 Advanced Usage
@@ -66,8 +56,8 @@ npm run e2e:ci:webkit    # CI mode for WebKit (workers=1)
 # Run specific tests
 npm run e2e -- --grep "Equipment.*validation"
 
-# Run tests for specific browser with custom options
-npm run e2e -- --project=chromium --headed
+# Run tests with custom options (Chrome)
+npm run e2e -- --headed
 
 # Run tests with specific tags
 npm run e2e -- --grep "@critical"
@@ -75,9 +65,8 @@ npm run e2e -- --grep "@critical"
 
 ### ⚠️ Notes
 
-- `npm run e2e` runs all browsers in parallel for comprehensive testing
-- Use browser-specific commands for faster feedback during development
-- CI commands automatically set workers=1 for stability
+- `npm run e2e` runs all tests in Chrome browser
+- CI command automatically sets workers=1 for stability
 - Use feature-specific tests to focus on specific functionality
 
 ### 📊 Database Management

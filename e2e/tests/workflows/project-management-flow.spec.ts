@@ -1,12 +1,5 @@
 import { test, expect } from '../../fixtures/test-fixtures';
-import {
-  NavigationHelper,
-  FormHelper,
-  ModalHelper,
-  TableHelper,
-  CrossBrowserHelper,
-  WaitHelper,
-} from '../../helpers';
+import { NavigationHelper, FormHelper, ModalHelper, TableHelper, WaitHelper } from '../../helpers';
 import path from 'path';
 
 test.describe.configure({ mode: 'serial' }); // ワークフローテストは順次実行
@@ -16,7 +9,6 @@ test.describe('@workflow Project Management Workflow', () => {
   let modal: ModalHelper;
   let table: TableHelper;
   let wait: WaitHelper;
-  let crossBrowser: CrossBrowserHelper;
 
   test.beforeEach(async ({ page }) => {
     navigation = new NavigationHelper(page);
@@ -24,7 +16,6 @@ test.describe('@workflow Project Management Workflow', () => {
     modal = new ModalHelper(page);
     table = new TableHelper(page);
     wait = new WaitHelper(page);
-    crossBrowser = new CrossBrowserHelper(page);
   });
 
   test.skip('プロジェクト中心の素材管理ワークフロー - プロジェクト管理機能未実装のためスキップ', async ({
@@ -156,7 +147,7 @@ test.describe('@workflow Project Management Workflow', () => {
     console.log('✅ Project management workflow completed successfully!');
   });
 
-  test('マスタデータ連携ワークフロー', async ({ page, browserName }) => {
+  test('マスタデータ連携ワークフロー', async ({ page }) => {
     // WebKitではFormDataのboundaryエラーがあるため、このテストをスキップ
     // Server Actionsに移行したため、全ブラウザで動作
 
@@ -169,7 +160,7 @@ test.describe('@workflow Project Management Workflow', () => {
 
     // 特定プロジェクト用の機材を追加
     await page.click('button:has-text("Add Equipment")');
-    await crossBrowser.waitForModalOpen();
+    await modal.waitForOpen();
 
     const uniqueEquipmentName = `Rode VideoMic Pro Plus ${Date.now()}`;
     await form.fillByLabel('Name', uniqueEquipmentName);
@@ -181,8 +172,8 @@ test.describe('@workflow Project Management Workflow', () => {
     );
 
     await modal.clickButton('Add Equipment');
-    await crossBrowser.waitForModalClose();
-    await crossBrowser.waitForElementVisible(`td:has-text("${uniqueEquipmentName}")`);
+    await modal.waitForClose();
+    await wait.waitForElementVisible(`td:has-text("${uniqueEquipmentName}")`);
 
     // 2. タグマスタでタグ整理（現在はダミーデータなので表示確認のみ）
     await navigation.goToTagMasterPage();
@@ -246,21 +237,17 @@ test.describe('@workflow Project Management Workflow', () => {
     // タグを入力（特殊な構造のため、id属性を使用）
     await page.locator('input#tags').fill('master-data-test, integration, studio');
 
-    // 素材保存（クロスブラウザ対応）
+    // 素材保存
     // Server Actionを使用しているためダイアログは表示されない
-    await crossBrowser.submitFormWithDialog(
-      'button[type="submit"]:has-text("Save Material")',
-      undefined, // ダイアログメッセージなし
-      '/materials', // ナビゲーション先
-    );
+    const submitButton = page.locator('button[type="submit"]:has-text("Save Material")');
+    await submitButton.click();
 
-    // WebKitでは素材一覧の読み込みに時間がかかることがある（WebKitはすでにスキップ済み）
-    // browserNameはすでにパラメータとして受け取っている
-    if (browserName === 'webkit') {
-      await wait.waitForNetworkStable({ timeout: 3000 });
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-    }
+    // ナビゲーション完了を待つ
+    await page.waitForURL('/materials', { timeout: 30000 });
+
+    // 素材一覧の読み込みを確実に待機
+    await wait.waitForNetworkStable({ timeout: 3000 });
+    await page.waitForLoadState('networkidle');
 
     // タイトルフィルターを使用して作成した素材を検索
     const titleFilter = page.locator('input#titleFilter');
@@ -273,10 +260,7 @@ test.describe('@workflow Project Management Workflow', () => {
     });
 
     // 4. 作成した素材で新機材が使用されていることを確認
-    // WebKitではボタンクリック前に追加の待機が必要
-    if (browserName === 'webkit') {
-      await wait.waitForBrowserStability();
-    }
+    await wait.waitForBrowserStability();
 
     const materialButton = page.locator(`button:has-text("${uniqueIntegrationTitle}")`);
     await expect(materialButton).toBeVisible();
@@ -287,7 +271,7 @@ test.describe('@workflow Project Management Workflow', () => {
     while (retries > 0) {
       try {
         await materialButton.click();
-        await crossBrowser.waitForModalOpen();
+        await modal.waitForOpen();
         break;
       } catch (error) {
         retries--;
@@ -309,7 +293,7 @@ test.describe('@workflow Project Management Workflow', () => {
     // await expect(page.locator('[role="dialog"]').getByText('Rode VideoMic Pro Plus')).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await crossBrowser.waitForModalClose();
+    await modal.waitForClose();
 
     console.log('✅ Master data integration workflow completed successfully!');
   });

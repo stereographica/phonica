@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { MapPin } from 'lucide-react';
+import { MapPin, AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useMaterialsWithLocation } from '@/hooks/use-materials-with-location';
 
 // 地図コンポーネントは動的インポート（SSR回避）
 const MaterialLocationMap = dynamic(() => import('@/components/maps/MaterialLocationMap'), {
@@ -17,67 +19,108 @@ const MaterialLocationMap = dynamic(() => import('@/components/maps/MaterialLoca
   ),
 });
 
-// TODO: 実際のデータ取得とAPIコールを実装
 export function CollectionMapWidget() {
-  // プレースホルダーデータ
-  const materials = [
-    {
-      id: '1',
-      title: '朝の鳥のさえずり',
-      latitude: 35.6895,
-      longitude: 139.6917,
-      locationName: '代々木公園',
-    },
-    {
-      id: '2',
-      title: '海の波音',
-      latitude: 35.3139,
-      longitude: 139.4502,
-      locationName: '江ノ島',
-    },
-    {
-      id: '3',
-      title: '雨音',
-      latitude: 35.709,
-      longitude: 139.7319,
-      locationName: '上野公園',
-    },
-  ];
+  const { data: locationData, isLoading, error, refetch } = useMaterialsWithLocation(50); // 地図表示用は50件に制限
 
-  const totalMaterials = materials.length;
-  const locationsWithData = materials.filter((m) => m.latitude && m.longitude).length;
+  // 地図の中心点と初期ズームレベルを計算
+  const mapConfig = useMemo(() => {
+    if (!locationData?.materials || locationData.materials.length === 0) {
+      return {
+        center: { lat: 35.6762, lng: 139.6503 }, // 東京駅をデフォルト
+        zoom: 10,
+      };
+    }
 
-  console.log('CollectionMapWidget render:', {
-    materialsLength: materials.length,
-    hasLatitude: !!materials[0]?.latitude,
-    hasLongitude: !!materials[0]?.longitude,
-    hasLocation: !!(materials[0]?.latitude && materials[0]?.longitude),
-    firstMaterial: materials[0],
-  });
+    if (locationData.center) {
+      return {
+        center: { lat: locationData.center.lat, lng: locationData.center.lng },
+        zoom: 10,
+      };
+    }
+
+    // フォールバック: 最初の素材の位置
+    const firstMaterial = locationData.materials[0];
+    return {
+      center: { lat: firstMaterial.latitude, lng: firstMaterial.longitude },
+      zoom: 10,
+    };
+  }, [locationData]);
+
+  // ローディング状態
+  if (isLoading) {
+    return (
+      <div className="space-y-2 h-full">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">録音場所を読み込み中...</span>
+          <RefreshCw className="h-3 w-3 animate-spin" />
+        </div>
+        <div className="flex-1 min-h-[200px]">
+          <div className="h-full bg-gray-200 animate-pulse rounded-lg"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (error) {
+    return (
+      <div className="space-y-2 h-full">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">録音場所</span>
+          <Button size="sm" variant="ghost" onClick={() => refetch()}>
+            <RefreshCw className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="flex-1 min-h-[200px]">
+          <div className="flex flex-col items-center justify-center h-full bg-secondary/20 rounded-lg">
+            <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+            <p className="text-xs text-muted-foreground mb-2">位置情報の読み込みに失敗しました</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>
+              再試行
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const materials = locationData?.materials || [];
+  const totalCount = locationData?.totalCount || 0;
 
   return (
     <div className="space-y-2 h-full">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">{locationsWithData}件の録音場所</span>
-        <span className="text-xs text-muted-foreground">全{totalMaterials}件中</span>
+        <span className="text-muted-foreground">{materials.length}件の録音場所</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">全{totalCount}件中</span>
+          <Button size="sm" variant="ghost" onClick={() => refetch()}>
+            <RefreshCw className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-[200px]" style={{ height: '200px', minHeight: '200px' }}>
-        {materials.length > 0 && materials[0].latitude && materials[0].longitude ? (
+        {materials.length > 0 ? (
           <div
             className="h-full w-full"
             style={{ height: '200px', minHeight: '200px', width: '100%' }}
           >
             <MaterialLocationMap
-              latitude={materials[0].latitude}
-              longitude={materials[0].longitude}
-              popupText={`${materials[0].title} - ${materials[0].locationName}`}
-              zoom={10}
+              latitude={mapConfig.center.lat}
+              longitude={mapConfig.center.lng}
+              popupText={`${materials[0].title}${materials[0].location ? ` - ${materials[0].location}` : ''}`}
+              zoom={mapConfig.zoom}
             />
           </div>
         ) : (
           <div className="flex items-center justify-center h-full bg-secondary/20 rounded-lg">
-            <p className="text-xs text-muted-foreground">位置情報のある素材がありません</p>
+            <div className="text-center">
+              <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">位置情報のある素材がありません</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                録音時に位置情報を追加してみましょう
+              </p>
+            </div>
           </div>
         )}
       </div>

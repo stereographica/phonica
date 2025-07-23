@@ -2,7 +2,6 @@ import { test, expect } from '../../fixtures/test-fixtures';
 import { NavigationHelper } from '../../helpers/navigation';
 import { FormHelper } from '../../helpers/form';
 import { WaitHelper } from '../../helpers/wait';
-import { CrossBrowserHelper } from '../../helpers/cross-browser';
 import { Page } from '@playwright/test';
 import path from 'path';
 
@@ -12,13 +11,11 @@ test.describe('@materials Edit Material', () => {
   let navigation: NavigationHelper;
   let form: FormHelper;
   let wait: WaitHelper;
-  let crossBrowser: CrossBrowserHelper;
 
   test.beforeEach(async ({ page }) => {
     navigation = new NavigationHelper(page);
     form = new FormHelper(page);
     wait = new WaitHelper(page);
-    crossBrowser = new CrossBrowserHelper(page);
 
     // 素材一覧ページに移動
     await navigation.goToMaterialsPage();
@@ -81,48 +78,24 @@ test.describe('@materials Edit Material', () => {
     await expect(modal).toBeVisible({ timeout: 5000 });
 
     // モーダル内のEditボタンをクリック
-    const browserName = page.context().browser()?.browserType().name() || 'unknown';
-    let editElement;
-
-    // すべてのブラウザで安定した方法を使用
     // まずボタンが見えるまで待つ
     await wait.waitForBrowserStability();
 
-    if (browserName === 'webkit') {
-      // WebKitの場合、より具体的なセレクターを使用
-      editElement = modal.locator('button').filter({ hasText: /^Edit$/ });
-
-      // WebKitではポインターイベントを妨害する要素がある可能性があるため、
-      // force: true を使用してクリックを試みる
-    } else if (browserName === 'firefox') {
-      // Firefoxでは追加の待機が必要
-      await wait.waitForBrowserStability();
-      await wait.waitForNetworkStable({ timeout: 2000 });
-
-      // Firefoxの場合、より安定したセレクター戦略を使用
-      editElement = modal.locator('button').filter({ hasText: 'Edit' }).first();
-    } else {
-      // Chromiumベースのブラウザ
-      editElement = modal.locator('button:has-text("Edit")');
-    }
+    const editElement = modal.locator('button:has-text("Edit")');
 
     // Editボタンが確実に表示されていることを確認
     try {
       await expect(editElement).toBeVisible({ timeout: 5000 });
-      console.log(`${browserName}: Edit button is visible, attempting to click...`);
+      console.log('Chrome: Edit button is visible, attempting to click...');
     } catch (error) {
-      console.error(`${browserName}: Edit button not visible, logging modal content...`);
+      console.error('Chrome: Edit button not visible, logging modal content...');
       const modalText = await modal.textContent();
       console.log('Modal content:', modalText);
       throw error;
     }
 
-    // クリック処理（WebKitの場合は force オプションを使用）
-    if (browserName === 'webkit') {
-      await editElement.click({ force: true });
-    } else {
-      await editElement.click();
-    }
+    // クリック処理
+    await editElement.click();
 
     // 編集ページに遷移するのを待つ
     await expect(page).toHaveURL(/\/materials\/[^/]+\/edit$/);
@@ -531,17 +504,9 @@ test.describe('@materials Edit Material', () => {
     // タグを追加 (ラベルテキストを正確に指定)
     await page.fill('input#tags', 'edited, test, update');
 
-    // CrossBrowserHelperを使用してFirefox対応の送信処理を実行
-    const browserName = crossBrowser.getBrowserName();
-
-    console.log(`Browser: ${browserName} - Using cross-browser form submission`);
-
-    // Server Actionを使用したフォーム送信（Firefox対応）
-    await crossBrowser.submitFormWithDialog(
-      'button[type="submit"]',
-      undefined, // Server Actionなのでダイアログなし
-      '/materials', // 期待されるナビゲーション先
-    );
+    // Server Actionを使用しているので、API監視は不要
+    // 保存
+    await form.submitForm();
 
     // データが更新されるまで少し待つ
     await wait.waitForNetworkStable({ timeout: 4000 });
@@ -720,20 +685,8 @@ test.describe('@materials Edit Material', () => {
       timeout: 10000,
     });
 
-    // WebKitでは追加の待機が必要な場合がある
-    const browserName = page.context().browser()?.browserType().name() || 'unknown';
-    if (browserName === 'webkit') {
-      // WebKitでは時々リダイレクトが遅れるため、短い待機を入れる
-      await page.waitForTimeout(1000);
-
-      // 明示的にURLを確認し、まだ編集ページにいる場合は素材一覧に移動
-      const currentUrl = page.url();
-      if (currentUrl.includes('/edit')) {
-        await page.goto('/materials');
-      }
-    } else {
-      await page.waitForURL('/materials', { timeout: 30000 });
-    }
+    // ページの遷移を待つ
+    await page.waitForURL('/materials', { timeout: 30000 });
 
     // Step 4: 素材一覧で評価が表示されることを確認
     await expect(page.locator('h1:has-text("Materials")')).toBeVisible();

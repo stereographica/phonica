@@ -4,7 +4,6 @@ export { FormHelper } from './form';
 export { WaitHelper } from './wait';
 export { TableHelper } from './table';
 export { ModalHelper } from './modal';
-export { CrossBrowserHelper } from './cross-browser';
 export { ToastHelper } from './toast';
 
 // ヘルパーのタイプ定義

@@ -76,14 +76,7 @@ export class MaterialHelper {
   /**
    * 素材一覧ページで特定の素材が表示されるまで待機
    */
-  async waitForMaterialInList(title: string, timeout: number = 30000) {
-    const browserName = this.page.context().browser()?.browserType().name() || 'unknown';
-
-    // Firefox/WebKitでは追加の待機が必要
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      await this.page.waitForTimeout(2000);
-    }
-
+  async waitForMaterialInList(title: string, timeout: number = 10000) {
     // 素材が表示されるまで待機
     const materialCell = this.page.locator(`td:has-text("${title}")`).first();
     await materialCell.waitFor({ state: 'visible', timeout });
@@ -119,14 +112,14 @@ export class MaterialHelper {
       const filterInput = this.page
         .locator('input[placeholder*="Filter"], input[placeholder*="title"], input[type="text"]')
         .first();
-      if (await filterInput.isVisible({ timeout: 5000 })) {
+      if (await filterInput.isVisible({ timeout: 2000 })) {
         await filterInput.fill(searchQuery);
 
         // フィルター適用ボタンを探してクリック
         const applyButton = this.page.locator(
           'button:has-text("Apply"), button:has-text("Filter")',
         );
-        if (await applyButton.isVisible({ timeout: 5000 })) {
+        if (await applyButton.isVisible({ timeout: 2000 })) {
           await applyButton.click();
           await this.waitHelper.waitForNetworkStable();
         }
@@ -165,7 +158,7 @@ export class MaterialHelper {
         const materialInTable = this.page
           .locator(`tbody tr:has-text("${title}") td a, tbody tr:has-text("${title}") button`)
           .first();
-        if (await materialInTable.isVisible({ timeout: 5000 })) {
+        if (await materialInTable.isVisible({ timeout: 2000 })) {
           console.log(`方法2: テーブル内の素材リンクをクリック`);
           await materialInTable.click();
           await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
@@ -180,7 +173,7 @@ export class MaterialHelper {
       try {
         // 方法3: テキストによる素材リンクを探す
         const materialLink = this.page.locator(`text="${title}"`).first();
-        await materialLink.waitFor({ state: 'visible', timeout: 10000 });
+        await materialLink.waitFor({ state: 'visible', timeout: 3000 });
         console.log(`方法3: テキストリンクをクリック`);
         await materialLink.click();
         await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
@@ -195,7 +188,7 @@ export class MaterialHelper {
         // 方法4: より柔軟な検索（部分一致）
         const partialTitle = title.split(' ')[0]; // タイトルの最初の単語で検索
         const partialLink = this.page.locator(`button:has-text("${partialTitle}")`).first();
-        await partialLink.waitFor({ state: 'visible', timeout: 10000 });
+        await partialLink.waitFor({ state: 'visible', timeout: 3000 });
         console.log(`方法4: 部分一致でクリック（"${partialTitle}"）`);
         await partialLink.click();
         await this.modalHelper.waitForOpen(); // デフォルトタイムアウトを使用
@@ -222,7 +215,7 @@ export class MaterialHelper {
     // フォームが表示されるまで待機
     await this.page.waitForSelector('form, [data-testid="material-form"]', {
       state: 'visible',
-      timeout: 10000,
+      timeout: 5000,
     });
   }
 
@@ -236,7 +229,7 @@ export class MaterialHelper {
     // 編集フォームが表示されるまで待機
     await this.page.waitForSelector('form, [data-testid="material-edit-form"]', {
       state: 'visible',
-      timeout: 10000,
+      timeout: 5000,
     });
   }
 

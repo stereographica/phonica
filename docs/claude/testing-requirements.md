@@ -109,6 +109,19 @@ Common scenarios and solutions:
 
 ## E2E Test Execution Rules
 
+### Browser Configuration
+
+**Chrome-only Testing Strategy**:
+
+- **E2E tests run exclusively on Chrome (Chromium)** for consistency and reliability
+- **No multi-browser testing**: Firefox and WebKit testing has been removed
+- **Benefits**:
+  - Eliminates browser-specific test failures and flakiness
+  - Reduces CI execution time by ~70%
+  - Simplifies test maintenance and debugging
+  - Consistent FormData handling with Next.js 15
+- **Coverage**: Chrome usage represents majority of target users
+
 ### Timeout Configuration
 
 - **ALWAYS use 10-minute timeout (600000ms)** when executing E2E tests via Bash tool

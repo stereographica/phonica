@@ -1,12 +1,5 @@
 import { test, expect } from '../../fixtures/test-fixtures';
-import {
-  NavigationHelper,
-  FormHelper,
-  ModalHelper,
-  TableHelper,
-  CrossBrowserHelper,
-  WaitHelper,
-} from '../../helpers';
+import { NavigationHelper, FormHelper, ModalHelper, TableHelper, WaitHelper } from '../../helpers';
 import * as path from 'path';
 
 test.describe.configure({ mode: 'serial' }); // ワークフローテストは順次実行
@@ -15,7 +8,6 @@ test.describe('@workflow Data Integrity Workflow', () => {
   let form: FormHelper;
   let modal: ModalHelper;
   let table: TableHelper;
-  let crossBrowser: CrossBrowserHelper;
   let wait: WaitHelper;
 
   test.beforeEach(async ({ page }) => {
@@ -23,7 +15,6 @@ test.describe('@workflow Data Integrity Workflow', () => {
     form = new FormHelper(page);
     modal = new ModalHelper(page);
     table = new TableHelper(page);
-    crossBrowser = new CrossBrowserHelper(page);
     wait = new WaitHelper(page);
   });
 
@@ -34,15 +25,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
     test.skip();
 
-    // Firefoxでは素材作成後の検索で不安定な挙動があるため一時的にスキップ
-    // issue #33で根本対応予定
-    if (browserName === 'firefox') {
-      test.skip();
-      return;
-    }
-
     // 一時的な回避策: slug重複問題（issue #33）を回避するため
-    // Chromiumでは待機不要（FirefoxとWebKitはすでにスキップ済み）
 
     // 1. 機材マスタを確認
     await navigation.goToEquipmentMasterPage();
@@ -59,8 +42,8 @@ test.describe('@workflow Data Integrity Workflow', () => {
     // process.hrtime.bigint()を使用してナノ秒精度のタイムスタンプを取得
     const hrtime = process.hrtime.bigint();
     const uniqueSuffix = hrtime.toString().slice(-10); // 最後の10桁を使用
-    const uniqueEquipmentName = `DI Equipment ${browserName} ${uniqueSuffix}`;
-    const uniqueMaterialTitle = `DI Material ${browserName} ${uniqueSuffix}`;
+    const uniqueEquipmentName = `DI Equipment Chrome ${uniqueSuffix}`;
+    const uniqueMaterialTitle = `DI Material Chrome ${uniqueSuffix}`;
     let savedSlug = ''; // Material slug will be saved here after creation
     await form.fillByLabel('Name', uniqueEquipmentName);
     await form.fillByLabel('Type', 'Test Equipment');
@@ -154,47 +137,34 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     await page.waitForURL('/materials', { timeout: 15000 });
 
-    // すべてのブラウザで追加の待機とリロードを実行
-    // FirefoxとWebKitでは特に長めの待機が必要
-    if (browserName === 'webkit') {
-      console.log(`${browserName}: Waiting for data synchronization with extended timeout...`);
-      // WebKitでは特に長い待機時間が必要
-      await wait.waitForNetworkStable({ timeout: 15000 });
-      await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
+    // データ同期のための待機とリロード
+    console.log('Chrome: Waiting for data synchronization with extended timeout...');
+    await wait.waitForNetworkStable({ timeout: 15000 });
+    await wait.waitForDataLoad({ minRows: 1, timeout: 5000 });
 
-      // 複数回リロードして確実にデータを取得
-      for (let i = 0; i < 3; i++) {
-        await page.reload({ waitUntil: 'networkidle' });
-        await wait.waitForNetworkStable({ timeout: 3000 });
-      }
-    } else {
-      // Chromiumでは通常の処理
-      await wait.waitForNetworkStable({ timeout: 2000 });
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-      await wait.waitForDataLoad({ minRows: 1, timeout: 2000 });
+    // 複数回リロードして確実にデータを取得
+    for (let i = 0; i < 3; i++) {
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait.waitForNetworkStable({ timeout: 3000 });
     }
 
-    // Chromiumでのみ以下の処理を実行（FirefoxとWebKitはすでにスキップ済み）
-    // この時点でbrowserNameは必ず'chromium'
-    if (browserName === 'chromium') {
-      // Chromiumでの通常のフィルター処理を実行する
+    // 素材の検索と表示確認
+    // Chromiumでの通常のフィルター処理を実行する
 
-      // Chromiumでは通常のフィルター処理を使用
-      const titleFilter = page.locator('input#titleFilter');
-      await expect(titleFilter).toBeVisible({ timeout: 10000 });
-      await titleFilter.clear();
-      await titleFilter.fill(uniqueMaterialTitle);
+    // Chromiumでは通常のフィルター処理を使用
+    const titleFilter = page.locator('input#titleFilter');
+    await expect(titleFilter).toBeVisible({ timeout: 10000 });
+    await titleFilter.clear();
+    await titleFilter.fill(uniqueMaterialTitle);
 
-      await page.click('button:has-text("Apply Filters")');
-      await page.waitForLoadState('networkidle');
-      await wait.waitForDataLoad({ minRows: 1, timeout: 2000 });
+    await page.click('button:has-text("Apply Filters")');
+    await page.waitForLoadState('networkidle');
+    await wait.waitForDataLoad({ minRows: 1, timeout: 2000 });
 
-      // 素材の表示を確認
-      await expect(page.locator(`button:has-text("${uniqueMaterialTitle}")`)).toBeVisible({
-        timeout: 15000,
-      });
-    }
+    // 素材の表示を確認
+    await expect(page.locator(`button:has-text("${uniqueMaterialTitle}")`)).toBeVisible({
+      timeout: 15000,
+    });
 
     // WebKitの場合の特別な処理（このテストはWebKitではすでにスキップされているため、ここに到達しない）
 
@@ -203,7 +173,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
     await page.locator(`button:has-text("${uniqueMaterialTitle}")`).click();
 
     // Chromiumでのみ実行（FirefoxとWebKitはすでにスキップ済み）
-    await crossBrowser.waitForModalOpen();
+    await modal.waitForOpen();
 
     // 位置情報が正しく表示されることを確認（存在する場合のみ）
     const locationInModal = page.locator('[role="dialog"]').getByText('Test Studio');
@@ -242,17 +212,17 @@ test.describe('@workflow Data Integrity Workflow', () => {
     await page.waitForSelector('[role="menuitem"]:has-text("Edit")', { state: 'visible' });
     await page.click('[role="menuitem"]:has-text("Edit")');
 
-    await crossBrowser.waitForModalOpen();
+    await modal.waitForOpen();
 
-    // 機材名を変更（クロスブラウザ対応）
-    const updatedEquipmentName = `Updated DI Equipment ${browserName} ${uniqueSuffix}`;
-    await crossBrowser.fillInputSafely('[role="dialog"] input[name="name"]', updatedEquipmentName);
+    // 機材名を変更
+    const updatedEquipmentName = `Updated DI Equipment Chrome ${uniqueSuffix}`;
+    await form.fillByLabel('Name', updatedEquipmentName);
 
     await modal.clickButton('Save');
-    await crossBrowser.waitForModalClose();
+    await modal.waitForClose();
 
     // 機材名が更新されたことを確認
-    await crossBrowser.waitForElementVisible(`td:has-text("${updatedEquipmentName}")`);
+    await wait.waitForElementVisible(`td:has-text("${updatedEquipmentName}")`);
 
     // 6. 素材詳細で更新された機材名が反映されていることを確認
     await navigation.goToMaterialsPage();
@@ -264,7 +234,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     // Chromiumでのみ以下の処理を実行（FirefoxとWebKitはすでにスキップ済み）
     if (browserName === 'chromium') {
-      console.log(`${browserName}: Starting post-equipment-edit material search...`);
+      console.log(`Chrome: Starting post-equipment-edit material search...`);
 
       // ページをリロードして最新データを取得
       await page.reload({ waitUntil: 'networkidle' });
@@ -280,7 +250,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
       const maxSearchAttempts = 10;
 
       // 素材が既に作成されているはずなので、まず全素材を表示
-      console.log(`${browserName}: Clearing any existing filters first...`);
+      console.log(`Chrome: Clearing any existing filters first...`);
       const clearFilter = page.locator('input#titleFilter');
       if (await clearFilter.isVisible({ timeout: 2000 }).catch(() => false)) {
         await clearFilter.clear();
@@ -290,7 +260,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
       for (let attempt = 0; attempt < maxSearchAttempts; attempt++) {
         console.log(
-          `${browserName}: Post-equipment-edit search attempt ${attempt + 1}/${maxSearchAttempts}`,
+          `Chrome: Post-equipment-edit search attempt ${attempt + 1}/${maxSearchAttempts}`,
         );
 
         // 2回目以降はページをリロード
@@ -313,7 +283,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
           const tdMatch = page.locator(`td:has-text("${uniqueMaterialTitle}")`);
           materialFound = await tdMatch.isVisible({ timeout: 2000 }).catch(() => false);
           if (materialFound) {
-            console.log(`${browserName}: Found material in td element`);
+            console.log(`Chrome: Found material in td element`);
           }
         }
 
@@ -325,9 +295,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
           const partialCount = await partialMatchButton.count();
           if (partialCount > 0) {
             materialFound = true;
-            console.log(
-              `${browserName}: Found material with partial match (${partialCount} matches)`,
-            );
+            console.log(`Chrome: Found material with partial match (${partialCount} matches)`);
           }
         }
 
@@ -335,31 +303,31 @@ test.describe('@workflow Data Integrity Workflow', () => {
           // 方法4: すべてのボタンをチェック
           const allButtons = page.locator('button.text-blue-600');
           const buttonCount = await allButtons.count();
-          console.log(`${browserName}: Checking ${buttonCount} buttons...`);
+          console.log(`Chrome: Checking ${buttonCount} buttons...`);
 
           for (let i = 0; i < Math.min(buttonCount, 10); i++) {
             const buttonText = await allButtons.nth(i).textContent();
             if (buttonText && buttonText.includes(uniqueMaterialTitle.substring(0, 20))) {
               materialFound = true;
-              console.log(`${browserName}: Found material at button index ${i}: ${buttonText}`);
+              console.log(`Chrome: Found material at button index ${i}: ${buttonText}`);
               break;
             }
           }
         }
 
         if (materialFound) {
-          console.log(`${browserName}: Material found successfully`);
+          console.log(`Chrome: Material found successfully`);
           break;
         }
 
         // フィルターは使わない（FirefoxとWebKitでは不安定なため）
-        console.log(`${browserName}: Skipping filter search for better stability`);
+        console.log(`Chrome: Skipping filter search for better stability`);
 
         // デバッグ情報を出力（最後の試行時）
         if (attempt === maxSearchAttempts - 1) {
           const allRows = page.locator('tbody tr');
           const rowCount = await allRows.count();
-          console.log(`${browserName}: Final attempt - Total rows: ${rowCount}`);
+          console.log(`Chrome: Final attempt - Total rows: ${rowCount}`);
           for (let i = 0; i < Math.min(rowCount, 5); i++) {
             const row = allRows.nth(i);
             const titleText = await row
@@ -367,14 +335,14 @@ test.describe('@workflow Data Integrity Workflow', () => {
               .first()
               .textContent()
               .catch(() => 'N/A');
-            console.log(`${browserName}: Row ${i}: ${titleText}`);
+            console.log(`Chrome: Row ${i}: ${titleText}`);
           }
         }
       }
 
       if (!materialFound) {
         // 最後の手段: ページを完全にリロード
-        console.log(`${browserName}: Final attempt - navigating to materials page directly`);
+        console.log(`Chrome: Final attempt - navigating to materials page directly`);
         await page.goto('/materials', { waitUntil: 'networkidle' });
         await wait.waitForNetworkStable({ timeout: 5000 });
         await wait.waitForDataLoad({ minRows: 1 });
@@ -386,14 +354,14 @@ test.describe('@workflow Data Integrity Workflow', () => {
         if (!finalCheck) {
           // エラーではなく警告として扱い、テストを続行
           console.warn(
-            `${browserName}: Material "${uniqueMaterialTitle}" not found after equipment edit. This might be a timing issue. Continuing with test...`,
+            `Chrome: Material "${uniqueMaterialTitle}" not found after equipment edit. This might be a timing issue. Continuing with test...`,
           );
           // 最初に見つかる素材を使用
           const anyMaterial = page.locator('button.text-blue-600').first();
           if (await anyMaterial.isVisible({ timeout: 3000 })) {
-            console.log(`${browserName}: Using first available material instead`);
+            console.log(`Chrome: Using first available material instead`);
             await anyMaterial.click();
-            await crossBrowser.waitForModalOpen();
+            await modal.waitForOpen();
             await page.keyboard.press('Escape');
             await expect(page.locator('[role="dialog"]')).not.toBeVisible();
             console.log('✅ Data integrity workflow completed with workaround!');
@@ -432,7 +400,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
     }
 
     await materialRow.locator('button').first().click();
-    await crossBrowser.waitForModalOpen();
+    await modal.waitForOpen();
 
     // 機材情報の更新は実装されていない場合スキップ
     // await expect(page.locator('[role="dialog"]').getByText('Updated Data Integrity Equipment')).toBeVisible();
@@ -510,11 +478,11 @@ test.describe('@workflow Data Integrity Workflow', () => {
 
     // 素材を保存（クロスブラウザ対応）
     // Server Actionを使用しているため、ダイアログは表示されない
-    await crossBrowser.submitFormWithDialog(
-      'button[type="submit"]:has-text("Save Material")',
-      undefined, // ダイアログメッセージなし
-      '/materials', // ナビゲーション先
-    );
+    const submitButton = page.locator('button[type="submit"]:has-text("Save Material")');
+    await submitButton.click();
+
+    // ナビゲーション完了を待つ
+    await page.waitForURL('/materials', { timeout: 30000 });
 
     // ページが完全に読み込まれるまで待機
     await page.waitForLoadState('networkidle');
@@ -529,7 +497,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
       await page.waitForLoadState('networkidle');
     }
 
-    await crossBrowser.waitForElementVisible(`td:has-text("${uniqueTagTestTitle}")`);
+    await wait.waitForElementVisible(`td:has-text("${uniqueTagTestTitle}")`);
 
     // 3. 素材詳細でタグが正しく表示されることを確認
     // Firefoxでは追加の待機が必要
@@ -557,7 +525,7 @@ test.describe('@workflow Data Integrity Workflow', () => {
       await wait.waitForBrowserStability();
     }
 
-    await crossBrowser.waitForModalOpen();
+    await modal.waitForOpen();
 
     // タグが表示されることを確認（一部が含まれていることを確認）
     await expect(page.locator('[role="dialog"]')).toContainText('consistency-test');

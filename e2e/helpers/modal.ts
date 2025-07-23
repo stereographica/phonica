@@ -7,13 +7,6 @@ export class ModalHelper {
   constructor(private page: Page) {}
 
   /**
-   * ブラウザ名を取得
-   */
-  private getBrowserName(): string {
-    return this.page.context().browser()?.browserType().name() || 'unknown';
-  }
-
-  /**
    * モーダルのロケーターを取得
    */
   getModal(): Locator {
@@ -42,13 +35,7 @@ export class ModalHelper {
   async clickButton(buttonText: string) {
     const modal = this.getModal();
     const button = modal.locator(`button:has-text("${buttonText}")`);
-
-    // WebKitの場合は force オプションを使用
-    if (this.getBrowserName() === 'webkit') {
-      await button.click({ force: true });
-    } else {
-      await button.click();
-    }
+    await button.click();
   }
 
   /**
@@ -60,12 +47,7 @@ export class ModalHelper {
       .locator('[aria-label="Close"], button[aria-label*="close"], button:has-text("×")')
       .first();
     if (await closeButton.isVisible()) {
-      // WebKitの場合は force オプションを使用
-      if (this.getBrowserName() === 'webkit') {
-        await closeButton.click({ force: true });
-      } else {
-        await closeButton.click();
-      }
+      await closeButton.click();
     }
   }
 
@@ -121,13 +103,7 @@ export class ModalHelper {
     const confirmButton = confirmDialog.locator(
       'button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes")',
     );
-
-    // WebKitの場合は force オプションを使用
-    if (this.getBrowserName() === 'webkit') {
-      await confirmButton.click({ force: true });
-    } else {
-      await confirmButton.click();
-    }
+    await confirmButton.click();
   }
 
   /**
@@ -136,12 +112,6 @@ export class ModalHelper {
   async cancelAction() {
     const confirmDialog = this.page.locator('[role="alertdialog"]');
     const cancelButton = confirmDialog.locator('button:has-text("Cancel"), button:has-text("No")');
-
-    // WebKitの場合は force オプションを使用
-    if (this.getBrowserName() === 'webkit') {
-      await cancelButton.click({ force: true });
-    } else {
-      await cancelButton.click();
-    }
+    await cancelButton.click();
   }
 }

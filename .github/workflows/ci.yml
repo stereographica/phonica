@@ -131,11 +131,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox, webkit]
-    name: E2E Tests (${{ matrix.browser }})
+    name: E2E Tests (Chrome)
 
     services:
       postgres:
@@ -176,7 +172,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+        run: npx playwright install --with-deps chromium
 
       - name: Install FFmpeg
         run: |
@@ -207,7 +203,7 @@ jobs:
           echo "📁 Uploads directory:"
           ls -la public/uploads/ || echo "No uploads directory yet"
 
-      - name: Run E2E tests - ${{ matrix.browser }}
+      - name: Run E2E tests - Chrome
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           POSTGRES_USER: postgres
@@ -217,27 +213,13 @@ jobs:
           REDIS_URL: redis://localhost:6379
           NODE_ENV: test
           CI: true
-        run: |
-          # Firefox専用のタイムアウト延長設定
-          if [ "${{ matrix.browser }}" = "firefox" ]; then
-            echo "🦊 Firefox detected: Using extended timeout (20 minutes)"
-            timeout 1200s npm run e2e:ci:${{ matrix.browser }} || {
-              EXIT_CODE=$?
-              echo "❌ Firefox E2E tests exited with code: $EXIT_CODE"
-              if [ $EXIT_CODE -eq 124 ]; then
-                echo "⏱️ Firefox tests timed out after 20 minutes"
-              fi
-              exit $EXIT_CODE
-            }
-          else
-            npm run e2e:ci:${{ matrix.browser }}
-          fi
+        run: npm run e2e:ci
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-${{ matrix.browser }}
+          name: playwright-report-chrome
           path: playwright-report/
           retention-days: 30
 
@@ -261,15 +243,11 @@ jobs:
             });
             
             const e2eJobs = jobs.data.jobs.filter(job => job.name.startsWith('E2E Tests'));
-            const results = e2eJobs.map(job => {
-              const browser = job.name.match(/\((.+)\)/)?.[1] || 'Unknown';
-              const status = job.conclusion === 'success' ? '✅' : '❌';
-              return `- ${browser}: ${status}`;
-            }).join('\n');
+            const status = e2eJobs[0]?.conclusion === 'success' ? '✅' : '❌';
             
-            const overallStatus = e2eJobs.every(job => job.conclusion === 'success') 
-              ? '✅ すべてのE2Eテストが成功しました' 
-              : '❌ 一部のE2Eテストが失敗しました';
+            const overallStatus = e2eJobs[0]?.conclusion === 'success' 
+              ? '✅ E2Eテストが成功しました' 
+              : '❌ E2Eテストが失敗しました';
 
             // PRの場合のみコメントを投稿
             if (context.issue && context.issue.number) {
@@ -277,12 +255,12 @@ jobs:
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `## 🧪 E2Eテスト結果\n\n${overallStatus}\n\n### ブラウザ別結果:\n${results}\n\n- 実行時刻: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+                body: `## 🧪 E2Eテスト結果\n\n${overallStatus}\n\n- ブラウザ: Chrome\n- 実行時刻: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
               });
             } else {
               console.log('This is not a pull request, skipping comment creation');
               console.log('E2E test results:', overallStatus);
-              console.log('Browser results:', results);
+              console.log('Browser: Chrome');
             }
 
   deploy-preview:

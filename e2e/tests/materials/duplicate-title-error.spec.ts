@@ -21,8 +21,8 @@ test.describe('@materials Duplicate Title Error Handling', () => {
   });
 
   test('should display specific error message for duplicate title on create', async ({ page }) => {
-    // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
-    test.skip();
+    // データベース分離により並列実行が安定化したため有効化
+    // test.skip();
     await page.goto('/materials/new');
 
     // まず1つ目の素材を作成
@@ -111,10 +111,7 @@ test.describe('@materials Duplicate Title Error Handling', () => {
   });
 
   test('should display specific error message for duplicate title on edit', async ({ page }) => {
-    // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
-    test.skip();
-
-    // 並列実行時の不安定性のため一時的にスキップ（issue #72の修正とは無関係）
+    // 実行時間が長すぎてタイムアウトするためスキップ継続（最適化が必要）
     test.skip();
     // 素材一覧ページへ
     await navigation.goToMaterialsPage();
