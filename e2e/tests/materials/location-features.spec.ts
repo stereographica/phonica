@@ -1,6 +1,5 @@
 import { test, expect } from '../../fixtures/test-fixtures';
 import { WaitHelper } from '../../helpers/wait';
-// import * as path from 'path';
 
 test.describe('@materials @location Location Features', () => {
   let waitHelper: WaitHelper;

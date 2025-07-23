@@ -1,15 +1,12 @@
 import { test, expect } from '../fixtures/test-fixtures';
-// import { MaterialHelper } from '../helpers/material-helper';
 import { WaitHelper } from '../helpers/wait';
 import { ModalHelper } from '../helpers/modal';
 
 test.describe('Audio Player Debug', () => {
-  // let materialHelper: MaterialHelper;
   let waitHelper: WaitHelper;
   let modalHelper: ModalHelper;
 
   test.beforeEach(async ({ page }) => {
-    // materialHelper = new MaterialHelper(page);
     waitHelper = new WaitHelper(page);
     modalHelper = new ModalHelper(page);
 

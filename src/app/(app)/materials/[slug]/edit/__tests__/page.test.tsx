@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import '@testing-library/jest-dom';
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EditMaterialPage from '../page';
 
@@ -1735,12 +1735,22 @@ describe('EditMaterialPage', () => {
       // We'll override the useParams mock to return null
       mockUseParams.mockReturnValue({ slug: null });
 
-      // Need to re-render the component to pick up the new mock
-      // const { rerender } = render(<EditMaterialPage />);
+      // Re-render the component to pick up the new mock
+      cleanup();
+      await act(async () => {
+        render(<EditMaterialPage />);
+      });
 
-      // The component should now show the error state for missing slug
+      // Wait for loading to complete
+      await waitFor(() =>
+        expect(screen.queryByText(/loading material data.../i)).not.toBeInTheDocument(),
+      );
+
+      // Now the component should show an error state for missing slug
       await waitFor(() => {
-        expect(screen.getByText(/Error: Material identifier is missing/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/Error: Material identifier is missing. Cannot load data./i),
+        ).toBeInTheDocument();
       });
 
       consoleSpy.mockRestore();
