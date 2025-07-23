@@ -515,7 +515,12 @@ describe('file-system', () => {
 
     it('should rethrow non-ENOENT errors', async () => {
       await jest.isolateModules(async () => {
-        const error = new Error('Permission denied');
+        const error = Object.assign(new Error('Permission denied'), {
+          code: 'EACCES',
+          errno: -13,
+          syscall: 'unlink',
+          path: '/test/file.wav',
+        }) as NodeJS.ErrnoException;
         const mockUnlink = jest.fn().mockRejectedValue(error);
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
