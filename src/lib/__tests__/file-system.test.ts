@@ -417,11 +417,14 @@ describe('file-system', () => {
         const mockUnlink = jest.fn().mockResolvedValue(undefined);
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
+        // Ensure clean module state
+        jest.resetModules();
+
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
-          access: jest.fn(),
-          rename: jest.fn(),
-          readdir: jest.fn(),
+          access: jest.fn().mockResolvedValue(undefined),
+          rename: jest.fn().mockResolvedValue(undefined),
+          readdir: jest.fn().mockResolvedValue([]),
         }));
 
         const { deleteFile } = await import('../file-system');
@@ -430,8 +433,10 @@ describe('file-system', () => {
 
         // Wait for any pending async operations
         await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         expect(mockUnlink).toHaveBeenCalledWith(testPath);
+        expect(mockUnlink).toHaveBeenCalledTimes(1);
         expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"success":true'));
 
         consoleSpy.mockRestore();
@@ -441,20 +446,37 @@ describe('file-system', () => {
     it('should delete file with path validation', async () => {
       await jest.isolateModules(async () => {
         const mockUnlink = jest.fn().mockResolvedValue(undefined);
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
         const path = await import('path');
 
+        // Ensure clean module state and mock before any imports
+        jest.resetModules();
+
+        // Mock fs/promises with explicit module path
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
-          access: jest.fn(),
-          rename: jest.fn(),
-          readdir: jest.fn(),
+          access: jest.fn().mockResolvedValue(undefined),
+          rename: jest.fn().mockResolvedValue(undefined),
+          readdir: jest.fn().mockResolvedValue([]),
         }));
 
-        const { deleteFile } = await import('../file-system');
+        // Import the module after mocking - use require to ensure sync resolution
+        const fileSystemModule = await import('../file-system');
+        const { deleteFile } = fileSystemModule;
 
+        // Call deleteFile with path validation
         await deleteFile('file.wav', { allowedBaseDir: baseDir });
 
-        expect(mockUnlink).toHaveBeenCalledWith(path.resolve(baseDir, 'file.wav'));
+        // Wait for all async operations to complete
+        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Verify that unlink was called with the correct path
+        const expectedPath = path.resolve(baseDir, 'file.wav');
+        expect(mockUnlink).toHaveBeenCalledWith(expectedPath);
+        expect(mockUnlink).toHaveBeenCalledTimes(1);
+
+        consoleSpy.mockRestore();
       });
     });
 
