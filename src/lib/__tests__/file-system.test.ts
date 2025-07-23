@@ -4,15 +4,13 @@
 
 describe('file-system', () => {
   beforeEach(() => {
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'info').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.clearAllMocks();
+    jest.resetModules();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.resetModules();
   });
 
   describe('validateAndNormalizePath', () => {
@@ -142,6 +140,9 @@ describe('file-system', () => {
   describe('logFileOperation', () => {
     it('should log successful operations with info level', async () => {
       await jest.isolateModules(async () => {
+        // Mock console within isolateModules to prevent cross-test contamination
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         await logFileOperation({
@@ -151,13 +152,17 @@ describe('file-system', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
         });
 
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"level":"info"'));
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"operation":"delete"'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"level":"info"'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"operation":"delete"'));
+
+        consoleSpy.mockRestore();
       });
     });
 
     it('should log failed operations with error level', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         await logFileOperation({
@@ -168,15 +173,19 @@ describe('file-system', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
         });
 
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"level":"error"'));
-        expect(console.log).toHaveBeenCalledWith(
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"level":"error"'));
+        expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining('"error":"Permission denied"'),
         );
+
+        consoleSpy.mockRestore();
       });
     });
 
     it('should include materialId when provided', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         await logFileOperation({
@@ -187,14 +196,18 @@ describe('file-system', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
         });
 
-        expect(console.log).toHaveBeenCalledWith(
+        expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining('"materialId":"material-123"'),
         );
+
+        consoleSpy.mockRestore();
       });
     });
 
     it('should handle rename operations', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         await logFileOperation({
@@ -204,12 +217,16 @@ describe('file-system', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
         });
 
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"operation":"rename"'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"operation":"rename"'));
+
+        consoleSpy.mockRestore();
       });
     });
 
     it('should handle create operations', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         await logFileOperation({
@@ -219,12 +236,16 @@ describe('file-system', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
         });
 
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"operation":"create"'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"operation":"create"'));
+
+        consoleSpy.mockRestore();
       });
     });
 
     it('should log all required fields', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         const logEntry = {
@@ -238,7 +259,7 @@ describe('file-system', () => {
 
         await logFileOperation(logEntry);
 
-        const logCall = (console.log as jest.Mock).mock.calls[0][0];
+        const logCall = consoleSpy.mock.calls[0][0];
         const parsedLog = JSON.parse(logCall);
 
         expect(parsedLog.level).toBe('error');
@@ -249,6 +270,8 @@ describe('file-system', () => {
         expect(parsedLog.success).toBe(false);
         expect(parsedLog.error).toBe('File not found');
         expect(parsedLog.timestamp).toBe('2024-01-01T12:00:00.000Z');
+
+        consoleSpy.mockRestore();
       });
     });
   });
@@ -272,6 +295,8 @@ describe('file-system', () => {
 
     it('should handle logFileOperation with all possible combinations', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         // Test with minimal required fields
@@ -282,7 +307,9 @@ describe('file-system', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
         });
 
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"operation":"create"'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"operation":"create"'));
+
+        consoleSpy.mockRestore();
       });
     });
 
@@ -346,6 +373,8 @@ describe('file-system', () => {
 
     it('should handle edge cases in operation logging', async () => {
       await jest.isolateModules(async () => {
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
         const { logFileOperation } = await import('../file-system');
 
         // Test success without materialId
@@ -373,6 +402,8 @@ describe('file-system', () => {
           success: true,
           timestamp: '2024-01-01T00:00:00.000Z',
         });
+
+        consoleSpy.mockRestore();
       });
     });
   });
@@ -384,6 +415,7 @@ describe('file-system', () => {
     it('should delete file successfully without validation', async () => {
       await jest.isolateModules(async () => {
         const mockUnlink = jest.fn().mockResolvedValue(undefined);
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
@@ -400,7 +432,9 @@ describe('file-system', () => {
         await new Promise((resolve) => setImmediate(resolve));
 
         expect(mockUnlink).toHaveBeenCalledWith(testPath);
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"success":true'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"success":true'));
+
+        consoleSpy.mockRestore();
       });
     });
 
@@ -429,6 +463,7 @@ describe('file-system', () => {
         const error = new Error('File not found') as NodeJS.ErrnoException;
         error.code = 'ENOENT';
         const mockUnlink = jest.fn().mockRejectedValue(error);
+        const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
@@ -440,9 +475,11 @@ describe('file-system', () => {
         const { deleteFile } = await import('../file-system');
 
         await expect(deleteFile(testPath, { skipValidation: true })).resolves.not.toThrow();
-        expect(console.info).toHaveBeenCalledWith(
+        expect(consoleInfoSpy).toHaveBeenCalledWith(
           expect.stringContaining('File already deleted or not found'),
         );
+
+        consoleInfoSpy.mockRestore();
       });
     });
 
@@ -450,6 +487,7 @@ describe('file-system', () => {
       await jest.isolateModules(async () => {
         const error = new Error('Permission denied');
         const mockUnlink = jest.fn().mockRejectedValue(error);
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
@@ -463,13 +501,16 @@ describe('file-system', () => {
         await expect(deleteFile(testPath, { skipValidation: true })).rejects.toThrow(
           'Permission denied',
         );
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"success":false'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"success":false'));
+
+        consoleSpy.mockRestore();
       });
     });
 
     it('should include materialId in logs', async () => {
       await jest.isolateModules(async () => {
         const mockUnlink = jest.fn().mockResolvedValue(undefined);
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
@@ -482,7 +523,9 @@ describe('file-system', () => {
 
         await deleteFile(testPath, { skipValidation: true, materialId: 'mat-123' });
 
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"materialId":"mat-123"'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"materialId":"mat-123"'));
+
+        consoleSpy.mockRestore();
       });
     });
 
@@ -749,6 +792,7 @@ describe('file-system', () => {
         const oldTimestamp = 1000000000 - 25 * 60 * 60 * 1000;
         const mockReaddir = jest.fn().mockResolvedValue([`old-file.wav.deleted_${oldTimestamp}`]);
         const mockUnlink = jest.fn();
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
@@ -763,7 +807,9 @@ describe('file-system', () => {
 
         expect(result).toEqual([]);
         expect(mockUnlink).not.toHaveBeenCalled();
-        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] Would delete'));
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] Would delete'));
+
+        consoleSpy.mockRestore();
       });
     });
 
@@ -792,6 +838,7 @@ describe('file-system', () => {
     it('should handle readdir errors gracefully', async () => {
       await jest.isolateModules(async () => {
         const mockReaddir = jest.fn().mockRejectedValue(new Error('Directory not found'));
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: jest.fn(),
@@ -805,10 +852,12 @@ describe('file-system', () => {
         const result = await cleanupOrphanedFiles('/test/uploads');
 
         expect(result).toEqual([]);
-        expect(console.error).toHaveBeenCalledWith(
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
           'Error during orphaned files cleanup:',
           expect.any(Error),
         );
+
+        consoleErrorSpy.mockRestore();
       });
     });
 
@@ -817,6 +866,7 @@ describe('file-system', () => {
         const oldTimestamp = 1000000000 - 25 * 60 * 60 * 1000;
         const mockReaddir = jest.fn().mockResolvedValue([`file.wav.deleted_${oldTimestamp}`]);
         const mockUnlink = jest.fn().mockRejectedValue(new Error('Permission denied'));
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
         jest.doMock('fs/promises', () => ({
           unlink: mockUnlink,
@@ -830,10 +880,12 @@ describe('file-system', () => {
         const result = await cleanupOrphanedFiles('/test/uploads');
 
         expect(result).toEqual([]);
-        expect(console.error).toHaveBeenCalledWith(
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Failed to cleanup'),
           expect.any(Error),
         );
+
+        consoleErrorSpy.mockRestore();
       });
     });
 
