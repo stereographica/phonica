@@ -75,7 +75,7 @@
     "tailwindcss-animate": "^1.0.7",
     "transliteration": "^2.3.5",
     "wavesurfer.js": "^7.9.9",
-    "zod": "^3.25.56"
+    "zod": "^4.0.10"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
