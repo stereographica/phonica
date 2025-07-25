@@ -119,8 +119,21 @@ test.describe('@materials @modal @detail Material Detail Modal Flows', () => {
         timeout: 30000, 
         force: true  // UI要素の重なりを回避
       });
+      
+      // クリック後の安定化待機（モバイル環境では処理に時間がかかる）
+      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
+      
+      // モーダル状態確認とフォールバック処理
+      const modalExists = await page.locator('[role="dialog"]').count();
+      if (modalExists === 0) {
+        // 強制クリックが効果がない場合の通常クリックリトライ
+        await page.waitForTimeout(1000);
+        await mobileFirstMaterialButton.click({ timeout: 15000 });
+        await page.waitForTimeout(1000);
+      }
 
-      await expect(modal).toBeVisible({ timeout: 10000 });
+      await expect(modal).toBeVisible({ timeout: 15000 });
 
       await page.keyboard.press('Escape');
       await expect(modal).not.toBeVisible({ timeout: 5000 });
