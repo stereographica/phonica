@@ -41,20 +41,17 @@ Remember: Every CI failure wastes time, breaks flow, and delays delivery. Test l
 ### 🔒 MANDATORY Pre-commit Hook Execution
 
 1. **Pre-commit hook exists and MUST pass**:
-
    - The repository has a pre-commit hook that runs ALL tests
    - You CANNOT commit unless ALL tests pass successfully
    - This includes unit tests, lint, type check, and E2E tests
 
 2. **DO NOT modify or bypass pre-commit hooks**:
-
    - NEVER delete or modify `.husky/pre-commit` file
    - NEVER reduce the number of tests executed in pre-commit hook
    - NEVER use `--no-verify` flag unless explicitly instructed by the user
    - **Exception**: You MAY use `--no-verify` for changes that don't affect test results (documentation, CI configuration, etc.)
 
 3. **Pre-commit hook execution policy**:
-
    - **MUST run pre-commit hook**: When changing implementation or tests
    - **MAY skip with `--no-verify`**: Only for documentation, CI configuration, or other non-test-affecting changes
    - **ALWAYS verify**: If unsure whether changes affect tests, run the pre-commit hook
@@ -70,22 +67,19 @@ Remember: Every CI failure wastes time, breaks flow, and delays delivery. Test l
 ### 🚦 Pre-commit Hook Timeout Handling
 
 1. **Expected execution time**:
-
    - **Normal execution**: 5-10 minutes for full test suite
    - **Maximum timeout**: Set to 15 minutes to account for worst-case scenarios
    - **ALWAYS use maximum timeout** when executing pre-commit hooks
    - **DO NOT assume quick completion** even for "small" changes
 
 2. **When pre-commit hook times out**:
-
    - **IMMEDIATELY report to the user** with the timeout duration
    - **WAIT for explicit user instructions**
    - **DO NOT make autonomous decisions** to use `--no-verify`
 
 3. **Common timeout scenarios**:
-
    - Large test suites taking longer than expected
-   - E2E tests running slowly (especially cross-browser tests)
+   - E2E tests running slowly (Chrome-only testing)
    - System resource constraints
    - First run after dependency updates
 
@@ -101,13 +95,11 @@ Remember: Every CI failure wastes time, breaks flow, and delays delivery. Test l
 ### ⚠️ Critical Mindset Principles
 
 1. **No change is too small**:
-
    - Even "simple" changes like instanceof checks can affect test execution
    - Changing error handling can impact test environments differently
    - Import statement modifications can break module resolution
 
 2. **Urgency is not an excuse**:
-
    - CI failures create pressure, but rushing increases risk
    - Following process prevents cascading failures
    - One proper fix is better than multiple rushed attempts

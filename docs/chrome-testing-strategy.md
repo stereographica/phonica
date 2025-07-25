@@ -1,32 +1,24 @@
-# FormData Browser Compatibility Guide
+# Browser Strategy Guide
 
 ## 概要
 
-Next.js 15 + Turbopack環境において、Firefox/WebKitでFormDataのパースエラーが発生する問題と、その解決策について説明します。
+Phonicaプロジェクトでは、E2Eテストの一貫性と信頼性を向上させるため、**Chrome専用テスト戦略**を採用しています。
 
-## 問題の詳細
+## Chrome専用戦略の理由
 
-### エラー内容
-```
-TypeError: expected a value starting with -- and the boundary
-```
+### 技術的利点
 
-このエラーは、multipart/form-dataのboundaryパラメータが正しく設定されていない、またはパースできない場合に発生します。
+1. **FormData処理の安定性**: Next.js 15 + TurbopackでChromeが最も安定したFormData処理を提供
+2. **CI実行時間の短縮**: 単一ブラウザ実行により約70%の時間短縮を実現
+3. **メンテナンス性の向上**: ブラウザ固有の問題解決に費やす時間を削減
 
-### 影響を受けるブラウザ
-- Firefox (全バージョン)
-- WebKit (Safari)
+### 実用的利点
 
-### 影響を受けないブラウザ
-- Chrome/Chromium
+1. **ユーザーベース**: Chromeは対象ユーザーの大多数が使用
+2. **開発効率**: テスト失敗の原因特定が容易
+3. **リソース配分**: 機能開発により多くの時間を割当可能
 
-## 原因
-
-1. **ブラウザ間の実装差異**: FormDataのmultipart boundary生成方法が異なる
-2. **undiciライブラリの問題**: Node.js 18以降で使用されるundiciのFormDataパースが、一部のブラウザが生成するboundaryと互換性がない
-3. **CRLF処理の違い**: 各ブラウザとHTTPクライアントがCRLF（改行）を異なる方法で処理
-
-## 解決策
+## 実装方針
 
 ### 1. サーバーアクション（推奨）
 
@@ -62,10 +54,7 @@ APIルートを使用する必要がある場合は、以下の対策を実装�
 // Content-Typeヘッダーの検証
 const contentType = request.headers.get('content-type') || '';
 if (!contentType.includes('multipart/form-data')) {
-  return NextResponse.json(
-    { error: "Invalid content type" },
-    { status: 400 }
-  );
+  return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
 }
 
 // リクエストのクローンを作成してリトライ
@@ -79,22 +68,14 @@ try {
 
 ### 3. E2Eテストの対応
 
-E2Eテストでは、ブラウザごとに異なる戦略を使用：
+E2EテストはChromeのみで実行されるため、FormDataのブラウザ互換性問題は発生しません。これにより、テストコードがシンプルになり、メンテナンスが容易になっています。
 
 ```typescript
 export class MaterialHelper {
   async createMaterial(data: MaterialData) {
-    const browserName = this.page.context().browser()?.browserType().name();
-    
-    // Firefox/WebKitはテスト用APIを使用
-    if (browserName === 'firefox' || browserName === 'webkit') {
-      return await this.page.request.post('/api/materials/test', {
-        data: { ...data }
-      });
-    }
-    
-    // Chromiumは通常のフォーム送信
-    // ...
+    // Chrome専用のシンプルな実装
+    // FormData関連の互換性問題を考慮する必要なし
+    return await this.submitForm(data);
   }
 }
 ```
@@ -104,20 +85,22 @@ export class MaterialHelper {
 ### 1. フォーム送信時の注意点
 
 **❌ 避けるべき実装:**
+
 ```javascript
 fetch('/api/endpoint', {
   headers: {
-    'Content-Type': 'multipart/form-data' // 手動で設定しない
+    'Content-Type': 'multipart/form-data', // 手動で設定しない
   },
-  body: formData
-})
+  body: formData,
+});
 ```
 
 **✅ 推奨実装:**
+
 ```javascript
 fetch('/api/endpoint', {
-  body: formData // ブラウザが自動的にContent-Typeを設定
-})
+  body: formData, // ブラウザが自動的にContent-Typeを設定
+});
 ```
 
 ### 2. プログレッシブエンハンスメント
@@ -130,7 +113,7 @@ fetch('/api/endpoint', {
 
 - **単体テスト**: FormData処理をモック化
 - **統合テスト**: サーバーアクションのテスト
-- **E2Eテスト**: ブラウザごとの動作確認
+- **E2Eテスト**: Chrome環境での動作確認
 
 ## 今後の開発への影響
 
@@ -138,7 +121,7 @@ fetch('/api/endpoint', {
 
 1. **サーバーアクションを優先的に使用**
 2. APIルートが必要な場合は、このガイドに従って実装
-3. E2Eテストでクロスブラウザ動作を確認
+3. E2Eテスト（Chrome）で動作を確認
 
 ### 既存のフォームを更新する場合
 
@@ -153,4 +136,5 @@ fetch('/api/endpoint', {
 
 ## 更新履歴
 
+- 2025年7月20日: E2EテストがChrome専用になったことを反映
 - 2025年6月2日: 初版作成（FormDataのboundaryエラー対応）

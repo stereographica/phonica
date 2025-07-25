@@ -30,7 +30,7 @@ await waitFor(() => {
 
 - **Unit Tests**: Verify independent behavior of individual functions and components
 - **Integration Tests**: Verify coordination between multiple components (avoid full browser API simulation)
-- **E2E Tests**: Verify actual interaction with browser APIs
+- **E2E Tests**: Verify actual interaction with browser APIs (Chrome-only for consistency)
 
 ## 2. React Testing Library Considerations
 
@@ -79,13 +79,11 @@ expect(MaterialDetailModal).toHaveBeenLastCalledWith(
 ### 3.1 Incremental Implementation
 
 1. **Start with basic functionality tests**
-
    - Loading states
    - Data display
    - Error handling
 
 2. **Add interactions**
-
    - User operations (clicks, input)
    - State changes
 
@@ -112,12 +110,10 @@ Issues occurred trying to test complex state management and URL parameter synchr
 ### 4.2 Improved Approach
 
 1. **Simplify implementation**
-
    - Remove unnecessary state management
    - Use URL parameters as the single source of truth
 
 2. **Make tests user-centric**
-
    - Verify filter input and button click behavior
    - Focus on display result validation
 

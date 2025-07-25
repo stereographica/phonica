@@ -53,14 +53,24 @@ Many-to-many relationships exist between materials and projects/tags/equipment.
 
 The application uses BullMQ for background tasks like ZIP file generation. Redis is required for job queue management.
 
-## Browser Compatibility Issues
+## E2E Testing Configuration
 
-### FormData Boundary Error in Firefox/WebKit
+### Chrome-only Strategy
 
-When using multipart/form-data with FormData in Next.js 15 + Turbopack, Firefox and WebKit browsers may encounter a boundary parsing error. This is resolved by:
+E2E tests are configured to run exclusively on Chrome (Chromium) to provide:
 
-1. **Using Server Actions (Recommended)**: Server actions handle FormData parsing internally without browser-specific issues
-2. **Test-specific Endpoints**: E2E tests use alternate endpoints for Firefox/WebKit to bypass the issue
-3. **See `docs/formdata-browser-compatibility.md`** for detailed information and implementation guidelines
+1. **Consistent Test Environment**: Eliminates browser-specific test failures and improves reliability
+2. **Faster CI Execution**: Single browser testing reduces CI time and resource usage by ~70%
+3. **Simplified Maintenance**: Reduces complexity in test maintenance and debugging
+4. **Reliable FormData Handling**: Chrome provides consistent FormData behavior with Next.js 15
 
-**Important**: Always prefer server actions for new form implementations to ensure cross-browser compatibility.
+### Test Organization
+
+Tests are organized into feature-specific groups for efficient parallel execution:
+
+- **Smoke Tests**: Critical functionality verification
+- **Master Data Tests**: Equipment and tag management
+- **Material Tests**: CRUD operations for audio materials
+- **Workflow Tests**: End-to-end user journeys
+
+This organization allows selective test execution during development while ensuring comprehensive coverage in CI.

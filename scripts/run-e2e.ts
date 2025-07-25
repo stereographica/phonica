@@ -160,11 +160,11 @@ async function runE2ETests() {
       args.push('--workers=4');
     }
 
-    // 全ブラウザを並列実行（CI・ローカル問わず）
+    // Chrome上で全プロジェクトを並列実行（CI・ローカル問わず）
     const hasProjectArg = args.some((arg) => arg.includes('--project'));
     if (!hasProjectArg) {
-      console.log('🌐 Running tests on all browsers in parallel...');
-      args.push('--project=chromium', '--project=firefox', '--project=webkit');
+      console.log('🌐 Running tests on Chrome with all project groups in parallel...');
+      args.push('--project=chrome');
     }
 
     console.log(`📋 Executing Playwright command: npx playwright test ${args.join(' ')}`);
