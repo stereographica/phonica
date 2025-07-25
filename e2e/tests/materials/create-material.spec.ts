@@ -197,8 +197,11 @@ test.describe('@materials Create Material', () => {
     // フォーム送信
     await form.submitForm();
 
-    // フォーム送信後の処理を待つ（material-testsでは特に遅延がある）
-    await wait.waitForBrowserStability();
+    // フォーム送信後のAPIレスポンスを待つ
+    await page.waitForResponse(
+      response => response.url().includes('/api/materials') && response.ok(),
+      { timeout: 30000 }
+    );
 
     // フォーム送信後の処理を完全に待つ
     let redirected = false;
@@ -206,27 +209,23 @@ test.describe('@materials Create Material', () => {
     // まずToast表示を待つ（Server Actionの完了を示す）
     try {
       await page.waitForSelector('[role="alert"]', { timeout: 10000 });
-      await wait.waitForBrowserStability();
+      // Toast表示後は追加の待機は不要
     } catch {
       // Toastが表示されない場合も続行
     }
 
     // リダイレクトまたは成功メッセージを待つ
-    for (let i = 0; i < 3; i++) {
-      if (page.url().includes('/materials') && !page.url().includes('/new')) {
-        redirected = true;
-        break;
-      }
-
-      // 少し待ってから再チェック
-      await page.waitForTimeout(2000);
-
-      // それでもリダイレクトしていない場合は手動でナビゲート
-      if (i === 2 && !redirected) {
-        await page.goto('/materials');
-        await page.waitForLoadState('networkidle');
-        redirected = true;
-      }
+    try {
+      // 適切なURLへのリダイレクトを待つ
+      await page.waitForURL(url => url.includes('/materials') && !url.includes('/new'), {
+        timeout: 10000
+      });
+      redirected = true;
+    } catch {
+      // リダイレクトしない場合は手動でナビゲート
+      await page.goto('/materials');
+      await page.waitForLoadState('networkidle');
+      redirected = true;
     }
 
     // 素材一覧ページにいることを確認
@@ -364,7 +363,7 @@ test.describe('@materials Create Material', () => {
     await page.click('[aria-label="4 stars"]');
 
     // 1-4番目の星が塗りつぶされていることを確認
-    await wait.waitForBrowserStability();
+    // (expect().toBeVisible() が既に要素の表示を待つため追加の待機は不要)
 
     // 星の選択状態をチェック（視覚的な確認は複雑なので、クリックが成功したことを確認）
     const fourthStar = page.locator('[aria-label="4 stars"]');
@@ -372,7 +371,7 @@ test.describe('@materials Create Material', () => {
 
     // 別の星（2つ星）を選択して変更可能であることを確認
     await page.click('[aria-label="2 stars"]');
-    await wait.waitForBrowserStability();
+    // (expect().toBeVisible() が既に要素の表示を待つため追加の待機は不要)
 
     const secondStar = page.locator('[aria-label="2 stars"]');
     await expect(secondStar).toBeVisible();
@@ -388,7 +387,7 @@ test.describe('@materials Create Material', () => {
 
     // 3つ星を選択
     await page.click('[aria-label="3 stars"]');
-    await wait.waitForBrowserStability();
+    // (この後のフォーム送信処理で星の状態が確認されるため追加の待機は不要)
 
     // テスト用の音声ファイルを使用
     const testAudioPath = path.join(process.cwd(), 'e2e', 'fixtures', 'test-audio.wav');
@@ -416,8 +415,11 @@ test.describe('@materials Create Material', () => {
     // フォーム送信
     await form.submitForm();
 
-    // 送信後の処理を待つ
-    await wait.waitForBrowserStability();
+    // 送信後のAPIレスポンスを待つ
+    await page.waitForResponse(
+      response => response.url().includes('/api/materials') && response.ok(),
+      { timeout: 30000 }
+    );
 
     // 成功した場合はリダイレクトまたは成功メッセージを確認
     let success = false;

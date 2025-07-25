@@ -210,6 +210,7 @@ export default function NewMaterialPage() {
             <Label htmlFor="audioFile">Select Audio File</Label>
             <Input
               id="audioFile"
+              data-testid="input-audio-file"
               type="file"
               accept="audio/*"
               onChange={handleFileChange}
@@ -257,6 +258,7 @@ export default function NewMaterialPage() {
             <Label htmlFor="title">Title</Label>
             <Input
               id="title"
+              data-testid="input-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Morning Chorus at Yoyogi Park"
@@ -267,6 +269,7 @@ export default function NewMaterialPage() {
             <Label htmlFor="recordedAt">Recorded At</Label>
             <Input
               id="recordedAt"
+              data-testid="input-recorded-at"
               type="datetime-local"
               value={recordedAt}
               onChange={(e) => setRecordedAt(e.target.value)}
@@ -344,6 +347,7 @@ export default function NewMaterialPage() {
               <TagsIcon className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <Input
                 id="tags"
+                data-testid="input-tags"
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
                 placeholder="e.g., Nature, Birds, Park"
@@ -385,7 +389,11 @@ export default function NewMaterialPage() {
               Cancel
             </Button>
           </Link>
-          <Button type="submit" disabled={isSubmitting || uploadProgress !== 'ready' || !metadata}>
+          <Button 
+            type="submit" 
+            data-testid="button-save-material"
+            disabled={isSubmitting || uploadProgress !== 'ready' || !metadata}
+          >
             {isSubmitting ? 'Saving...' : 'Save Material'}
           </Button>
         </div>

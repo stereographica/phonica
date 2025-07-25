@@ -87,11 +87,6 @@ test.describe('Audio Player Debug', () => {
   });
 
   test('Debug: Playボタンクリック後の状態', async ({ page, browserName }) => {
-    // Firefox CI環境では音声プレーヤーの属性取得がタイムアウトするためスキップ
-    test.skip(
-      browserName === 'firefox' && process.env.CI === 'true',
-      'Firefox CI環境では音声プレーヤーの属性取得がタイムアウトするためスキップ',
-    );
 
     // 素材詳細モーダルを開く
     // 素材一覧ページに移動
@@ -127,12 +122,23 @@ test.describe('Audio Player Debug', () => {
     });
     console.log('🔍 クリック後のaudio要素の状態:', audioStateAfterClick);
 
-    // data-playing属性の確認
-    const dataPlaying = await audioPlayerContainer.getAttribute('data-playing');
+    // data-playing属性の確認（Firefox CI用の長めのタイムアウト）
+    let dataPlaying;
+    if (browserName === 'firefox' && process.env.CI === 'true') {
+      // Firefox CI環境では属性取得に時間がかかる場合があるので長めのタイムアウトを設定
+      dataPlaying = await audioPlayerContainer.getAttribute('data-playing', { timeout: 10000 }).catch(() => null);
+    } else {
+      dataPlaying = await audioPlayerContainer.getAttribute('data-playing');
+    }
     console.log('🔍 data-playing属性:', dataPlaying);
 
-    // ボタンのtitle属性の確認
-    const buttonTitle = await playButton.getAttribute('title').catch(() => null);
+    // ボタンのtitle属性の確認（Firefox CI用の長めのタイムアウト）
+    let buttonTitle;
+    if (browserName === 'firefox' && process.env.CI === 'true') {
+      buttonTitle = await playButton.getAttribute('title', { timeout: 10000 }).catch(() => null);
+    } else {
+      buttonTitle = await playButton.getAttribute('title').catch(() => null);
+    }
     const pauseButton = page.locator('button[title="Pause"]');
     const pauseButtonExists = await pauseButton.isVisible().catch(() => false);
     console.log('🔍 ボタンの状態:', {

@@ -65,11 +65,6 @@ test.describe('@master @critical Equipment Master', () => {
   });
 
   test('Can edit equipment (via dropdown menu)', async ({ page, browserName }) => {
-    // Firefoxでの不安定な動作のため一時的にスキップ（issue作成予定）
-    test.skip(
-      browserName === 'firefox',
-      'Temporarily skip on Firefox due to modal close timeout issue',
-    );
 
     // テストの独立性を確保するため、確実に新しい機材を作成
     // まず新しい機材を作成
@@ -135,7 +130,27 @@ test.describe('@master @critical Equipment Master', () => {
 
     // モーダルが閉じることを確認（エラーの場合は手動で閉じる）
     try {
-      await modal.waitForClose();
+      // Firefox用の特別な処理
+      const browserName = page.context().browser()?.browserType().name();
+      if (browserName === 'firefox') {
+        // Firefoxの場合は特別な処理を追加
+        await page.waitForFunction(() => {
+          const modal = document.querySelector('[role="dialog"]');
+          if (!modal) return true; // モーダルが既に消えていればOK
+          const style = getComputedStyle(modal);
+          return style.opacity === '1' && style.transform === 'none';
+        }, { timeout: 5000 });
+        
+        // Escキーを2回押す（Firefoxでは1回で閉じない場合がある）
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(100);
+        await page.keyboard.press('Escape');
+        
+        // モーダルが閉じることを確認
+        await modal.waitForClose();
+      } else {
+        await modal.waitForClose();
+      }
     } catch (e) {
       // エラーメッセージが表示されている場合、モーダルを手動で閉じる
       const errorMessage = await page

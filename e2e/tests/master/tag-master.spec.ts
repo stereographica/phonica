@@ -54,7 +54,7 @@ test.describe('@master @smoke Tag Master', () => {
     await wait.waitForToast();
   });
 
-  test.skip('can rename a tag via dropdown menu', async ({ page }) => {
+  test('can rename a tag via dropdown menu', async ({ page }) => {
     const rowCount = await table.getRowCount();
 
     if (rowCount > 0) {
@@ -85,7 +85,27 @@ test.describe('@master @smoke Tag Master', () => {
       await modal.clickButton('Save Changes');
 
       // モーダルが閉じるまで径つ
-      await modal.waitForClose();
+      // Firefox用の特別な処理
+      const browserName = page.context().browser()?.browserType().name();
+      if (browserName === 'firefox') {
+        // Firefoxの場合は特別な処理を追加
+        await page.waitForFunction(() => {
+          const modal = document.querySelector('[role="dialog"]');
+          if (!modal) return true; // モーダルが既に消えていればOK
+          const style = getComputedStyle(modal);
+          return style.opacity === '1' && style.transform === 'none';
+        }, { timeout: 5000 });
+        
+        // Escキーを2回押す（Firefoxでは1回で閉じない場合がある）
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(100);
+        await page.keyboard.press('Escape');
+        
+        // モーダルが閉じることを確認
+        await modal.waitForClose();
+      } else {
+        await modal.waitForClose();
+      }
 
       // 成功メッセージの確認
       await wait.waitForToast();

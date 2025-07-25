@@ -78,8 +78,7 @@ test.describe('@materials Edit Material', () => {
     await expect(modal).toBeVisible({ timeout: 5000 });
 
     // モーダル内のEditボタンをクリック
-    // まずボタンが見えるまで待つ
-    await wait.waitForBrowserStability();
+    // (expect().toBeVisible() が既に要素の表示を待つため追加の待機は不要)
 
     const editElement = modal.locator('button:has-text("Edit")');
 
@@ -260,8 +259,11 @@ test.describe('@materials Edit Material', () => {
       const applyButton = page.getByRole('button', { name: 'Apply Filters' });
       await applyButton.click();
 
-      // フィルター適用後のデータ更新を待つ
-      await wait.waitForNetworkStable({ timeout: 3000 });
+      // フィルター適用後のAPIレスポンスを待つ
+      await page.waitForResponse(
+        response => response.url().includes('/api/') && response.ok(),
+        { timeout: 10000 }
+      );
 
       // 素材が表示されているか確認
       const filteredRows = page.locator('tbody tr');
@@ -283,7 +285,11 @@ test.describe('@materials Edit Material', () => {
       const clearButton = page.getByRole('button', { name: 'Clear' });
       if (await clearButton.isVisible()) {
         await clearButton.click();
-        await wait.waitForNetworkStable({ timeout: 3000 });
+        // クリア後のAPIレスポンスを待つ
+        await page.waitForResponse(
+          response => response.url().includes('/api/') && response.ok(),
+          { timeout: 10000 }
+        );
       }
 
       // より効率的な方法：部分一致でボタンを探す
@@ -385,8 +391,7 @@ test.describe('@materials Edit Material', () => {
     });
 
     // ナビゲーションのタイミングを改善
-    // Next.js のナビゲーションは非同期なので、まず画面遷移の開始を待つ
-    await wait.waitForBrowserStability();
+    // (page.waitForURL() が既にナビゲーション完了を待つため追加の待機は不要)
 
     // ナビゲーション完了を待つ（URLが変わるか、タイムアウトするまで）
     try {
@@ -508,8 +513,13 @@ test.describe('@materials Edit Material', () => {
     // 保存
     await form.submitForm();
 
-    // データが更新されるまで少し待つ
-    await wait.waitForNetworkStable({ timeout: 4000 });
+    // Server Action完了を待つ（リダイレクトまたはtoast表示）
+    try {
+      await page.waitForURL('/materials', { timeout: 10000 });
+    } catch {
+      // リダイレクトしない場合はtoastメッセージを待つ
+      await page.waitForSelector('[role="alert"]', { timeout: 5000 });
+    }
     await wait.waitForDataLoad({ minRows: 1 });
 
     // ページをリロードして最新のデータを取得
@@ -532,7 +542,7 @@ test.describe('@materials Edit Material', () => {
     if (!currentLatitude || isNaN(latValue) || latValue > 90 || latValue < -90) {
       console.log(`Invalid or empty latitude detected: ${currentLatitude}, clearing field`);
       await latitudeInput.clear();
-      await wait.waitForBrowserStability(); // 値が確実にクリアされるまで弅機
+      // (フィールドのクリア後、次のfillByLabel操作が適切な待機を行うため追加の待機は不要)
     }
 
     // 位置情報を更新（有効な範囲内の値を使用）
@@ -552,8 +562,7 @@ test.describe('@materials Edit Material', () => {
     // ナビゲーション完了を待つ
     await page.waitForURL('/materials', { timeout: 30000 });
 
-    // データが更新されるまで少し待つ
-    await wait.waitForNetworkStable({ timeout: 4000 });
+    // ナビゲーション後は既にページが読み込まれているため追加の待機は不要
     await wait.waitForDataLoad({ minRows: 1 });
 
     // ページをリロードして最新のデータを取得
@@ -630,7 +639,7 @@ test.describe('@materials Edit Material', () => {
 
     // 星評価を5つ星に変更
     await page.click('[aria-label="5 stars"]');
-    await wait.waitForBrowserStability();
+    // (expect().toBeVisible() が既に要素の表示を待つため追加の待機は不要)
 
     // 評価が変更されたことを確認（5つ星ボタンがクリック可能であること）
     const fifthStar = page.locator('[aria-label="5 stars"]');
@@ -675,7 +684,7 @@ test.describe('@materials Edit Material', () => {
 
     // Step 1: 星評価を3つ星に設定
     await page.click('[aria-label="3 stars"]');
-    await wait.waitForBrowserStability();
+    // (フォーム送信処理で星の状態が確認されるため追加の待機は不要)
 
     // Step 2: フォームを保存
     await form.submitForm();

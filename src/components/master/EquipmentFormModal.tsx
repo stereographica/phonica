@@ -159,7 +159,7 @@ export function EquipmentFormModal({
                 <FormItem className="grid grid-cols-4 items-center gap-4">
                   <FormLabel className="text-right">Name</FormLabel>
                   <FormControl className="col-span-3">
-                    <Input placeholder="Equipment name" {...field} />
+                    <Input placeholder="Equipment name" data-testid="input-equipment-name" {...field} />
                   </FormControl>
                   <FormMessage className="col-span-4 text-right" />
                 </FormItem>
@@ -172,7 +172,7 @@ export function EquipmentFormModal({
                 <FormItem className="grid grid-cols-4 items-center gap-4">
                   <FormLabel className="text-right">Type</FormLabel>
                   <FormControl className="col-span-3">
-                    <Input placeholder="e.g., Recorder, Microphone" {...field} />
+                    <Input placeholder="e.g., Recorder, Microphone" data-testid="input-equipment-type" {...field} />
                   </FormControl>
                   <FormMessage className="col-span-4 text-right" />
                 </FormItem>
@@ -185,7 +185,7 @@ export function EquipmentFormModal({
                 <FormItem className="grid grid-cols-4 items-center gap-4">
                   <FormLabel className="text-right">Manufacturer</FormLabel>
                   <FormControl className="col-span-3">
-                    <Input placeholder="e.g., Zoom, Sennheiser" {...field} value={field.value || ''} />
+                    <Input placeholder="e.g., Zoom, Sennheiser" data-testid="input-equipment-manufacturer" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage className="col-span-4 text-right" />
                 </FormItem>
@@ -198,17 +198,27 @@ export function EquipmentFormModal({
                 <FormItem className="grid grid-cols-4 items-center gap-4">
                   <FormLabel className="text-right">Memo</FormLabel>
                   <FormControl className="col-span-3">
-                    <Textarea placeholder="Any notes about the equipment" {...field} value={field.value || ''} rows={3} />
+                    <Textarea placeholder="Any notes about the equipment" data-testid="input-equipment-memo" {...field} value={field.value || ''} rows={3} />
                   </FormControl>
                   <FormMessage className="col-span-4 text-right" />
                 </FormItem>
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                data-testid="button-equipment-cancel"
+                onClick={() => onOpenChange(false)} 
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
+              <Button 
+                type="submit" 
+                data-testid="button-equipment-save"
+                disabled={isSubmitting || !form.formState.isValid}
+              >
                 {isSubmitting ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Add Equipment')}
               </Button>
             </DialogFooter>
