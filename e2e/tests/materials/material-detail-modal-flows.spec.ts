@@ -100,6 +100,16 @@ test.describe('@materials @modal @detail Material Detail Modal Flows', () => {
       await page.waitForTimeout(1500); // モバイルレイアウト安定化のため延長
       await page.waitForLoadState('networkidle');
       
+      // DevTools要素の事前無効化（CI環境対策）
+      await page.evaluate(() => {
+        // TanStack Query DevTools要素とオーバーレイを非表示化
+        const devtoolsElements = document.querySelectorAll('[class*="tsqd-"], [class*="go3932029643"]');
+        devtoolsElements.forEach(el => {
+          (el as HTMLElement).style.display = 'none';
+          (el as HTMLElement).style.pointerEvents = 'none';
+        });
+      });
+      
       // レスポンシブレイアウトでテーブルが正しく表示されることを確認
       await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
       
@@ -127,9 +137,18 @@ test.describe('@materials @modal @detail Material Detail Modal Flows', () => {
       // モーダル状態確認とフォールバック処理
       const modalExists = await page.locator('[role="dialog"]').count();
       if (modalExists === 0) {
-        // 強制クリックが効果がない場合の通常クリックリトライ
-        await page.waitForTimeout(1000);
-        await mobileFirstMaterialButton.click({ timeout: 15000 });
+        // 強制クリックが効果がない場合の再度強制クリックリトライ
+        await page.waitForTimeout(1500);
+        // DevTools要素の無効化を試行
+        await page.evaluate(() => {
+          // TanStack Query DevTools要素を非表示化
+          const devtoolsElements = document.querySelectorAll('[class*="tsqd-"]');
+          devtoolsElements.forEach(el => (el as HTMLElement).style.display = 'none');
+        });
+        await mobileFirstMaterialButton.click({ 
+          timeout: 15000, 
+          force: true  // フォールバックも強制クリック
+        });
         await page.waitForTimeout(1000);
       }
 
