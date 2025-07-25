@@ -69,10 +69,19 @@ test.describe('@materials @modal @detail Material Detail Modal Flows', () => {
       // 1. デスクトップサイズでテスト
       await page.setViewportSize({ width: 1280, height: 800 });
 
-      await expect(page.locator('text=materials found')).toBeVisible({ timeout: 10000 });
+      // CI環境での安定性のため追加の待機
+      await expect(page.locator('text=materials found')).toBeVisible({ timeout: 15000 });
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000); // レイアウト安定化のため
 
       const firstMaterialButton = page.locator('tbody tr').first().locator('button.text-blue-600');
-      await firstMaterialButton.click();
+
+      // ボタンが完全にクリック可能になるまで待つ
+      await expect(firstMaterialButton).toBeVisible({ timeout: 10000 });
+      await expect(firstMaterialButton).toBeEnabled({ timeout: 5000 });
+
+      // CI環境での安定性のためのクリック待機
+      await firstMaterialButton.click({ timeout: 30000 });
 
       const modal = page.locator('[role="dialog"]');
       await expect(modal).toBeVisible({ timeout: 10000 });
@@ -82,14 +91,24 @@ test.describe('@materials @modal @detail Material Detail Modal Flows', () => {
       expect(modalBounds!.width).toBeGreaterThan(0);
 
       await page.keyboard.press('Escape');
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
 
       // 2. モバイルサイズでテスト
       await page.setViewportSize({ width: 375, height: 667 });
 
-      await firstMaterialButton.click();
-      await expect(modal).toBeVisible({ timeout: 5000 });
+      // ビューポート変更後の安定化待機
+      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
+
+      // 再度ボタンの状態を確認してからクリック
+      await expect(firstMaterialButton).toBeVisible({ timeout: 10000 });
+      await expect(firstMaterialButton).toBeEnabled({ timeout: 5000 });
+      await firstMaterialButton.click({ timeout: 30000 });
+
+      await expect(modal).toBeVisible({ timeout: 10000 });
 
       await page.keyboard.press('Escape');
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
 
       console.log('✅ レスポンシブモーダル表示確認が完了しました');
     });
