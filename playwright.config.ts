@@ -25,7 +25,17 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 4, // CI環境では安定性優先で1、ローカルでは4並列で高速化
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
-    ? [['list'], ['json', { outputFile: 'test-results/results.json' }]]
+    ? [
+        ['list'],
+        ['json', { outputFile: 'test-results/results.json' }],
+        [
+          'html',
+          {
+            open: 'never',
+            outputFolder: 'playwright-report',
+          },
+        ],
+      ]
     : [
         [
           'html',

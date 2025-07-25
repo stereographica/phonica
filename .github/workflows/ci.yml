@@ -126,7 +126,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: test
     permissions:
       contents: read
@@ -213,14 +213,49 @@ jobs:
           REDIS_URL: redis://localhost:6379
           NODE_ENV: test
           CI: true
-        run: npm run e2e:ci
+          PLAYWRIGHT_HTML_REPORT: playwright-report
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/results.json
+        run: |
+          echo "🚀 E2Eテスト開始: $(date)"
+          echo "📊 環境情報:"
+          echo "  - Node.js: $(node --version)"
+          echo "  - npm: $(npm --version)"
+          echo "  - Workers: 1 (CI mode)"
+          echo "  - Retries: 3"
+          echo "  - Timeout: 3分"
+          
+          npm run e2e:ci || {
+            echo "❌ E2Eテスト失敗: $(date)"
+            echo "📁 生成されたファイル:"
+            ls -la playwright-report/ || echo "playwright-reportディレクトリが存在しません"
+            ls -la test-results/ || echo "test-resultsディレクトリが存在しません"
+            exit 1
+          }
+          
+          echo "✅ E2Eテスト成功: $(date)"
 
-      - name: Upload test report
+      - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report-chrome
           path: playwright-report/
+          retention-days: 30
+          
+      - name: Upload Test Results  
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 30
+          
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-screenshots
+          path: test-results/**/screenshots/
           retention-days: 30
 
   e2e-summary:
@@ -243,11 +278,33 @@ jobs:
             });
             
             const e2eJobs = jobs.data.jobs.filter(job => job.name.startsWith('E2E Tests'));
-            const status = e2eJobs[0]?.conclusion === 'success' ? '✅' : '❌';
+            const e2eJob = e2eJobs[0];
+            const isSuccess = e2eJob?.conclusion === 'success';
+            const status = isSuccess ? '✅' : '❌';
             
-            const overallStatus = e2eJobs[0]?.conclusion === 'success' 
+            const overallStatus = isSuccess 
               ? '✅ E2Eテストが成功しました' 
               : '❌ E2Eテストが失敗しました';
+
+            // アーティファクト情報を追加
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId
+            });
+            
+            const relevantArtifacts = artifacts.data.artifacts.filter(artifact => 
+              artifact.name.includes('playwright') || artifact.name.includes('screenshots')
+            );
+            
+            let artifactLinks = '';
+            if (relevantArtifacts.length > 0) {
+              artifactLinks = '\n\n### 📊 利用可能なレポート・アーティファクト:\n';
+              relevantArtifacts.forEach(artifact => {
+                artifactLinks += `- **${artifact.name}** (${(artifact.size_in_bytes / 1024 / 1024).toFixed(2)} MB)\n`;
+              });
+              artifactLinks += '\n💡 アーティファクトはGitHub ActionsのSummaryページからダウンロードできます';
+            }
 
             // PRの場合のみコメントを投稿
             if (context.issue && context.issue.number) {
@@ -255,7 +312,7 @@ jobs:
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `## 🧪 E2Eテスト結果\n\n${overallStatus}\n\n- ブラウザ: Chrome\n- 実行時刻: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+                body: `## 🧪 E2Eテスト結果\n\n${overallStatus}\n\n**詳細情報:**\n- ブラウザ: Chrome\n- 実行時刻: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n- ワーカー: 1 (CI最適化)\n- 再試行: 3回${artifactLinks}`
               });
             } else {
               console.log('This is not a pull request, skipping comment creation');
