@@ -99,7 +99,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/archiver": "^6.0.3",
     "@types/jest": "^29.5.14",
-    "@types/leaflet": "^1.9.18",
+    "@types/leaflet": "^1.9.20",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
