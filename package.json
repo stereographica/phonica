@@ -93,7 +93,7 @@
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.52.0",
     "@swc/jest": "^0.2.38",
-    "@tanstack/react-query-devtools": "^5.80.7",
+    "@tanstack/react-query-devtools": "^5.85.5",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
