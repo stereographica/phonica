@@ -54,7 +54,7 @@
     "@tanstack/react-query": "^5.81.2",
     "@tanstack/react-table": "^8.21.3",
     "archiver": "^7.0.1",
-    "bullmq": "^5.56.0",
+    "bullmq": "^5.58.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
