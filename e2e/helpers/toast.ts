@@ -11,9 +11,10 @@ export class ToastHelper {
     // Toast通知が表示されるまで少し待つ
     await this.page.waitForTimeout(500);
 
-    // すべてのToast要素を取得（より具体的なセレクター）
+    // すべてのToast要素を取得（Radix UIのToastに対応したセレクター）
+    // Radix UIのToastは [role="region"] と [data-state="open"] を使用
     const toasts = this.page.locator(
-      '[role="status"], .toast, .notification, [data-testid*="toast"]',
+      '[role="status"], [role="region"][data-state="open"], .toast, .notification, [data-testid*="toast"]',
     );
 
     // 少なくとも1つのToastが表示されるまで待つ（タイムアウトを延長）
@@ -40,9 +41,9 @@ export class ToastHelper {
    */
   async clearOldToasts(): Promise<void> {
     try {
-      // 既存のToast要素を探す
+      // 既存のToast要素を探す（Radix UIのToastに対応）
       const existingToasts = this.page.locator(
-        '[role="status"], .toast, .notification, [data-testid*="toast"]',
+        '[role="status"], [role="region"][data-state="open"], .toast, .notification, [data-testid*="toast"]',
       );
       const count = await existingToasts.count();
 
