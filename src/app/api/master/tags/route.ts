@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { generateUniqueSlug } from '@/lib/slug-generator';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { constraintTargetIncludes } from '@/lib/utils/prisma-error';
 
 // クエリパラメータのバリデーションスキーマ
 const GetTagsQuerySchema = z.object({
@@ -126,19 +127,12 @@ export async function POST(request: Request) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const target = error.meta?.target;
-        let conflictField = 'unknown';
+        const isNameConflict = constraintTargetIncludes(target, 'name');
+        const isSlugConflict = constraintTargetIncludes(target, 'slug');
 
-        if (typeof target === 'string') {
-          conflictField = target;
-        } else if (Array.isArray(target)) {
-          if (target.includes('name')) conflictField = 'name';
-          else if (target.includes('slug')) conflictField = 'slug';
-        }
-
-        if (conflictField === 'name') {
+        if (isNameConflict) {
           return NextResponse.json({ error: ERROR_MESSAGES.TAG_NAME_EXISTS }, { status: 409 });
-        } else {
-          // slug conflict shouldn't happen with generateUniqueSlug
+        } else if (isSlugConflict) {
           return NextResponse.json(
             { error: 'Slugの生成に失敗しました。もう一度お試しください。' },
             { status: 409 },

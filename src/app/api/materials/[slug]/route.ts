@@ -14,6 +14,7 @@ import {
 import fs from 'fs/promises'; // fs を再度インポート
 import { AudioMetadataService } from '@/lib/audio-metadata'; // 追加
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { constraintTargetIncludes } from '@/lib/utils/prisma-error';
 // import type { Prisma } from '@prisma/client'; // Prisma Namespaceはここでは不要かも
 
 const routeParamsSchema = z.object({
@@ -403,12 +404,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       'meta' in error &&
       error.meta &&
       typeof error.meta === 'object' &&
-      'target' in error.meta
+      'target' in error.meta &&
+      constraintTargetIncludes((error.meta as { target?: unknown }).target, 'title')
     ) {
-      const target = error.meta.target as string[];
-      if (target.includes('title')) {
-        return NextResponse.json({ error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS }, { status: 409 });
-      }
+      return NextResponse.json({ error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS }, { status: 409 });
     }
 
     return NextResponse.json(

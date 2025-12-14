@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 import { AudioMetadataService } from '@/lib/audio-metadata';
 import { generateUniqueSlug } from '@/lib/slug-generator';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { constraintTargetIncludes } from '@/lib/utils/prisma-error';
 
 // 新しいPOSTリクエストのスキーマ（メタデータ抽出対応）
 const CreateMaterialWithMetadataSchema = z.object({
@@ -460,13 +461,12 @@ export async function POST(request: NextRequest) {
       'meta' in error &&
       error.meta &&
       typeof error.meta === 'object' &&
-      'target' in error.meta &&
-      Array.isArray(error.meta.target)
+      'target' in error.meta
     ) {
-      if (error.meta.target.includes('title')) {
+      const target = (error.meta as { target?: unknown }).target;
+      if (constraintTargetIncludes(target, 'title')) {
         return NextResponse.json({ error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS }, { status: 409 });
-      } else if (error.meta.target.includes('slug')) {
-        // This shouldn't happen with generateUniqueSlug, but just in case
+      } else if (constraintTargetIncludes(target, 'slug')) {
         return NextResponse.json(
           { error: 'Slugの生成に失敗しました。もう一度お試しください。' },
           { status: 409 },
