@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client'; // PrismaClientKnownRequestError をインポート
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { constraintTargetIncludes } from '@/lib/utils/prisma-error';
 
 // GET /api/master/equipment - 機材一覧取得
 export async function GET() {
@@ -40,17 +41,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating equipment:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // P2002はユニーク制約違反
-      // error.meta.target can be a string or string[]
-      const target = error.meta?.target;
-      let isNameConflict = false;
-      if (typeof target === 'string') {
-        isNameConflict = target === 'name';
-      } else if (Array.isArray(target)) {
-        isNameConflict = target.includes('name');
-      }
-
-      if (error.code === 'P2002' && isNameConflict) {
+      if (error.code === 'P2002' && constraintTargetIncludes(error.meta?.target, 'name')) {
         return NextResponse.json(
           { error: ERROR_MESSAGES.EQUIPMENT_NAME_EXISTS },
           { status: 409 }, // Conflict

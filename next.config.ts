@@ -6,7 +6,12 @@ const nextConfig: NextConfig = {
 
   // Image optimization configuration
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+    ],
   },
 
   // Experimental features

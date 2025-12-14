@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
+import { constraintTargetIncludes } from '@/lib/utils/prisma-error';
 
 function slugify(text: string): string {
   return text
@@ -175,8 +176,7 @@ export async function POST(request: NextRequest) {
       error.meta &&
       typeof error.meta === 'object' &&
       'target' in error.meta &&
-      Array.isArray(error.meta.target) &&
-      error.meta.target.includes('slug')
+      constraintTargetIncludes((error.meta as { target?: unknown }).target, 'slug')
     ) {
       return NextResponse.json(
         { error: 'Failed to create project: Slug already exists. Please change the name.' },

@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import { AudioMetadataService } from '@/lib/audio-metadata';
 import { generateUniqueSlug } from '@/lib/slug-generator';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { constraintTargetIncludes } from '@/lib/utils/prisma-error';
 
 // Audio metadata type
 interface AudioMetadata {
@@ -257,15 +258,15 @@ export async function createMaterialWithMetadata(data: {
       'meta' in error &&
       error.meta &&
       typeof error.meta === 'object' &&
-      'target' in error.meta &&
-      Array.isArray(error.meta.target)
+      'target' in error.meta
     ) {
-      if (error.meta.target.includes('title')) {
+      const target = (error.meta as { target?: unknown }).target;
+      if (constraintTargetIncludes(target, 'title')) {
         return {
           success: false,
           error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS,
         };
-      } else if (error.meta.target.includes('slug')) {
+      } else if (constraintTargetIncludes(target, 'slug')) {
         return {
           success: false,
           error: 'Slugの生成に失敗しました。もう一度お試しください。',
@@ -424,8 +425,7 @@ export async function createMaterial(formData: FormData) {
       error.meta &&
       typeof error.meta === 'object' &&
       'target' in error.meta &&
-      Array.isArray(error.meta.target) &&
-      error.meta.target.includes('slug')
+      constraintTargetIncludes((error.meta as { target?: unknown }).target, 'slug')
     ) {
       return {
         success: false,
@@ -605,14 +605,12 @@ export async function updateMaterialWithMetadata(
       error.meta &&
       typeof error.meta === 'object' &&
       'target' in error.meta &&
-      Array.isArray(error.meta.target)
+      constraintTargetIncludes((error.meta as { target?: unknown }).target, 'title')
     ) {
-      if (error.meta.target.includes('title')) {
-        return {
-          success: false,
-          error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS,
-        };
-      }
+      return {
+        success: false,
+        error: ERROR_MESSAGES.MATERIAL_TITLE_EXISTS,
+      };
     }
 
     return {

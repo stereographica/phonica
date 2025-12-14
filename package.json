@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "concurrently -n \"next,worker\" -c \"blue,green\" \"npm run dev:next\" \"npm run dev:worker\"",
-    "dev:next": "next dev --turbopack",
+    "dev:next": "next dev",
     "dev:worker": "npx tsx watch src/workers/index.ts",
     "build": "next build",
     "start": "next start",
@@ -35,7 +35,9 @@
     "prepare": "husky"
   },
   "overrides": {
-    "brace-expansion": "^2.0.1"
+    "brace-expansion": "^2.0.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
@@ -102,8 +104,8 @@
     "@types/jest": "^29.5.14",
     "@types/leaflet": "^1.9.18",
     "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/uuid": "^10.0.0",
     "babel-jest": "^30.0.4",
     "babel-loader": "^10.0.0",

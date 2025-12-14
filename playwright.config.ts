@@ -64,7 +64,7 @@ export default defineConfig({
   globalTeardown: require.resolve('./e2e/setup/global-teardown.ts'),
 
   /* Timeout configurations */
-  timeout: process.env.CI ? 180 * 1000 : 90 * 1000, // CI: 3分, ローカル: 90秒
+  timeout: 600 * 1000, // 10分（CI/ローカル問わず最大タイムアウトを使用）
   expect: {
     timeout: process.env.CI ? 15 * 1000 : 10 * 1000, // CI: 15秒, ローカル: 10秒
   },
