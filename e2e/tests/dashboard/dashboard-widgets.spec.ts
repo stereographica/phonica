@@ -101,14 +101,19 @@ test.describe('@smoke @dashboard Dashboard Widgets', () => {
     // カレンダーのヘッダー情報（動的な表示期間に対応）
     await expect(widget.getByText(/過去\d+ヶ月間の録音活動/)).toBeVisible();
 
-    // 月ラベルが表示される
-    await expect(widget.getByText('1月', { exact: true })).toBeVisible();
-    // 12月は複数表示される可能性があるため、最初の要素を選択
-    await expect(widget.getByText('12月', { exact: true }).first()).toBeVisible();
+    // 月ラベルが表示される（data-testidで決定的に選択、年を含む）
+    const currentYear = new Date().getFullYear();
+    await expect(widget.getByTestId(`calendar-month-${currentYear}-1`)).toBeVisible();
+    // 12月は前年または今年のいずれかが表示される
+    const decemberCurrentYear = widget.getByTestId(`calendar-month-${currentYear}-12`);
+    const decemberPreviousYear = widget.getByTestId(`calendar-month-${currentYear - 1}-12`);
+    const hasDecemberCurrentYear = await decemberCurrentYear.isVisible().catch(() => false);
+    const hasDecemberPreviousYear = await decemberPreviousYear.isVisible().catch(() => false);
+    expect(hasDecemberCurrentYear || hasDecemberPreviousYear).toBeTruthy();
 
-    // 凡例が表示される
-    await expect(widget.getByText('少')).toBeVisible();
-    await expect(widget.getByText('多')).toBeVisible();
+    // 凡例が表示される（data-testidで決定的に選択）
+    await expect(widget.getByTestId('recording-calendar-legend-low')).toBeVisible();
+    await expect(widget.getByTestId('recording-calendar-legend-high')).toBeVisible();
   });
 
   test('今日の音ウィジェットの機能', async ({ page }) => {
