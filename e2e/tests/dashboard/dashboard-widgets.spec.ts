@@ -103,7 +103,8 @@ test.describe('@smoke @dashboard Dashboard Widgets', () => {
 
     // 月ラベルが表示される
     await expect(widget.getByText('1月', { exact: true })).toBeVisible();
-    await expect(widget.getByText('12月', { exact: true })).toBeVisible();
+    // 12月は複数表示される可能性があるため、最初の要素を選択
+    await expect(widget.getByText('12月', { exact: true }).first()).toBeVisible();
 
     // 凡例が表示される
     await expect(widget.getByText('少')).toBeVisible();

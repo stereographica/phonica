@@ -35,6 +35,8 @@ export function DashboardGrid() {
 
   // クライアントサイドでのみ実行
   useEffect(() => {
+    // SSR/CSR detection pattern - legitimate use case for setState in effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 

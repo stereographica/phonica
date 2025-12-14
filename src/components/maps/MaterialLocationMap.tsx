@@ -133,6 +133,8 @@ const MaterialLocationMap: React.FC<MaterialLocationMapProps> = (props) => {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // SSR/CSR detection pattern - legitimate use case for setState in effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
     console.log('MaterialLocationMap: Client side rendering enabled');
   }, []);

@@ -46,8 +46,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   useEffect(() => {
     if (!waveformRef.current || !audioUrl) {
-      setIsLoading(false);
-      setError(audioUrl ? null : 'No audio URL provided');
       return;
     }
 
@@ -56,6 +54,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       wavesurferRef.current = null;
     }
 
+    // Reset state when initializing new audio - legitimate use case
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     setError(null);
     setCurrentTime(0);
