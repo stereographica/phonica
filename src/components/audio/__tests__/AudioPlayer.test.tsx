@@ -83,7 +83,7 @@ describe('AudioPlayer', () => {
   it('renders without audio URL', () => {
     render(<AudioPlayer audioUrl="" />);
 
-    expect(screen.getByText(/No audio URL provided/i)).toBeInTheDocument();
+    expect(screen.getByText(/No audio to play/i)).toBeInTheDocument();
   });
 
   it('handles ready event', async () => {
