@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { ToastHelper } from '../helpers';
 import * as path from 'path';
 
-test.describe('エラーハンドリング機能', () => {
+test.describe('@master エラーハンドリング機能', () => {
   let toastHelper: ToastHelper;
 
   // テストごとに一意のIDを生成（ブラウザ名とタイムスタンプ）
@@ -15,6 +15,12 @@ test.describe('エラーハンドリング機能', () => {
 
     // 前のテストのToast通知をクリア
     await toastHelper.clearOldToasts();
+  });
+
+  test.afterEach(async ({ page }) => {
+    // ルートモックをクリーンアップして、テスト間の漏洩を防ぐ
+    await page.unroute('**/api/master/equipment/*');
+    // Toast のクリーンアップは beforeEach で実施するため、ここでは不要
   });
   test.describe('Toast通知', () => {
     // Toast通知系のテストは実装に問題があるため削除
@@ -79,12 +85,15 @@ test.describe('エラーハンドリング機能', () => {
       await page.fill('[role="dialog"] input[name="name"]', equipmentName);
       await page.fill('[role="dialog"] input[name="type"]', 'Recorder');
       await page.fill('[role="dialog"] input[name="manufacturer"]', 'エラーテスト');
-      await page.click('[role="dialog"] button[type="submit"]');
 
-      // 一覧が更新されるのを待つ（APIレスポンスを待つ）
-      await page.waitForResponse(
-        (response) => response.url().includes('/api/master/equipment') && response.status() === 200,
-      );
+      // submitとAPIレスポンスを同期化してrace conditionを回避
+      await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes('/api/master/equipment') && response.status() === 200,
+        ),
+        page.click('[role="dialog"] button[type="submit"]'),
+      ]);
 
       // 削除APIをモックしてエラーを返すように設定（特定の機材名のみ）
       await page.route('**/api/master/equipment/*', (route, request) => {
@@ -112,6 +121,9 @@ test.describe('エラーハンドリング機能', () => {
       // エラーToast通知が表示されることを確認
       const toastHelper = new ToastHelper(page);
       await toastHelper.expectErrorToast('機材の削除に失敗しました');
+
+      // 削除に失敗したため、機材行がまだ存在することを確認
+      await expect(equipmentRow).toBeVisible({ timeout: 5000 });
     });
 
     test('素材作成時の必須フィールドエラー', async ({ page, browserName }) => {
