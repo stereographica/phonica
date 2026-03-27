@@ -149,7 +149,12 @@ export function RecordingCalendarWidget() {
       '12月',
     ];
 
-    const monthsData: Array<{ label: string; weekIndex: number }> = [];
+    const monthsData: Array<{
+      label: string;
+      weekIndex: number;
+      monthNumber: number;
+      year: number;
+    }> = [];
     const seenMonths = new Set<string>();
 
     // カレンダーグリッドの週順序に従って月と位置を抽出
@@ -159,12 +164,14 @@ export function RecordingCalendarWidget() {
       // 週の最初の日付を使用して月を特定
       if (week.length > 0) {
         const firstDateOfWeek = week[0];
-        const monthKey = `${firstDateOfWeek.getFullYear()}-${firstDateOfWeek.getMonth()}`;
+        const year = firstDateOfWeek.getFullYear();
+        const monthKey = `${year}-${firstDateOfWeek.getMonth()}`;
         const monthLabel = monthsJa[firstDateOfWeek.getMonth()];
+        const monthNumber = firstDateOfWeek.getMonth() + 1; // 1-12
 
         if (!seenMonths.has(monthKey)) {
           seenMonths.add(monthKey);
-          monthsData.push({ label: monthLabel, weekIndex });
+          monthsData.push({ label: monthLabel, weekIndex, monthNumber, year });
         }
       }
     }
@@ -242,6 +249,7 @@ export function RecordingCalendarWidget() {
               return (
                 <div
                   key={`${month.label}-${month.weekIndex}`}
+                  data-testid={`calendar-month-${month.year}-${month.monthNumber}`}
                   className="absolute text-xs text-muted-foreground"
                   style={{ left: `${leftPosition}px` }}
                 >
@@ -305,7 +313,7 @@ export function RecordingCalendarWidget() {
           {/* 凡例 */}
           {isInitialized && (
             <div className="flex items-center justify-center gap-2 mt-2 text-xs text-muted-foreground">
-              <span>少</span>
+              <span data-testid="recording-calendar-legend-low">少</span>
               <div className="flex gap-1">
                 {[0, 1, 3, 5, 7].map((level) => {
                   const availableHeight = containerDimensions.height - 80;
@@ -322,7 +330,7 @@ export function RecordingCalendarWidget() {
                   );
                 })}
               </div>
-              <span>多</span>
+              <span data-testid="recording-calendar-legend-high">多</span>
             </div>
           )}
         </div>

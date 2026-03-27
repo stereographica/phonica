@@ -192,14 +192,14 @@ test.describe('@smoke @workflow Global Search', () => {
     // 検索を実行（必ず存在するシードデータの一部）
     const searchInput = page.getByPlaceholder('Search materials...');
     await searchInput.click();
-    await searchInput.fill('e2e'); // E2E Test Materialは必ず存在する
+    await searchInput.fill('Ocean'); // "Ocean Waves at Dawn" は必ず存在する
 
     // 検索結果のポップオーバーが表示されるのを待つ
     const searchResults = page.getByTestId('global-search-results');
     await expect(searchResults).toBeVisible({ timeout: 5000 });
 
-    // 検索結果があることを確認（E2E Test Materialが存在するはず）
-    await expect(searchResults.getByText('E2E Test Material')).toBeVisible({ timeout: 3000 });
+    // 検索結果があることを確認（Ocean Waves at Dawnが存在するはず）
+    await expect(searchResults.getByText('Ocean Waves at Dawn')).toBeVisible({ timeout: 3000 });
 
     // ArrowDownで最初の結果を選択し、Enterで決定
     await page.keyboard.press('ArrowDown');
